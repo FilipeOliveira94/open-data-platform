@@ -1,0 +1,16 @@
+---
+description: Mandatory workflow for all implementation tasks
+alwaysApply: true
+---
+
+# Agent workflow
+
+- Read `AGENTS.md` before making changes. Also read `PROJECT_STATUS.md`, `ROADMAP.md` and relevant ADRs when they exist.
+- Check the relevant roadmap item and acceptance criteria.
+- For non-trivial work, present a plan before editing files.
+- Implement one coherent task at a time.
+- Run relevant validation commands and report their actual results.
+- Update documentation and project status after completing verified work.
+- Ask before destructive operations, cloud deployments, resource deletion or commands that may incur costs.
+- Do not silently change architecture, dependencies or acceptance criteria.
+- Never report an unexecuted test as passing.
