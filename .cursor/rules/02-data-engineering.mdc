@@ -1,0 +1,19 @@
+---
+description: Data contracts, lakehouse layers, CDC, quality and lineage
+alwaysApply: true
+---
+
+# Data engineering
+
+- Ingest from multiple sources (historical datasets, APIs, PostgreSQL and synthetic events) into a lakehouse with Bronze, Silver and Gold layers.
+- Make batch pipelines idempotent and support controlled backfills.
+- Define explicit data contracts. Document schema evolution.
+- Define primary keys and table grain explicitly.
+- Record ingestion timestamps, source identifiers and execution IDs where relevant.
+- Distinguish event time, processing time and ingestion time.
+- Handle nulls, duplicate records and invalid schemas intentionally. Do not drop them silently.
+- Design CDC consumers to handle retries, duplicates and deletes.
+- Keep raw data auditable and preserve lineage metadata.
+- Validate business metrics against source data.
+- Document partitioning, file sizing and incremental processing strategies.
+- Treat exactly-once end-to-end processing as a claim that requires explicit proof. Do not assume it from Kafka or Spark alone.

@@ -1,0 +1,19 @@
+---
+description: Python, SQL and testing conventions
+alwaysApply: true
+---
+
+# Python, SQL and testing
+
+- Use type hints and clear interfaces.
+- Follow Ruff formatting and linting rules.
+- Pin and lock dependencies. Do not leave versions floating.
+- Use parameterized SQL and explicit transaction boundaries where appropriate.
+- Avoid hard-coded paths and environment-specific assumptions.
+- Add unit tests for meaningful business logic.
+- Keep tests deterministic and independent of public API availability.
+- Run the narrowest relevant tests first. Run broader checks before declaring a phase complete.
+- Distinguish code validation, integration validation and real end-to-end execution.
+- Test failure recovery and idempotency, not only the happy path.
+- Never report an unexecuted test as passing.
+- If a dependency or external service is unavailable, report the limitation rather than inventing a successful result.

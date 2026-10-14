@@ -115,3 +115,5 @@ At the end of every task, report:
 - Suggested next issue.
 
 The user makes final architectural decisions and approves significant changes.
+
+Cursor project rules in `.cursor/rules/` split this contract by concern (`00` principles, `01` Python/testing, `02` data engineering, `03` infrastructure/security, `04` agent workflow). Keep `AGENTS.md` as the canonical source.

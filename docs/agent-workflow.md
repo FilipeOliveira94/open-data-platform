@@ -4,7 +4,7 @@ Use this prompt at the start of an implementation task. Replace the issue placeh
 
 ---
 
-Follow the project instructions in `AGENTS.md` and the workflow in `.cursor/rules/agent-workflow.mdc`.
+Follow the project instructions in `AGENTS.md` and the Cursor rules in `.cursor/rules/`.
 
 I want to work on issue: `<ISSUE-ID> — <title>`.
 

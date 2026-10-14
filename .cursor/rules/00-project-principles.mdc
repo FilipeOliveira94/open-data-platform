@@ -1,0 +1,19 @@
+---
+description: Architecture principles and scope control for the data platform
+alwaysApply: true
+---
+
+# Project principles
+
+- Target a reproducible open-source data platform for a data engineering portfolio.
+- Prefer simple, modular, reproducible solutions over extra infrastructure.
+- Keep business logic out of Airflow DAGs and infrastructure configuration.
+- Use environment-specific configuration without duplicating business logic.
+- Validate compatibility between storage, table formats, catalogs and query engines before adopting a combination.
+- Do not introduce a new technology without stating its purpose and operational cost.
+- Do not introduce Kubernetes unless an explicit requirement justifies it.
+- Avoid duplicate tools for the same responsibility.
+- Work on one issue or one small, coherent task at a time. Do not implement multiple future phases in a single change.
+- Prefer an explicit TODO or a documented blocker over speculative implementation.
+- Use English for code, identifiers, comments, commit messages and technical documentation. Communicate with the user in Brazilian Portuguese.
+- Explain architectural trade-offs clearly. The user makes final architectural decisions.

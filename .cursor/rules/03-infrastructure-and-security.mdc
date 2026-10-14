@@ -1,0 +1,20 @@
+---
+description: Docker, Terraform, AWS, credentials and cost controls
+alwaysApply: true
+---
+
+# Infrastructure and security
+
+- Primary development environment: Windows 11, WSL2 Ubuntu and Docker Desktop.
+- Prefer Linux paths inside WSL2.
+- Do not assume PowerShell syntax in Linux scripts or Bash syntax in PowerShell commands.
+- Use Docker Compose for local services.
+- Keep local development independent of AWS credentials whenever possible.
+- Use Terraform for cloud infrastructure and document the required permissions.
+- Do not install or upgrade system-wide dependencies without explaining the impact.
+- Never commit secrets, credentials, access tokens or sensitive datasets. Do not hard-code them in source.
+- Treat public API responses and downloaded files as untrusted input.
+- Use `.env.example` for variable names and safe placeholders.
+- Prefer short-lived AWS credentials and OIDC for CI/CD.
+- Ask for explicit approval before destructive operations, cloud deployment, resource deletion, production changes or commands that may incur costs.
+- Never run `terraform apply`, `terraform destroy` or destructive Docker volume operations without reviewing the intended impact with the user.
