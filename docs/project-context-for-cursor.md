@@ -479,11 +479,12 @@ Phase 0 — Foundation (update as work progresses)
 
 ### `DECISIONS.md`
 
-Registrar decisões arquiteturais em formato leve: - Contexto/problema. -
-Decisão. - Alternativas consideradas. - Consequências e trade-offs. -
-Estado: proposta, aprovada, substituída. - Data e evidência relevante.
+Índice curto: ID, resumo de uma linha, estado (`proposed` /
+`approved` / `superseded` / `rejected`) e link para o ADR.
 
-Para decisões relevantes, criar ADRs em `docs/decisions/`.
+O detalhe (contexto, decisão, alternativas, consequências, evidência,
+revisit triggers) vive em ADRs em `docs/decisions/`, usando
+`docs/decisions/_template.md`.
 
 ## 8. Prompts reutilizáveis para o Cursor Agent
 

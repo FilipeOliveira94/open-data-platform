@@ -67,13 +67,13 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | P0-04 | Project status ledger | — | Delivered | `PROJECT_STATUS.md` distinguishes delivered vs verified |
 | P0-05 | Program context document | — | Delivered | `docs/project-context-for-cursor.md` captures objectives, constraints, target architecture |
 | P0-06 | Program roadmap | P0-04, P0-05 | Delivered | This file: phases 0–7, issue IDs, dependencies, acceptance, out-of-scope |
-| P0-07 | Decision log scaffold | P0-06 | Not started | `DECISIONS.md` lists target stack as proposed vs approved; ADR path documented |
+| P0-07 | Decision log scaffold | P0-06 | Delivered | `DECISIONS.md` is a summary index; ADRs under `docs/decisions/` hold rationale; proposed vs approved visible |
 | P0-08 | Python 3.12 package with `uv` | — | Not started | Package under `src/open_data_platform/`; `pyproject.toml` + committed lockfile; installable via documented command |
 | P0-09 | Ruff and pytest smoke | P0-08 | Not started | Lint and a toolchain smoke test pass via documented commands |
 | P0-10 | Docker Compose: PostgreSQL 16 and MinIO | — | Not started | Pinned image tags; health checks; documented start/stop; no unverified tags |
 | P0-11 | Repo hygiene and README | P0-08, P0-10 | Not started | `.gitignore`, `.env.example` (names/placeholders only), Makefile, `README.md` with setup |
 | P0-12 | GitHub Actions: lint and tests | P0-09 | Not started | Workflow runs lint + tests; no cloud deploy |
-| P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Not started | Decision recorded: Docker Compose for local development and verification; AWS target architecture delivered as Terraform IaC in Phase 7; Phase 0 limited to PostgreSQL + MinIO |
+| P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Not started | Approve/update D-001 (and D-002 as applicable) in `DECISIONS.md`/ADRs: Compose for local verification; AWS as Terraform IaC in Phase 7 |
 
 **Suggested order:** P0-06 → P0-07 → P0-08 → P0-09 → P0-10 → P0-11 → P0-12 → P0-13 (P0-08 and P0-10 may proceed in parallel after P0-07).
 
@@ -134,7 +134,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
 | P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Phase 1 | Not started | Create / write / catalog / query one table; versions pinned; result recorded; incompatible combos rejected with a decision note |
-| P2-02 | Local catalog and query-engine choice | P2-01 | Not started | Local catalog (and Trino or alternative) chosen after PoC; recorded in `DECISIONS.md` |
+| P2-02 | Local catalog and query-engine choice | P2-01 | Not started | Local table catalog (and Trino or alternative) chosen after PoC; recorded in D-004 / `DECISIONS.md` |
 | P2-03 | Bronze layer from raw ingestion | P2-01, P1-02 | Not started | Bronze preserves source payload + ingestion metadata; grain and PK documented |
 | P2-04 | Silver normalization and deduplication | P2-03 | Not started | Typed, deduplicated Silver tables; null/duplicate/invalid handling intentional |
 | P2-05 | Analytical model design (grain, keys, SCD) | P2-04 | Not started | Document grain/keys/update rules for facts, dims and marts before implementing models |
@@ -331,7 +331,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 2. Plan with the issue ID (see `docs/agent-workflow.md`); wait for approval on non-trivial changes.
 3. Implement one coherent issue; run its acceptance checks.
 4. Update `PROJECT_STATUS.md` with evidence; mark the issue verified only with evidence.
-5. Record architecture choices in `DECISIONS.md` / `docs/decisions/` when a proposed item is approved or replaced.
+5. Record architecture choices as ADRs in `docs/decisions/` and update the one-line row in `DECISIONS.md` when a proposed item is approved or replaced.
 
 ---
 
@@ -343,4 +343,4 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Last updated | 2026-10-15 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-15: Phase 7 reframed as AWS deployment path via Terraform IaC; P5-05 cost model; cloud apply gated by approval. Earlier same day: three update patterns (daily/weekly batch + streaming CDC); P3-08, P3-09, P4-07; P1-06 strengthened |
+| Changelog | 2026-10-15: ADRs restructured to D-001–D-017 (splits + discovery/dataviz). Earlier: P0-07 summary index; Phase 7 as AWS IaC; three update patterns; P3-08/P3-09/P4-07 |
