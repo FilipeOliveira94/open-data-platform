@@ -20,9 +20,9 @@ ponta a ponta:
 -   Orquestração com Airflow.
 -   CDC com PostgreSQL, Debezium e Kafka.
 -   Qualidade de dados, contratos, observabilidade e linhagem.
--   CI/CD, testes automatizados, infraestrutura como código e
-    implantação AWS.
--   Documentação técnica com decisões, limitações, resultados medidos e
+-   CI/CD, testes automatizados e infraestrutura como código (caminho AWS
+    via Terraform, com mapeamento local→nuvem).
+-   Documentação técnica com decisões, limitações, evidências e
     instruções de reprodução.
 
 O projeto deve ser útil como estudo de caso de Data Engineer em
@@ -33,12 +33,13 @@ processos seletivos, não apenas como uma coleção de tecnologias.
 -   Disponibilidade prevista: **15+ horas por semana**.
 -   Ambiente desejado: **Windows 11 como host, WSL2/Ubuntu para
     desenvolvimento Linux e Docker Desktop com integração WSL**.
--   Execução híbrida: stack local para desenvolvimento e testes; AWS
-    para uma implantação controlada e demonstração.
+-   Execução híbrida: Docker Compose para desenvolvimento e verificação
+    ponta a ponta; caminho AWS expresso como Infrastructure as Code
+    (Terraform), mostrando como a plataforma se provisiona na nuvem.
 -   Repositório: **GitHub monorepo**.
 -   Experiência já existente: Airflow, dbt, Spark, AWS e Terraform.
 -   Prioridades: arquitetura sólida, reprodutibilidade, clareza técnica,
-    evidências de testes e custo controlado.
+    evidências de testes e modelo de custo documentado.
 -   Cursor Agent: modelo **Auto**, com tarefas pequenas, contexto
     explícito e revisão humana dos diffs.
 
@@ -100,19 +101,22 @@ Cursor Chat: https://docs.cursor.com/chat/overview
 -   Debezium + Kafka para captura e transporte de alterações.
 -   Spark para processamento de dados, incluindo Structured Streaming
     quando aplicável.
--   MinIO local e Amazon S3 na AWS como armazenamento de objetos.
+-   MinIO no ambiente local; Amazon S3 no caminho AWS (mesmo papel de
+    object store).
 -   Parquet e Apache Iceberg para armazenamento tabular/lakehouse, após
     validar compatibilidade das versões.
--   Catálogo de tabelas: Glue Catalog na AWS; opção local a definir
-    conforme a prova de conceito.
--   Trino local e Athena na AWS para consulta analítica.
+-   Catálogo de tabelas: opção local após a prova de conceito; Glue
+    Catalog no caminho AWS.
+-   Trino no ambiente local; Athena no caminho AWS para consulta
+    analítica.
 -   dbt para transformação e modelagem analítica.
 -   Testes de qualidade com dbt e Python.
 -   OpenLineage para linhagem, integrado aos componentes efetivamente
     suportados.
 -   Prometheus e Grafana para métricas e dashboards.
--   Terraform para infraestrutura AWS.
--   GitHub Actions para CI/CD.
+-   Terraform para o caminho de provisionamento AWS (IaC).
+-   GitHub Actions para CI/CD, incluindo validação de Terraform e
+    padrão OIDC para credenciais AWS de curta duração.
 
 ### Camadas de dados
 
@@ -156,8 +160,8 @@ ler um objeto no MinIO. - Lint e testes básicos executam. - Nenhum
 segredo, arquivo `.env` real ou dado privado é versionado. - O CI
 executa as verificações previstas.
 
-Fora do escopo desta fase: Airflow, Kafka, Spark, Trino, Iceberg e
-implantação AWS.
+Fora do escopo desta fase: Airflow, Kafka, Spark, Trino, Iceberg e o
+caminho Terraform AWS (Fase 7).
 
 ### Fase 1 --- Ingestão de múltiplas fontes (semanas 1--2)
 
@@ -221,13 +225,13 @@ específica.
 
 Objetivos: - Adicionar logs estruturados. - Criar métricas e dashboards
 Prometheus/Grafana. - Integrar OpenLineage aos componentes realmente
-suportados. - Documentar custos estimados e, quando houver implantação,
-custos observados na AWS. - Definir alertas úteis e runbooks.
+suportados. - Documentar um modelo de custo para a arquitetura AWS
+alvo, com premissas explícitas. - Definir alertas úteis e runbooks.
 
 Critérios de aceite: - Falhas e atrasos relevantes podem ser
 diagnosticados. - Linhagem demonstrada corresponde a execuções reais. -
-Métricas são medidas, não inventadas. - Estimativas de custo identificam
-premissas; custos reais são diferenciados de estimativas.
+Métricas são medidas, não inventadas. - O modelo de custo identifica
+premissas, drivers e faixas estimadas.
 
 ### Fase 6 --- CI/CD, resiliência e segurança (semanas 12--13)
 
@@ -241,23 +245,24 @@ falha. - Testes de integração são reproduzíveis e isolados. - Cenários
 de recuperação têm evidência. - Segredos e credenciais não são expostos
 em logs ou artefatos.
 
-Não implantar na nuvem antes de a validação local estar estável.
+Manter a validação da plataforma estável no Compose antes de expandir o
+caminho AWS.
 
-### Fase 7 --- AWS, documentação final e demonstração (semanas 14--16)
+### Fase 7 --- Caminho AWS como Infrastructure as Code (semanas 14--16)
 
-Objetivos: - Definir uma implantação AWS mínima e econômica. -
-Provisionar infraestrutura via Terraform. - Configurar S3, Glue Catalog,
-Athena, IAM e OIDC para GitHub Actions quando apropriado. - Configurar
-backend remoto do Terraform com versionamento e mecanismo de lock
-compatível com a versão usada. - Medir desempenho e custos reais, se
-houver implantação. - Finalizar README, diagramas, runbooks e
-demonstração.
+Objetivos: - Documentar o mapeamento local→AWS (MinIO→S3, catálogo
+local→Glue, Trino→Athena). - Entregar módulos Terraform para S3, Glue
+Catalog, Athena, IAM e OIDC (GitHub Actions). - Documentar backend
+remoto (S3 + lock) como padrão de produção e layout adequado à
+validação em CI. - Publicar modelo de custo com premissas. - Finalizar
+README, diagramas, runbooks e estudo de caso.
 
-Critérios de aceite: - Implantação é reproduzível e documentada. - IAM
-segue o princípio do menor privilégio. - CI usa OIDC quando aplicável,
-evitando chaves AWS de longa duração. - Custos, limitações e
-procedimento de limpeza são claros. - Operações de nuvem são executadas
-apenas após revisão e aprovação explícita.
+Critérios de aceite: - Mapeamento de serviços e módulos Terraform
+claros e alinhados. - IAM segue o princípio do menor privilégio. -
+OIDC e CI de validação Terraform (`fmt` / `validate`) estão
+documentados. - Modelo de custo e limitações arquiteturais são
+explícitos. - O case study apresenta a plataforma local e o caminho de
+provisionamento AWS via IaC.
 
 ## 5. Estrutura de diretórios proposta
 
@@ -324,8 +329,8 @@ sugerido:
 # Instructions for AI coding agents
 
 ## Project goal
-Build a reproducible, well-documented end-to-end data engineering platform.
-Optimize for correctness, clarity, testability, operational safety, and portfolio value.
+Build a reproducible, well-documented end-to-end data engineering platform with a local Compose stack and an AWS deployment path expressed as Terraform Infrastructure as Code.
+Optimize for correctness, clarity, testability, and operational safety.
 
 ## Communication and documentation
 - Communicate with the user in Brazilian Portuguese.
@@ -368,9 +373,9 @@ Optimize for correctness, clarity, testability, operational safety, and portfoli
 
 ## Security and cost
 - Never commit secrets, credentials, tokens, or real .env files.
-- Never run Terraform apply/destroy, delete cloud resources, or execute destructive Docker volume commands without explicit user approval.
-- Ask before any operation that can incur meaningful cloud costs.
 - Prefer IAM least privilege and short-lived credentials/OIDC over long-lived cloud keys.
+- Validate Terraform with `fmt`/`validate` in CI; do not run `terraform apply`/`destroy`, delete cloud resources, or execute destructive Docker volume commands without explicit user approval.
+- Ask before any operation that can incur meaningful cloud costs.
 - Do not expose secrets in logs, test output, screenshots, or documentation.
 
 ## Truthfulness
@@ -603,7 +608,7 @@ Acceptance criteria:
 - No secrets, actual .env files, or private data are tracked.
 - CI runs the intended checks.
 
-Do not add Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, or AWS deployment in this phase.
+Do not add Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, or the AWS Terraform path in this phase.
 Do not use unverified image tags. Pin suitable versions and document compatibility.
 Do not run destructive volume cleanup without approval.
 ```
@@ -680,10 +685,10 @@ Add structured logs and the minimum useful metrics/dashboards using Prometheus/G
 Integrate OpenLineage only for components with verified support.
 Demonstrate lineage from an actual run rather than a mocked or assumed graph.
 Document alert thresholds and runbooks.
-Separate estimated cloud costs from observed AWS costs and state the assumptions behind every estimate.
+Document a FinOps cost model for the AWS target architecture with explicit assumptions, drivers, and estimated ranges.
 
 Do not invent metrics, benchmark results, lineage, or cost numbers.
-Do not deploy resources or incur cloud costs without approval.
+Do not run terraform apply/destroy or incur cloud costs without my explicit approval.
 ```
 
 ### Fase 6 --- CI/CD, segurança e resiliência
@@ -696,24 +701,24 @@ Add relevant security checks without leaking credentials or creating noisy, unex
 Exercise failure/retry/recovery paths and document evidence.
 Ensure CI fails when a required check fails.
 
-Do not deploy to AWS in this phase.
+Do not add cloud provisioning workflows in this phase; Terraform validation belongs with the Phase 7 IaC path.
 Do not weaken or skip tests merely to obtain a green pipeline.
 ```
 
-### Fase 7 --- AWS e demonstração
+### Fase 7 --- Caminho AWS como IaC
 
 ``` text
-Work only on Phase 7 — AWS deployment and final case study.
+Work only on Phase 7 — AWS deployment path as Infrastructure as Code and final case study.
 
-First propose a minimal architecture and estimate cost assumptions for review. Do not deploy until I explicitly approve.
-Use Terraform, S3, Glue Catalog, Athena, least-privilege IAM, and GitHub OIDC where appropriate.
-Use a remote Terraform state with versioning and a locking mechanism supported by the selected Terraform version.
-Avoid long-lived AWS credentials.
-Document deployment, verification, cost monitoring, teardown, limitations, and recovery procedures.
+Document the local→AWS service mapping (MinIO→S3, local catalog→Glue, Trino→Athena) and optional counterparts for Spark/Airflow/Kafka.
+Deliver modular Terraform for S3, Glue Catalog, Athena, least-privilege IAM, and GitHub OIDC.
+Document backend options (local for CI validation; remote S3 + lock as the production pattern).
+Add CI for terraform fmt/validate.
+Publish a cost model with explicit assumptions.
+Finish with a case study: README, diagrams, local reproduction path, and AWS provisioning guidance via IaC.
 
-Measure real performance and costs only when the relevant workload has actually run.
-Do not run apply, destroy, delete resources, or incur cloud costs without explicit approval.
-Finish with a clear README case study, architecture diagrams, setup instructions, runbooks, and a demonstration path.
+Do not invent metrics or cost figures.
+Do not run terraform apply/destroy or delete cloud resources without my explicit approval.
 ```
 
 ## 10. Estratégia de Git

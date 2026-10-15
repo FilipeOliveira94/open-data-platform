@@ -38,7 +38,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
-| 7 | Minimal AWS path, measured cost, case-study docs | Sprint 6 (weeks 14–16) | Phase 6 verified; explicit cloud approval | Not started |
+| 7 | AWS deployment path as IaC (Terraform, local→AWS mapping), case-study docs | Sprint 6 (weeks 14–16) | Phase 6 verified | Not started |
 
 ---
 
@@ -46,7 +46,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 
 **Goal:** Reproducible local baseline and program documents that govern later work.
 
-**Out of scope:** Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, AWS deployment.
+**Out of scope:** Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, AWS Terraform path.
 
 **Phase acceptance (all required):**
 
@@ -73,7 +73,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | P0-10 | Docker Compose: PostgreSQL 16 and MinIO | — | Not started | Pinned image tags; health checks; documented start/stop; no unverified tags |
 | P0-11 | Repo hygiene and README | P0-08, P0-10 | Not started | `.gitignore`, `.env.example` (names/placeholders only), Makefile, `README.md` with setup |
 | P0-12 | GitHub Actions: lint and tests | P0-09 | Not started | Workflow runs lint + tests; no cloud deploy |
-| P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Not started | Decision recorded: local Compose for dev; Phase 0 limited to PostgreSQL + MinIO |
+| P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Not started | Decision recorded: Docker Compose for local development and verification; AWS target architecture delivered as Terraform IaC in Phase 7; Phase 0 limited to PostgreSQL + MinIO |
 
 **Suggested order:** P0-06 → P0-07 → P0-08 → P0-09 → P0-10 → P0-11 → P0-12 → P0-13 (P0-08 and P0-10 may proceed in parallel after P0-07).
 
@@ -120,7 +120,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 
 **Depends on:** Phase 1 verified. **Hard gate:** P2-01 must succeed before scaling transforms.
 
-**Out of scope:** Airflow orchestration, CDC/streaming, AWS lakehouse services (those belong to Phase 7).
+**Out of scope:** Airflow orchestration, CDC/streaming, AWS lakehouse modules (Phase 7 IaC).
 
 **Phase acceptance (all required):**
 
@@ -217,18 +217,18 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 
 ## Phase 5 — Observability, lineage and FinOps
 
-**Goal:** Diagnose failures/latency with real metrics; show lineage from real runs; separate estimated vs observed cost.
+**Goal:** Diagnose failures/latency with real metrics; show lineage from real runs; document a FinOps cost model for the AWS target architecture with explicit assumptions.
 
 **Depends on:** Phase 3 verified. Stream-specific metrics may wait for Phase 4.
 
-**Out of scope:** Invented metrics, benchmarks, lineage graphs or cost figures; cloud spend without approval.
+**Out of scope:** Invented metrics, benchmarks, lineage graphs or cost figures.
 
 **Phase acceptance (all required):**
 
 - [ ] Relevant failures and delays can be diagnosed from logs/metrics.
 - [ ] Demonstrated lineage matches actual executions.
 - [ ] Metrics are measured, not invented.
-- [ ] Cost estimates state assumptions; observed AWS costs (if any) are separate.
+- [ ] Cost model documents assumptions, unit drivers and estimated monthly ranges for the AWS target design.
 
 ### Issues
 
@@ -238,7 +238,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | P5-02 | Prometheus and Grafana local stack | P5-01 | Not started | Services in Compose; pinned images; documented access |
 | P5-03 | Pipeline metrics and dashboards | P5-02 | Not started | Useful dashboards for lag, failures, throughput where instrumented |
 | P5-04 | OpenLineage where supported | Phase 3 (and 4 if streaming) | Not started | Lineage emitted only for components with verified support; demo from a real run |
-| P5-05 | Cost visibility (estimates vs observed) | — | Not started | Local/AWS cost assumptions documented; observed figures only after real usage |
+| P5-05 | Cost model for AWS target architecture | — | Not started | Documented cost model with assumptions, drivers and estimated ranges aligned to the Phase 7 AWS design |
 | P5-06 | Alerts and runbooks | P5-03 | Not started | Alert thresholds and at least one failure runbook under `docs/runbooks/` |
 
 **Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06.
@@ -251,7 +251,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 
 **Depends on:** Phases 1–3 verified; include Phase 4/5 checks when those components exist.
 
-**Out of scope:** AWS deploy (Phase 7); weakening tests to force green CI.
+**Out of scope:** Cloud provisioning workflows (Phase 7 focuses on Terraform IaC and CI validation); weakening tests to force green CI.
 
 **Phase acceptance (all required):**
 
@@ -275,35 +275,37 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 
 ---
 
-## Phase 7 — AWS, documentation and demonstration
+## Phase 7 — AWS deployment path as Infrastructure as Code
 
-**Goal:** Minimal, economical AWS demonstration path with Terraform, measured cost and a portfolio-ready case study.
+**Goal:** Deliver a clear AWS target architecture and Terraform modules that show how the verified local lakehouse maps to cloud services (S3, Glue Catalog, Athena, IAM/OIDC)—reproducible Infrastructure as Code for provisioning.
 
-**Depends on:** Phase 6 verified. **Hard gate:** no `terraform apply` / destroy / paid usage without explicit user approval.
+**Depends on:** Phase 6 verified. Cloud `apply`/`destroy` require explicit user approval (see `AGENTS.md`); CI validates Terraform with `fmt` / `validate`.
 
-**Out of scope:** Kubernetes unless a later approved requirement; broad multi-account enterprise landing zones.
+**Out of scope:** Multi-account enterprise landing zones; Kubernetes unless a later approved requirement; embedding managed EMR/MWAA/MSK as required core modules (document as optional AWS counterparts to local Spark/Airflow/Kafka).
 
 **Phase acceptance (all required):**
 
-- [ ] Deployment is reproducible and documented.
-- [ ] IAM follows least privilege.
-- [ ] CI uses OIDC when applicable (no long-lived AWS keys).
-- [ ] Costs, limitations and teardown are clear.
-- [ ] Cloud operations run only after explicit approval.
+- [ ] Local→AWS service mapping is documented (MinIO→S3, local catalog→Glue, Trino→Athena; compute/orchestration counterparts noted).
+- [ ] Terraform modules are modular, readable and aligned with the target architecture.
+- [ ] IAM follows least privilege in code and documentation.
+- [ ] GitHub Actions OIDC to AWS is defined as Terraform and documented.
+- [ ] CI runs `terraform fmt -check` and `validate`.
+- [ ] Cost model states assumptions and estimated ranges for the AWS design.
+- [ ] Case study presents the local platform and the AWS IaC path with diagrams and reproduction steps.
 
 ### Issues
 
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
-| P7-01 | Minimal AWS architecture and cost assumptions | Phase 6 | Not started | Written proposal (S3, Glue, Athena, IAM/OIDC); cost assumptions reviewed; **approval required before apply** |
-| P7-02 | Terraform remote state (versioning + lock) | P7-01 approved | Not started | Backend with versioning and locking compatible with chosen Terraform version; no secrets in state docs |
-| P7-03 | Core AWS resources (S3, Glue Catalog, Athena, IAM) | P7-02 | Not started | Modules/resources match approved architecture; least-privilege IAM documented |
-| P7-04 | GitHub Actions OIDC to AWS | P7-03 | Not started | Short-lived creds via OIDC; no long-lived access keys in repo or CI secrets for deploy role |
-| P7-05 | Controlled deploy, verification and cost measurement | P7-04, explicit approval | Not started | Apply after approval; smoke verification; observed cost recorded separately from estimates |
-| P7-06 | Teardown runbook | P7-05 | Not started | Documented destroy/cleanup path; approval required before destroy |
-| P7-07 | Case study: README, diagrams, runbooks, demo path | P7-05, P7-06 | Not started | Portfolio narrative: architecture, limitations, how to reproduce, what was measured |
+| P7-01 | Local→AWS architecture and service mapping | Phase 6 | Not started | Written mapping: MinIO→S3, local catalog→Glue, Trino→Athena; optional AWS counterparts for Airflow/Spark/Kafka documented; diagrams under `docs/architecture/` |
+| P7-02 | Terraform scaffold under `infrastructure/terraform/` | P7-01 | Not started | Module layout, variables, outputs, README; backend configuration documented (local for CI; remote S3+DynamoDB lock as the recommended production pattern) |
+| P7-03 | Core AWS resources as code (S3, Glue, Athena, IAM) | P7-02 | Not started | Modules for lakehouse buckets, Glue catalog/database, Athena workgroup, least-privilege IAM; `terraform validate` succeeds in CI |
+| P7-04 | GitHub Actions OIDC to AWS | P7-03 | Not started | OIDC provider and deploy role as Terraform + docs; no long-lived access keys in the repository |
+| P7-05 | CI: Terraform fmt and validate | P7-02, P6-03 | Not started | Workflow runs `terraform fmt -check` and `validate` on the IaC tree |
+| P7-06 | AWS cost model | P7-01 | Not started | Cost model with assumptions, drivers and monthly estimate ranges for the documented AWS design |
+| P7-07 | Case study: README, diagrams, demo path | P7-03, P7-04, P7-05, P7-06 | Not started | Case study: local platform + AWS IaC path, architecture diagrams, setup and provisioning guidance |
 
-**Suggested order:** P7-01 (approve) → P7-02 → P7-03 → P7-04 → P7-05 → P7-06 → P7-07.
+**Suggested order:** P7-01 → P7-02 → P7-03 → P7-04 ∥ P7-05 ∥ P7-06 → P7-07.
 
 ---
 
@@ -317,7 +319,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | New technology | State purpose and operational cost; prefer proving compatibility before expanding |
 | Kubernetes | Out of scope unless an explicit approved requirement |
 | Secrets | Never commit credentials, tokens, live `.env`, or private datasets |
-| Cloud cost | Ask before apply, destroy, or any command likely to incur charges |
+| Cloud / AWS IaC | Phase 7 delivers the AWS path as Terraform IaC and local→AWS mapping. CI validates with `fmt`/`validate`. Cost models must state assumptions. Never invent metrics or spend figures. Do not run `terraform apply`/`destroy` without explicit user approval |
 | Empty dirs | Do not scaffold later-phase trees until that phase starts |
 | Language | Code/docs in English; agent↔user communication in Brazilian Portuguese |
 
@@ -341,4 +343,4 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Last updated | 2026-10-15 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-15: clarified three required update patterns (daily batch, weekly batch, streaming CDC); added P3-08, P3-09, P4-07; strengthened P1-06 |
+| Changelog | 2026-10-15: Phase 7 reframed as AWS deployment path via Terraform IaC; P5-05 cost model; cloud apply gated by approval. Earlier same day: three update patterns (daily/weekly batch + streaming CDC); P3-08, P3-09, P4-07; P1-06 strengthened |

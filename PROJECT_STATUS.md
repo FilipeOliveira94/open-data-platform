@@ -7,7 +7,7 @@
 | Last updated | 2026-10-15 |
 | Current phase | Phase 0 — Repository and environment foundation |
 | Phase 0 | In progress |
-| Platform (ingestion through AWS) | Not started |
+| Platform (ingestion through lakehouse; AWS path as IaC in Phase 7) | Not started |
 
 This ledger records **delivered work and executed validation**. Planned architecture is not treated as complete.
 
@@ -19,7 +19,7 @@ This ledger records **delivered work and executed validation**. Planned architec
 
 Establish Phase 0: a reproducible local baseline (Python 3.12, lint/tests, PostgreSQL 16, MinIO, CI) and the program documents that govern later phases (`ROADMAP.md`, `DECISIONS.md`, README).
 
-Out of scope for Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and AWS deployment.
+Out of scope for Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and the AWS Terraform path (Phase 7).
 
 ## Verified
 
@@ -46,7 +46,7 @@ None. Phase 0 acceptance checks have not been run (no Compose stack, no lint/tes
 | P0-10 | Docker Compose: PostgreSQL 16 and MinIO, health checks, pinned image tags |
 | P0-11 | `.gitignore`, `.env.example` (names and placeholders only), Makefile, `README.md` |
 | P0-12 | GitHub Actions: lint and tests (no cloud deploy) |
-| P0-13 | Initial decision note: local Compose vs later AWS; Phase 0 limited to PostgreSQL and MinIO |
+| P0-13 | Initial decision note: Compose for local development/verification; AWS target architecture as Terraform IaC in Phase 7; Phase 0 limited to PostgreSQL and MinIO |
 
 Do not create empty directories for later phases until those phases start.
 
@@ -84,7 +84,7 @@ Issue-level detail belongs in `ROADMAP.md`.
 | 4 | Streaming CDC: PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming | Sprint 5 | Not started |
 | 5 | Observability, lineage, and cost visibility (Prometheus, Grafana, OpenLineage where supported) | Sprint 6 | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 | Not started |
-| 7 | Minimal AWS path (Terraform, S3, Glue, Athena, IAM/OIDC), measured cost, case-study documentation | Sprint 6 | Not started |
+| 7 | AWS deployment path as IaC (Terraform, local→AWS mapping), case-study documentation | Sprint 6 | Not started |
 
 ## Open decisions
 
@@ -92,16 +92,16 @@ Target stack, pending proof of concept and explicit approval:
 
 | Topic | Direction | State |
 | --- | --- | --- |
-| Runtime | Local Docker Compose for development; AWS for a controlled demonstration | Proposed |
+| Runtime | Docker Compose for local development and verification; AWS target architecture delivered as Terraform IaC (Phase 7) | Proposed |
 | Phase 0 services | PostgreSQL 16 and MinIO only | Proposed |
-| Object storage | MinIO locally; Amazon S3 on AWS | Proposed |
+| Object storage | MinIO locally; Amazon S3 on the AWS path | Proposed |
 | Table format | Parquet and Apache Iceberg after version compatibility is proven | Proposed |
-| Catalog / SQL | Glue Catalog and Athena on AWS; local catalog chosen after the Phase 2 PoC | Proposed |
+| Catalog / SQL | Local catalog/query after Phase 2 PoC; Glue Catalog and Athena on the AWS path | Proposed |
 | Batch compute / transform | Spark, Airflow, dbt | Proposed |
 | Daily / weekly batch | Same PostgreSQL incremental extract (P1-06); distinct Airflow schedules (P3-08 daily, P3-09 weekly); weekly grain/purpose documented when implemented | Proposed |
 | Streaming CDC | PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming (Phase 4); complementary to batch, not a replacement | Proposed |
 | Observability | Prometheus, Grafana; OpenLineage only on components with verified support | Proposed |
-| IaC / CI | Terraform; GitHub Actions; OIDC in preference to long-lived cloud keys | Proposed |
+| IaC / CI | Terraform for the AWS path (fmt/validate in CI; apply gated by approval); GitHub Actions; OIDC for short-lived AWS credentials | Proposed |
 | Kubernetes | Out of scope unless a later requirement justifies it | Proposed |
 
 Analytical models (`fct_orders`, `fct_order_items`, `fct_payments`, `dim_customers`, `dim_products`, `dim_date`, `mart_daily_sales`, `mart_customer_retention`) are placeholders until grain, keys, and update rules are documented.
@@ -112,8 +112,8 @@ Analytical models (`fct_orders`, `fct_order_items`, `fct_payments`, `dim_custome
 - Spark, Iceberg, catalog, and query-engine compatibility is unproven. That combination will not be expanded until a minimal create/write/query PoC succeeds.
 - The historical e-commerce dataset will not be vendored until license and redistribution terms are confirmed.
 - Exactly-once processing will not be claimed without a specific technical proof.
-- Cloud apply/destroy and other cost-incurring operations require explicit approval.
-- Daily and weekly batch vs streaming CDC must stay clearly separated in implementation and demos; conflating them would weaken the portfolio story.
+- Cloud provisioning (`terraform apply`/`destroy`) requires explicit approval; Phase 7 focuses on a complete AWS IaC artifact and local→AWS mapping validated by CI.
+- Daily and weekly batch vs streaming CDC must stay clearly separated in implementation and demos; conflating them would weaken the technical narrative.
 
 ## Blocked
 
@@ -134,6 +134,10 @@ None.
 | Result | Documentation and repository baseline only |
 
 ## Log
+
+### 2026-10-15 — AWS path as Infrastructure as Code
+
+Scope alignment: Phase 7 delivers the **AWS deployment path as Terraform IaC**—service mapping (MinIO→S3, catalog→Glue, Trino→Athena), modular resources, OIDC/IAM, cost model and case study—with CI `fmt`/`validate`. Local Compose remains the environment for pipeline development and verification. Cloud apply/destroy stay approval-gated. Updated `ROADMAP.md`, this ledger, `docs/project-context-for-cursor.md`, `AGENTS.md` and infrastructure rules.
 
 ### 2026-10-15 — Three update patterns (batch + stream)
 

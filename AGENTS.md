@@ -2,15 +2,15 @@
 
 ## 1. Project Goal
 
-Build a reproducible open-source data platform that supports local development on Windows 11 through WSL2 and Docker Compose, with an AWS deployment path managed by Terraform.
+Build a reproducible open-source data platform that supports local development on Windows 11 through WSL2 and Docker Compose, with an AWS deployment path expressed as Terraform Infrastructure as Code.
 
 The platform demonstrates:
 - Multiple source ingestion: historical datasets, APIs, PostgreSQL and synthetic events.
 - Batch processing and CDC/streaming.
 - A lakehouse with Bronze, Silver and Gold layers.
 - Apache Airflow orchestration and dbt analytics.
-- Data quality, lineage, observability and cost analysis.
-- Automated testing, CI/CD and reproducible infrastructure.
+- Data quality, lineage, observability and FinOps cost modeling.
+- Automated testing, CI/CD and reproducible cloud infrastructure as code.
 
 ## 2. Working Language
 
@@ -71,9 +71,9 @@ Do not mark a task complete unless its acceptance criteria have been verified.
 - Primary development environment: Windows 11, WSL2 Ubuntu and Docker Desktop.
 - Prefer Linux paths inside WSL2.
 - Do not assume PowerShell syntax in Linux scripts or Bash syntax in PowerShell commands.
-- Use Docker Compose for local services.
+- Use Docker Compose for local services and end-to-end verification.
 - Keep local development independent of AWS credentials whenever possible.
-- Use Terraform for cloud infrastructure and document the required permissions.
+- Use Terraform for the AWS deployment path (local→AWS service mapping) and document the required permissions.
 - Do not install or upgrade system-wide dependencies without explaining the impact.
 
 ## 8. Security and Cost
@@ -81,9 +81,11 @@ Do not mark a task complete unless its acceptance criteria have been verified.
 - Never commit secrets, credentials, access tokens or sensitive datasets.
 - Use `.env.example` for variable names and safe placeholders.
 - Treat public API responses and downloaded files as untrusted input.
-- Ask for explicit approval before destructive operations, cloud deployment, resource deletion, production changes or commands that may incur costs.
-- Never run `terraform apply`, `terraform destroy` or destructive Docker volume operations without reviewing the intended impact with the user.
 - Prefer short-lived AWS credentials and OIDC for CI/CD.
+- Validate Terraform with `fmt`/`validate` in CI; do not run `terraform apply`, `terraform destroy`, delete cloud resources or destructive Docker volume operations without explicit user approval.
+- Ask before any operation that can incur meaningful cloud costs.
+- Do not invent performance metrics, cost figures, lineage or benchmark results.
+- Present the AWS path as Infrastructure as Code that shows how the platform provisions on AWS; do not frame documentation around unpaid cloud usage.
 
 ## 9. Testing and Verification
 
