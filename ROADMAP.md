@@ -13,15 +13,29 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 
 ---
 
+## Target update patterns (required use cases)
+
+The platform must demonstrate **three distinct ways** to refresh data from the transactional PostgreSQL source (and related batch sources). CDC does **not** replace scheduled batch loads.
+
+| Use case | Pattern | Where it lives | What “done” means |
+| --- | --- | --- | --- |
+| Daily batch | Scheduled incremental extract → lakehouse | Phase 1 extract + Phase 3 Airflow (`@daily` or cron) | Idempotent daily window; watermark / partition documented; re-run safe |
+| Weekly batch | Scheduled incremental or snapshot extract on a weekly cadence | Phase 1 extract + Phase 3 Airflow (`@weekly` or cron) | Distinct weekly DAG (or schedule); grain and why-weekly documented; re-run safe |
+| Streaming | Continuous CDC (logical replication → Debezium → Kafka → Spark Structured Streaming) | Phase 4 | Inserts, updates and deletes handled with explicit delivery semantics |
+
+**Clarification:** Phase 4 CDC is near-real-time change capture. Daily and weekly refreshes are **batch** pipelines orchestrated by Airflow, typically driven by watermarks (`updated_at`, business date, or agreed high-water mark)—not by Debezium schedules.
+
+---
+
 ## Phase overview
 
 | Phase | Scope | Window | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | In progress |
-| 1 | Multi-source ingestion (historical, API, PostgreSQL, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | Not started |
+| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | Not started |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
-| 3 | Airflow, idempotent backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
-| 4 | CDC and streaming (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
+| 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
+| 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
 | 7 | Minimal AWS path, measured cost, case-study docs | Sprint 6 (weeks 14–16) | Phase 6 verified; explicit cloud approval | Not started |
@@ -67,11 +81,11 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 
 ## Phase 1 — Multi-source ingestion
 
-**Goal:** Idempotent batch ingestion from four source types into auditable raw storage, with contracts and deterministic tests.
+**Goal:** Idempotent batch ingestion from four source types into auditable raw storage, with contracts and deterministic tests. PostgreSQL extract must support **windowed incremental loads** usable by daily and weekly Airflow schedules (scheduling itself is Phase 3).
 
 **Depends on:** Phase 0 verified.
 
-**Out of scope:** Streaming, Iceberg, Airflow, lakehouse transforms.
+**Out of scope:** Streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms.
 
 **Phase acceptance (all required):**
 
@@ -80,6 +94,7 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 - [ ] Raw data is traceable by source and execution.
 - [ ] Contracts and expected fields are documented.
 - [ ] Invalid records and errors have explicit, documented behavior.
+- [ ] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
 
 ### Issues
 
@@ -90,10 +105,10 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 | P1-03 | Data contracts for planned sources | P1-02 | Not started | Contracts under `config/contracts/` (or agreed path); schema/fields/null rules explicit |
 | P1-04 | Historical e-commerce dataset ingestion | P1-01, P1-02, P1-03 | Not started | Repeatable ingest to raw layout; idempotent re-run; unit/integration coverage without private data |
 | P1-05 | Paginated public API client | P1-02, P1-03 | Not started | Timeouts, retries, rate-limit handling; local fixtures; no live-API dependency in unit tests |
-| P1-06 | PostgreSQL source extract | P0-10, P1-02, P1-03 | Not started | Parameterized extract; documented grain/keys; repeatable without corrupting raw |
+| P1-06 | PostgreSQL incremental batch extract | P0-10, P1-02, P1-03 | Not started | Parameterized extract by watermark/window (`start`/`end` or high-water mark); grain/keys documented; same code path supports daily and weekly windows; idempotent re-run without corrupting raw |
 | P1-07 | Synthetic event generator | P1-02 | Not started | Deterministic or seedable generator for later streaming scenarios; schema documented |
-| P1-08 | Failure and invalid-record behavior | P1-04–P1-07 | Not started | Explicit handling for nulls, duplicate records, invalid schemas; tests for failure paths |
-| P1-09 | Phase 1 documentation and status | P1-08 | Not started | README/docs updated; `PROJECT_STATUS.md` records verification evidence |
+| P1-08 | Failure and invalid-record behavior | P1-04–P1-07 | Not started | Explicit handling for nulls, duplicates, invalid schemas; tests for failure paths |
+| P1-09 | Phase 1 documentation and status | P1-08 | Not started | README/docs updated; three update patterns (daily batch, weekly batch, streaming) referenced; `PROJECT_STATUS.md` records verification evidence |
 
 **Suggested order:** P1-01 ∥ P1-02 → P1-03 → P1-04 ∥ P1-05 ∥ P1-06 ∥ P1-07 → P1-08 → P1-09.
 
@@ -135,7 +150,7 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 
 ## Phase 3 — Orchestration and data quality
 
-**Goal:** Orchestrate validated batch flows with Airflow; prove idempotent backfills and quarantine.
+**Goal:** Orchestrate validated batch flows with Airflow—including **daily** and **weekly** PostgreSQL (and related) schedules—prove idempotent backfills and quarantine. This phase delivers the two batch use cases; streaming remains Phase 4.
 
 **Depends on:** Phase 2 verified.
 
@@ -144,6 +159,8 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 **Phase acceptance (all required):**
 
 - [ ] DAGs have clear dependencies and verifiable failure behavior.
+- [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
+- [ ] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily).
 - [ ] Backfills do not corrupt data or create undue duplication.
 - [ ] Invalid records are identified and handled per documented rules.
 - [ ] Success and failure scenarios have tests or reproducible evidence.
@@ -155,29 +172,32 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 | P3-01 | Airflow in local Compose | Phase 2 | Not started | Airflow runs locally; pinned images; documented UI/CLI access; business logic stays out of DAG bodies |
 | P3-02 | Ingestion DAGs (thin wrappers) | P3-01, Phase 1 | Not started | DAGs call package entrypoints; retries/timeouts configured; no duplicated business logic |
 | P3-03 | Transform / dbt DAGs | P3-01, Phase 2 | Not started | Orchestrates Bronze→Silver→Gold/dbt with clear task dependencies |
-| P3-04 | Idempotent backfill support | P3-02, P3-03 | Not started | Documented backfill parameters; re-run evidence shows no corruption/undue duplicates |
+| P3-04 | Idempotent backfill support | P3-02, P3-03 | Not started | Documented backfill parameters for daily and weekly windows; re-run evidence shows no corruption/undue duplicates |
 | P3-05 | Quality checks and quarantine | P3-03, P2-07 | Not started | Invalid records routed per contract; quarantine location and reprocess path documented |
 | P3-06 | Execution metadata and failure logging | P3-02–P3-05 | Not started | Execution IDs, failure reasons and run metadata are inspectable |
-| P3-07 | Orchestration success/failure tests | P3-04, P3-05 | Not started | Automated or scripted evidence for happy path, retry and failed-run handling |
+| P3-07 | Orchestration success/failure tests | P3-04, P3-05, P3-08, P3-09 | Not started | Automated or scripted evidence for happy path, retry and failed-run handling for daily and weekly DAGs |
+| P3-08 | Daily batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Airflow DAG with daily schedule passes watermark/window into P1-06 extract; documented cadence, catchup policy and idempotency; manual trigger proves one successful daily-shaped run |
+| P3-09 | Weekly batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Distinct weekly schedule (separate DAG or explicit weekly timetable); purpose/grain vs daily documented; watermark/window for a week; manual trigger proves one successful weekly-shaped run |
 
-**Suggested order:** P3-01 → P3-02 ∥ P3-03 → P3-04 → P3-05 → P3-06 → P3-07.
+**Suggested order:** P3-01 → P3-02 ∥ P3-03 → P3-08 ∥ P3-09 → P3-04 → P3-05 → P3-06 → P3-07.
 
 ---
 
-## Phase 4 — CDC and streaming
+## Phase 4 — Streaming CDC
 
-**Goal:** End-to-end change capture from PostgreSQL through Debezium/Kafka into a streaming processor, with honest delivery semantics.
+**Goal:** Deliver the **streaming** use case: continuous change capture from PostgreSQL through Debezium/Kafka into a streaming processor, with honest delivery semantics. Complements—does not replace—daily and weekly batch (Phase 3).
 
-**Depends on:** Phase 3 verified; PostgreSQL from Phase 0/1 available for logical replication.
+**Depends on:** Phase 3 verified (daily and weekly batch paths exist); PostgreSQL from Phase 0/1 available for logical replication.
 
-**Out of scope:** Claiming exactly-once end-to-end without a specific technical proof; breaking the validated batch path.
+**Out of scope:** Using CDC as a substitute for daily/weekly scheduled batch loads; claiming exactly-once end-to-end without a specific technical proof; breaking the validated batch path.
 
 **Phase acceptance (all required):**
 
-- [ ] Inserts, updates and deletes are handled correctly.
+- [ ] Inserts, updates and deletes are handled correctly on the streaming path.
 - [ ] Duplicates and out-of-order events have explicit handling.
 - [ ] Restart and replay do not corrupt sinking state.
-- [ ] Docs do not claim “exactly once” without proof.
+- [ ] Docs contrast streaming CDC vs daily/weekly batch and do not claim “exactly once” without proof.
+- [ ] Validated daily and weekly batch paths still work after CDC is introduced.
 
 ### Issues
 
@@ -187,10 +207,11 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 | P4-02 | Debezium and Kafka Compose stack | P4-01 | Not started | Pinned versions; topic/connector config documented; health checks where supported |
 | P4-03 | CDC path for insert / update / delete | P4-02 | Not started | Reproducible demo of I/U/D landing in Kafka (or agreed sink) with schema documented |
 | P4-04 | Spark Structured Streaming consumer | P4-03, P2-01 | Not started | Consumer processes CDC events into lakehouse tables; checkpoints documented |
-| P4-05 | Semantics documentation | P4-03, P4-04 | Not started | Snapshots, duplicates, ordering, late events, deletes, checkpoints, replay and recovery documented |
+| P4-05 | Semantics documentation (batch vs stream) | P4-03, P4-04, P3-08, P3-09 | Not started | Snapshots, duplicates, ordering, late events, deletes, checkpoints, replay and recovery documented; explicit comparison of daily batch, weekly batch and streaming CDC |
 | P4-06 | Streaming resilience scenarios | P4-04, P4-05 | Not started | Tests or runbooks for duplicates, out-of-order, restart/replay and deletes |
+| P4-07 | Batch path regression check | P3-08, P3-09, P4-04 | Not started | Evidence that daily and weekly batch extracts still succeed alongside the streaming path |
 
-**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06.
+**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07.
 
 ---
 
@@ -290,6 +311,8 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 
 | Topic | Rule |
 | --- | --- |
+| Three update patterns | Daily batch, weekly batch and streaming CDC are all in scope; each must remain distinguishable in docs and demos |
+| Batch vs CDC | Scheduled batch uses windowed extracts + Airflow; CDC uses logical replication—do not conflate the two |
 | Exactly-once | Never claim end-to-end exactly-once without a written technical proof for the specific path |
 | New technology | State purpose and operational cost; prefer proving compatibility before expanding |
 | Kubernetes | Out of scope unless an explicit approved requirement |
@@ -315,5 +338,7 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
+| Last updated | 2026-10-15 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
+| Changelog | 2026-10-15: clarified three required update patterns (daily batch, weekly batch, streaming CDC); added P3-08, P3-09, P4-07; strengthened P1-06 |

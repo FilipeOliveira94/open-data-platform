@@ -61,6 +61,16 @@ Phase 0 is complete only when all of the following are true and recorded:
 - [ ] No secrets, live `.env` files, or private datasets are in version control.
 - [ ] CI runs the same lint and test checks.
 
+## Required update patterns
+
+Three PostgreSQL refresh patterns are in scope (see `ROADMAP.md`). CDC does **not** cover daily/weekly batch.
+
+| Use case | Pattern | Phases | Status |
+| --- | --- | --- | --- |
+| Daily batch | Windowed incremental extract + Airflow daily schedule | 1 (P1-06), 3 (P3-08) | Not started |
+| Weekly batch | Windowed extract + Airflow weekly schedule (distinct from daily) | 1 (P1-06), 3 (P3-09) | Not started |
+| Streaming | Logical replication → Debezium → Kafka → Spark Structured Streaming | 4 | Not started |
+
 ## Program roadmap
 
 Issue-level detail belongs in `ROADMAP.md`.
@@ -68,10 +78,10 @@ Issue-level detail belongs in `ROADMAP.md`.
 | Phase | Scope | Window | Status |
 | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 | In progress |
-| 1 | Multi-source ingestion: historical dataset (license-checked), paginated public API, PostgreSQL extract, synthetic events | Sprint 2 | Not started |
+| 1 | Multi-source ingestion: historical dataset, API, PostgreSQL incremental extract (daily/weekly windows), synthetic events | Sprint 2 | Not started |
 | 2 | Lakehouse PoC (Spark, Iceberg, catalog, query engine), Bronze / Silver / Gold, initial dbt models | Sprint 3 | Not started |
-| 3 | Airflow orchestration, idempotent backfills, quality checks and quarantine | Sprint 4 | Not started |
-| 4 | CDC and streaming: PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming | Sprint 5 | Not started |
+| 3 | Airflow: daily + weekly batch schedules, idempotent backfills, quality checks and quarantine | Sprint 4 | Not started |
+| 4 | Streaming CDC: PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming | Sprint 5 | Not started |
 | 5 | Observability, lineage, and cost visibility (Prometheus, Grafana, OpenLineage where supported) | Sprint 6 | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 | Not started |
 | 7 | Minimal AWS path (Terraform, S3, Glue, Athena, IAM/OIDC), measured cost, case-study documentation | Sprint 6 | Not started |
@@ -88,7 +98,8 @@ Target stack, pending proof of concept and explicit approval:
 | Table format | Parquet and Apache Iceberg after version compatibility is proven | Proposed |
 | Catalog / SQL | Glue Catalog and Athena on AWS; local catalog chosen after the Phase 2 PoC | Proposed |
 | Batch compute / transform | Spark, Airflow, dbt | Proposed |
-| CDC | PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming (Phase 4) | Proposed |
+| Daily / weekly batch | Same PostgreSQL incremental extract (P1-06); distinct Airflow schedules (P3-08 daily, P3-09 weekly); weekly grain/purpose documented when implemented | Proposed |
+| Streaming CDC | PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming (Phase 4); complementary to batch, not a replacement | Proposed |
 | Observability | Prometheus, Grafana; OpenLineage only on components with verified support | Proposed |
 | IaC / CI | Terraform; GitHub Actions; OIDC in preference to long-lived cloud keys | Proposed |
 | Kubernetes | Out of scope unless a later requirement justifies it | Proposed |
@@ -102,6 +113,7 @@ Analytical models (`fct_orders`, `fct_order_items`, `fct_payments`, `dim_custome
 - The historical e-commerce dataset will not be vendored until license and redistribution terms are confirmed.
 - Exactly-once processing will not be claimed without a specific technical proof.
 - Cloud apply/destroy and other cost-incurring operations require explicit approval.
+- Daily and weekly batch vs streaming CDC must stay clearly separated in implementation and demos; conflating them would weaken the portfolio story.
 
 ## Blocked
 
@@ -122,6 +134,10 @@ None.
 | Result | Documentation and repository baseline only |
 
 ## Log
+
+### 2026-10-15 — Three update patterns (batch + stream)
+
+Scope review: CDC (Phase 4) covers **streaming** only, not daily/weekly PostgreSQL loads. Updated `ROADMAP.md` and this ledger to require three use cases—daily batch (P1-06 + P3-08), weekly batch (P1-06 + P3-09), streaming CDC (Phase 4)—and added P4-07 batch regression after CDC.
 
 ### 2026-10-15 — P0-06 roadmap
 
