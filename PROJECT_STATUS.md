@@ -34,12 +34,12 @@ None. Phase 0 acceptance checks have not been run (no Compose stack, no lint/tes
 | P0-03 | Project engineering rules (architecture, Python/testing, data engineering, infrastructure/security, workflow) | `71e96c6` — `.cursor/rules/` |
 | P0-04 | Project status ledger | `PROJECT_STATUS.md` (2026-10-14) |
 | P0-05 | Program context: objectives, constraints, target architecture, and phase backlog | `docs/` |
+| P0-06 | Program roadmap: phases 0–7, issue IDs, dependencies, acceptance criteria | `ROADMAP.md` (2026-10-15) |
 
 ## Phase 0 remaining
 
 | ID | Item |
 | --- | --- |
-| P0-06 | `ROADMAP.md` — phases, dependencies, and acceptance criteria |
 | P0-07 | `DECISIONS.md` — architecture decisions (proposed vs approved); ADRs when a decision is taken |
 | P0-08 | Python 3.12 package with `uv` and a committed lockfile (`src/open_data_platform/`) |
 | P0-09 | Ruff and pytest, including a toolchain smoke test |
@@ -109,9 +109,8 @@ None.
 
 ## Next work
 
-1. **P0-06** — `ROADMAP.md` (phases 0–7, acceptance criteria, out-of-scope notes).
-2. **P0-07** — `DECISIONS.md` with the target stack marked proposed.
-3. Phase 0 implementation plan for P0-08–P0-13, then implementation in small slices after approval.
+1. **P0-07** — `DECISIONS.md` with the target stack marked proposed.
+2. Phase 0 implementation plan for P0-08–P0-13, then implementation in small slices after approval.
 
 ## Latest validation
 
@@ -123,6 +122,10 @@ None.
 | Result | Documentation and repository baseline only |
 
 ## Log
+
+### 2026-10-15 — P0-06 roadmap
+
+Added `ROADMAP.md` with issue-level scope for phases 0–7 (IDs `P0-xx` … `P7-xx`), dependencies, phase and issue acceptance criteria, and out-of-scope notes. Phase 0 issue statuses aligned with this ledger; later phases remain not started.
 
 ### 2026-10-14 — Phase 0 started
 
