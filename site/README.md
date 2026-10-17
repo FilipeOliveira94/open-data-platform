@@ -49,7 +49,7 @@ Static output is written to `dist/`.
 | `src/content/docs/operations.md` | Operations |
 | `src/content/docs/reference.md` | Reference |
 
-Theme options live in `astro.config.mjs` (`starlightCatppuccin` dark/light flavors and accents).
+Theme options live in `astro.config.mjs`: mocha/latte with mauve accent (same as the [Catppuccin kitchen sink](https://starlight-themes.netlify.app/catppuccin/kitchen-sink/)).
 
 ## Content rules
 

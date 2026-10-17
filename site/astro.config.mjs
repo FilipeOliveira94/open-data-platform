@@ -29,10 +29,10 @@ export default defineConfig({
 				{ label: 'Reference', slug: 'reference' },
 			],
 			plugins: [
+				// Matches https://starlight-themes.netlify.app/catppuccin/
 				starlightCatppuccin({
-					// Preview: https://starlight-themes.netlify.app/catppuccin/
-					dark: { flavor: 'mocha', accent: 'teal' },
-					light: { flavor: 'latte', accent: 'teal' },
+					dark: { flavor: 'mocha', accent: 'mauve' },
+					light: { flavor: 'latte', accent: 'mauve' },
 				}),
 			],
 		}),
