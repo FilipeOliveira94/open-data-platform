@@ -2,6 +2,18 @@
 
 Reproducible open-source data platform: local development on Windows 11 + WSL2 + Docker Compose, with an AWS deployment path expressed later as Terraform Infrastructure as Code (Phase 7).
 
+## Platform report
+
+A short multi-page **platform report** (home, architecture, pipeline, operations, reference) is planned as **Phase 8** and will summarize the verified platform. Until that phase ships, this repository and [`PROJECT_STATUS.md`](PROJECT_STATUS.md) are the source of truth.
+
+| | |
+| --- | --- |
+| Live report | *Not published yet* (Phase 8) |
+| Scheme | See [`ROADMAP.md`](ROADMAP.md) → Platform report site |
+| Status | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) → Platform report site |
+
+When the report is live, the URL will also be set on the GitHub repository **About → Website** field.
+
 **Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. Next work is Phase 1 ingestion.
 
 ## Prerequisites
@@ -73,11 +85,11 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | Document | Role |
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | Agent and contributor operating contract |
-| [`ROADMAP.md`](ROADMAP.md) | Issue-level scope and acceptance criteria |
+| [`ROADMAP.md`](ROADMAP.md) | Issue-level scope and acceptance criteria (phases 0–8) |
 | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Delivered vs verified ledger |
 | [`DECISIONS.md`](DECISIONS.md) | Architecture decision index |
 | [`docs/decisions/`](docs/decisions/) | ADR detail |
 
 ## Out of scope for Phase 0
 
-Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and the AWS Terraform path (Phase 7).
+Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, the AWS Terraform path (Phase 7), and the platform report site (Phase 8).

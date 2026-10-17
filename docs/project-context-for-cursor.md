@@ -254,15 +254,32 @@ Objetivos: - Documentar o mapeamento local→AWS (MinIO→S3, catálogo
 local→Glue, Trino→Athena). - Entregar módulos Terraform para S3, Glue
 Catalog, Athena, IAM e OIDC (GitHub Actions). - Documentar backend
 remoto (S3 + lock) como padrão de produção e layout adequado à
-validação em CI. - Publicar modelo de custo com premissas. - Finalizar
-README, diagramas, runbooks e estudo de caso.
+validação em CI. - Publicar modelo de custo com premissas. - Entregar
+estudo de caso **no repositório** (README, diagramas, passos de
+reprodução) como base para a Fase 8.
 
 Critérios de aceite: - Mapeamento de serviços e módulos Terraform
 claros e alinhados. - IAM segue o princípio do menor privilégio. -
 OIDC e CI de validação Terraform (`fmt` / `validate`) estão
 documentados. - Modelo de custo e limitações arquiteturais são
-explícitos. - O case study apresenta a plataforma local e o caminho de
-provisionamento AWS via IaC.
+explícitos. - O case study in-repo apresenta a plataforma local e o
+caminho de provisionamento AWS via IaC.
+
+### Fase 8 --- Site/relatório da plataforma (semanas 16--18)
+
+Objetivos: - Entregar o hub estático multi-página (Home, Architecture,
+Pipeline, Operations, Reference) sob `site/`. - Popular apenas com
+trabalho verificado. - Publicar hosting estático e preencher o campo
+Website do repositório GitHub. - Ligar o bloco Platform report do
+README à URL pública.
+
+Critérios de aceite: - Cinco páginas do esquema publicadas. - Build
+local e CI documentados. - Conteúdo alinhado a `PROJECT_STATUS.md`
+(nada apresentado como pronto sem evidência). - URL no About → Website
+do GitHub e no README.
+
+Regra incremental (Fases 1--7): apenas fatos já verificados; não criar
+`site/` nem polir o design antes da Fase 8.
 
 ## 5. Estrutura de diretórios proposta
 
@@ -304,6 +321,7 @@ open-data-platform/
 ├── infrastructure/
 │   └── terraform/
 ├── observability/
+├── site/                    # Phase 8 platform report; do not create early
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -709,17 +727,33 @@ Do not weaken or skip tests merely to obtain a green pipeline.
 ### Fase 7 --- Caminho AWS como IaC
 
 ``` text
-Work only on Phase 7 — AWS deployment path as Infrastructure as Code and final case study.
+Work only on Phase 7 — AWS deployment path as Infrastructure as Code and in-repo case study.
 
 Document the local→AWS service mapping (MinIO→S3, local catalog→Glue, Trino→Athena) and optional counterparts for Spark/Airflow/Kafka.
 Deliver modular Terraform for S3, Glue Catalog, Athena, least-privilege IAM, and GitHub OIDC.
 Document backend options (local for CI validation; remote S3 + lock as the production pattern).
 Add CI for terraform fmt/validate.
 Publish a cost model with explicit assumptions.
-Finish with a case study: README, diagrams, local reproduction path, and AWS provisioning guidance via IaC.
+Finish with an in-repo case study: README, diagrams, local reproduction path, and AWS provisioning guidance via IaC (feeds Phase 8).
 
 Do not invent metrics or cost figures.
 Do not run terraform apply/destroy or delete cloud resources without my explicit approval.
+Do not build the full platform report site in this phase (Phase 8).
+```
+
+### Fase 8 --- Site/relatório da plataforma
+
+``` text
+Work only on Phase 8 — Platform report site.
+
+Build the static multi-page report under site/: Home, Architecture, Pipeline, Operations, Reference.
+Use only verified platform material from PROJECT_STATUS.md, docs/, and the Phase 7 case study.
+Document local build; add CI build (and optional deploy).
+Publish hosting and set the GitHub repository About → Website URL; link it from the README Platform report block.
+Keep tone factual (platform documentation).
+
+Do not invent metrics, lineage, or cost figures.
+Do not claim unfinished phases as complete.
 ```
 
 ## 10. Estratégia de Git

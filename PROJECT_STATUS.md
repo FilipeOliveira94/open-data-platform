@@ -4,10 +4,11 @@
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-16 (Phase 0 verified; uv 0.13.1 pinned) |
+| Last updated | 2026-10-16 (Phase 8 report site added to roadmap; Phase 0 verified) |
 | Current phase | Phase 1 — Multi-source ingestion |
 | Phase 0 | Verified |
 | Platform (ingestion through lakehouse; AWS path as IaC in Phase 7) | Not started |
+| Platform report site (Phase 8) | Not started |
 
 This ledger records **delivered work and executed validation**. Planned architecture is not treated as complete.
 
@@ -19,7 +20,7 @@ This ledger records **delivered work and executed validation**. Planned architec
 
 Start Phase 1 with **P1-01** (historical dataset license/redistribution check) and **P1-02** (raw storage layout and ingestion metadata conventions).
 
-Out of scope leftover from Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and the AWS Terraform path (Phase 7).
+Out of scope leftover from Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, the AWS Terraform path (Phase 7), and the platform report site (Phase 8).
 
 ## Verified
 
@@ -42,7 +43,7 @@ Out of scope leftover from Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kuber
 | P0-03 | Project engineering rules (architecture, Python/testing, data engineering, infrastructure/security, workflow) | `71e96c6` — `.cursor/rules/` |
 | P0-04 | Project status ledger | `PROJECT_STATUS.md` |
 | P0-05 | Program context: objectives, constraints, target architecture, and phase backlog | `docs/` |
-| P0-06 | Program roadmap: phases 0–7, issue IDs, dependencies, acceptance criteria | `ROADMAP.md` |
+| P0-06 | Program roadmap: phases 0–8, issue IDs, dependencies, acceptance criteria | `ROADMAP.md` (Phase 8 added 2026-10-16) |
 | P0-07 | Decision log: summary index + ADRs for proposed stack D-001–D-017 | `DECISIONS.md`, `docs/decisions/` |
 | P0-08 | Python 3.12 package with `uv` and committed lockfile | `pyproject.toml`, `uv.lock`, `src/open_data_platform/`; `uv` required-version `==0.13.1` |
 | P0-09 | Ruff and pytest, including toolchain smoke | Ruff + `tests/unit/` (verified) |
@@ -92,6 +93,7 @@ Issue-level detail belongs in `ROADMAP.md`.
 | 5 | Observability, lineage, and cost visibility (Prometheus, Grafana, OpenLineage where supported) | Sprint 6 | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 | Not started |
 | 7 | AWS deployment path as IaC (Terraform, local→AWS mapping), case-study documentation | Sprint 6 | Not started |
+| 8 | Platform report site: Home, Architecture, Pipeline, Operations, Reference | Sprint 7 | Not started |
 
 ## Open decisions
 
@@ -134,6 +136,18 @@ Analytical model names (`fct_*`, `dim_*`, `mart_*`) remain roadmap placeholders 
 
 None.
 
+## Platform report site
+
+Planned public hub finalized in **Phase 8**. Until then: no `site/` tree; optional light notes only for verified facts. See `ROADMAP.md` → Platform report site growth scheme.
+
+| Page | Role | Status |
+| --- | --- | --- |
+| Home | Purpose, status, sketch | Not started |
+| Architecture | Stack, medallion, contracts, batch vs stream | Not started |
+| Pipeline | Ingestion → Gold, orchestration, CDC | Not started |
+| Operations | Quality, observability, lineage, CI, AWS IaC path | Not started |
+| Reference | Links to repo, ADRs, roadmap, setup | Not started |
+
 ## Next work
 
 1. Phase 1 — **P1-01**: historical dataset license and redistribution check.
@@ -149,6 +163,10 @@ None.
 | Result | Phase 0 acceptance complete; `uv` pin to 0.13.1 added for reproducible CI installs |
 
 ## Log
+
+### 2026-10-16 — Phase 8 platform report site on roadmap
+
+Added Phase 8 as the program close-out: multi-page static report (Home, Architecture, Pipeline, Operations, Reference). Documented incremental growth (verified facts only before Phase 8) and P7-07 as in-repo case study feeding the site. Updated `ROADMAP.md`, this ledger, `README.md`, and `docs/project-context-for-cursor.md`. No `site/` scaffold yet.
 
 ### 2026-10-16 — Phase 0 verified; pin uv 0.13.1
 

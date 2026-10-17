@@ -39,6 +39,23 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
 | 7 | AWS deployment path as IaC (Terraform, local→AWS mapping), case-study docs | Sprint 6 (weeks 14–16) | Phase 6 verified | Not started |
+| 8 | Platform report site: multi-page static report | Sprint 7 (weeks 16–18) | Phase 7 verified | Not started |
+
+### Platform report site — growth scheme
+
+Public-facing **platform report** (not a separate product): a small static hub that presents the verified platform. Tone stays technical and factual.
+
+| Page | Role | Primary sources |
+| --- | --- | --- |
+| **Home** | What the platform is, current status, one architecture sketch | `README.md`, `PROJECT_STATUS.md` |
+| **Architecture** | Stack, medallion layers, contracts, batch vs streaming coexistence | `docs/architecture/`, ADRs, `DECISIONS.md` |
+| **Pipeline** | Ingestion → Bronze / Silver / Gold, orchestration, CDC | Phase 1–4 docs and diagrams |
+| **Operations** | Quality, observability, lineage, CI, local→AWS IaC path | Phases 5–7 docs; P7 case study |
+| **Reference** | Links to repository, ADRs, roadmap, setup | Repo root docs |
+
+**Incremental rule (Phases 1–7):** optional light updates only—facts that are already **verified** in `PROJECT_STATUS.md` (status line, short paragraph, diagram placeholder). Do **not** build full page design, copy polish, or hosting until Phase 8. Do **not** create `site/` until Phase 8 starts.
+
+**Phase 7 vs Phase 8:** P7-07 delivers the **in-repo case study** (markdown, diagrams, reproduction steps). Phase 8 turns that material into the **deployed multi-page report** and sets the GitHub repository Website URL.
 
 ---
 
@@ -66,7 +83,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | P0-03 | Project engineering rules | P0-02 | Delivered | `.cursor/rules/` covers principles, Python/testing, data engineering, infra/security, workflow |
 | P0-04 | Project status ledger | — | Delivered | `PROJECT_STATUS.md` distinguishes delivered vs verified |
 | P0-05 | Program context document | — | Delivered | `docs/project-context-for-cursor.md` captures objectives, constraints, target architecture |
-| P0-06 | Program roadmap | P0-04, P0-05 | Delivered | This file: phases 0–7, issue IDs, dependencies, acceptance, out-of-scope |
+| P0-06 | Program roadmap | P0-04, P0-05 | Delivered | This file: phases 0–8, issue IDs, dependencies, acceptance, out-of-scope |
 | P0-07 | Decision log scaffold | P0-06 | Delivered | `DECISIONS.md` is a summary index; ADRs under `docs/decisions/` hold rationale; proposed vs approved visible |
 | P0-08 | Python 3.12 package with `uv` | — | Delivered | Package under `src/open_data_platform/`; `pyproject.toml` + committed lockfile; installable via documented command |
 | P0-09 | Ruff and pytest smoke | P0-08 | Verified | Lint and a toolchain smoke test pass via documented commands |
@@ -303,9 +320,41 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | P7-04 | GitHub Actions OIDC to AWS | P7-03 | Not started | OIDC provider and deploy role as Terraform + docs; no long-lived access keys in the repository |
 | P7-05 | CI: Terraform fmt and validate | P7-02, P6-03 | Not started | Workflow runs `terraform fmt -check` and `validate` on the IaC tree |
 | P7-06 | AWS cost model | P7-01 | Not started | Cost model with assumptions, drivers and monthly estimate ranges for the documented AWS design |
-| P7-07 | Case study: README, diagrams, demo path | P7-03, P7-04, P7-05, P7-06 | Not started | Case study: local platform + AWS IaC path, architecture diagrams, setup and provisioning guidance |
+| P7-07 | Case study: README, diagrams, demo path | P7-03, P7-04, P7-05, P7-06 | Not started | In-repo case study: local platform + AWS IaC path, architecture diagrams, setup and provisioning guidance; content ready for Phase 8 site consumption |
 
 **Suggested order:** P7-01 → P7-02 → P7-03 → P7-04 ∥ P7-05 ∥ P7-06 → P7-07.
+
+---
+
+## Phase 8 — Platform report site
+
+**Goal:** Finish the program with a small, polished **multi-page static report** that documents the verified platform (home, architecture, pipeline, operations, reference). Host it and link it from the repository Website field and the README.
+
+**Depends on:** Phase 7 verified (in-repo case study and AWS IaC path available as source material).
+
+**Out of scope:** Backend, CMS, authentication, analytics pixels, interactive demos that require a live cluster, duplicating the full `ROADMAP.md` issue backlog on the site.
+
+**Phase acceptance (all required):**
+
+- [ ] Static site under `site/` (or equivalent) with the five pages populated from verified platform material.
+- [ ] Content matches delivered/verified work; no planned-but-unbuilt capabilities presented as complete.
+- [ ] Site builds locally via a documented command; CI builds (and optionally deploys) the static output.
+- [ ] Public URL is set on the GitHub repository Website field and linked from the README Platform report block.
+- [ ] Navigation and page roles match the growth scheme above; reference page links back to repo docs/ADRs.
+
+### Issues
+
+| ID | Title | Depends on | Status | Acceptance |
+| --- | --- | --- | --- | --- |
+| P8-01 | Site scaffold and page map | Phase 7 | Not started | `site/` with static toolchain chosen and documented; five routes stubbed (Home, Architecture, Pipeline, Operations, Reference); local build command works |
+| P8-02 | Home and Architecture pages | P8-01, P7-07 | Not started | Home states platform purpose and verified status; Architecture covers stack, medallion, contracts, batch vs stream with diagrams sourced from `docs/` |
+| P8-03 | Pipeline and Operations pages | P8-01, P7-07 | Not started | Pipeline covers ingestion through Gold, orchestration and CDC; Operations covers quality, observability, lineage, CI and local→AWS IaC path |
+| P8-04 | Reference page and repo cross-links | P8-02, P8-03 | Not started | Reference links to GitHub, ADRs, roadmap, setup; README Platform report block points to the live URL (or staging URL if deploy is gated) |
+| P8-05 | Static hosting and GitHub Website field | P8-04 | Not started | Hosting documented (e.g. GitHub Pages or equivalent); CI build green; repository About → Website set to the report URL |
+| P8-06 | Final copy and consistency pass | P8-05 | Not started | Tone is factual platform documentation; status/claims aligned with `PROJECT_STATUS.md`; no unverified metrics or cost figures |
+
+
+**Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-06.
 
 ---
 
@@ -320,6 +369,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Kubernetes | Out of scope unless an explicit approved requirement |
 | Secrets | Never commit credentials, tokens, live `.env`, or private datasets |
 | Cloud / AWS IaC | Phase 7 delivers the AWS path as Terraform IaC and local→AWS mapping. CI validates with `fmt`/`validate`. Cost models must state assumptions. Never invent metrics or spend figures. Do not run `terraform apply`/`destroy` without explicit user approval |
+| Platform report site | Finalized in Phase 8. Earlier phases may add verified facts only. Site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
 | Empty dirs | Do not scaffold later-phase trees until that phase starts |
 | Language | Code/docs in English; agent↔user communication in Brazilian Portuguese |
 
@@ -343,4 +393,4 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Last updated | 2026-10-16 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-16: Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |
+| Changelog | 2026-10-16: Phase 8 (platform report site) added; growth scheme documented; window ~18 weeks. Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |
