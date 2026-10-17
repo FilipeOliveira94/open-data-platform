@@ -50,11 +50,11 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 
 **Phase acceptance (all required):**
 
-- [ ] A clean clone can follow the documented setup.
-- [ ] PostgreSQL is healthy and reachable.
-- [ ] A smoke test can write and read an object in MinIO.
-- [ ] Lint and tests run via documented commands.
-- [ ] No secrets, live `.env` files, or private datasets are in version control.
+- [x] A clean clone can follow the documented setup.
+- [x] PostgreSQL is healthy and reachable.
+- [x] A smoke test can write and read an object in MinIO.
+- [x] Lint and tests run via documented commands.
+- [x] No secrets, live `.env` files, or private datasets are in version control.
 - [ ] CI runs the same lint and test checks.
 
 ### Issues
@@ -68,12 +68,12 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | P0-05 | Program context document | — | Delivered | `docs/project-context-for-cursor.md` captures objectives, constraints, target architecture |
 | P0-06 | Program roadmap | P0-04, P0-05 | Delivered | This file: phases 0–7, issue IDs, dependencies, acceptance, out-of-scope |
 | P0-07 | Decision log scaffold | P0-06 | Delivered | `DECISIONS.md` is a summary index; ADRs under `docs/decisions/` hold rationale; proposed vs approved visible |
-| P0-08 | Python 3.12 package with `uv` | — | Not started | Package under `src/open_data_platform/`; `pyproject.toml` + committed lockfile; installable via documented command |
-| P0-09 | Ruff and pytest smoke | P0-08 | Not started | Lint and a toolchain smoke test pass via documented commands |
-| P0-10 | Docker Compose: PostgreSQL 16 and MinIO | — | Not started | Pinned image tags; health checks; documented start/stop; no unverified tags |
-| P0-11 | Repo hygiene and README | P0-08, P0-10 | Not started | `.gitignore`, `.env.example` (names/placeholders only), Makefile, `README.md` with setup |
-| P0-12 | GitHub Actions: lint and tests | P0-09 | Not started | Workflow runs lint + tests; no cloud deploy |
-| P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Not started | Approve/update D-001 (and D-002 as applicable) in `DECISIONS.md`/ADRs: Compose for local verification; AWS as Terraform IaC in Phase 7 |
+| P0-08 | Python 3.12 package with `uv` | — | Delivered | Package under `src/open_data_platform/`; `pyproject.toml` + committed lockfile; installable via documented command |
+| P0-09 | Ruff and pytest smoke | P0-08 | Verified | Lint and a toolchain smoke test pass via documented commands |
+| P0-10 | Docker Compose: PostgreSQL 16 and MinIO | — | Verified | Pinned image tags; health checks; documented start/stop; no unverified tags |
+| P0-11 | Repo hygiene and README | P0-08, P0-10 | Delivered | `.gitignore`, `.env.example` (names/placeholders only), Makefile, `README.md` with setup |
+| P0-12 | GitHub Actions: lint and tests | P0-09 | Delivered | Workflow runs lint + tests; no cloud deploy |
+| P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Delivered | Approve/update D-001 (and D-002 as applicable) in `DECISIONS.md`/ADRs: Compose for local verification; AWS as Terraform IaC in Phase 7 |
 
 **Suggested order:** P0-06 → P0-07 → P0-08 → P0-09 → P0-10 → P0-11 → P0-12 → P0-13 (P0-08 and P0-10 may proceed in parallel after P0-07).
 
@@ -340,7 +340,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-10-15 |
+| Last updated | 2026-10-16 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-15: ADRs restructured to D-001–D-017 (splits + discovery/dataviz). Earlier: P0-07 summary index; Phase 7 as AWS IaC; three update patterns; P3-08/P3-09/P4-07 |
+| Changelog | 2026-10-16: Compose runtime verified; D-002 AGPL/AIStor note; CI still pending. Earlier same day: P0-08–P0-13 delivered. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |

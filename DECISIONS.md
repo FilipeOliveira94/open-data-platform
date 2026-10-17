@@ -25,8 +25,8 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | ID | Topic | Proposed stack | Implemented stack | State | ADR |
 | --- | --- | --- | --- | --- | --- |
-| D-001 | Runtime | Docker Compose (local); Terraform IaC for AWS (Phase 7) | — | `proposed` | [ADR-0001](docs/decisions/0001-runtime-compose-local-aws-iac.md) |
-| D-002 | Object storage | MinIO (local); Amazon S3 (AWS) | — | `proposed` | [ADR-0002](docs/decisions/0002-object-storage-minio-s3.md) |
+| D-001 | Runtime | Docker Compose (local); Terraform IaC for AWS (Phase 7) | Compose baseline: PostgreSQL 16 + MinIO (Phase 0); AWS IaC still Phase 7 | `approved` | [ADR-0001](docs/decisions/0001-runtime-compose-local-aws-iac.md) |
+| D-002 | Object storage | MinIO (local, AGPLv3); Amazon S3 (AWS) | `coollabsio/minio:RELEASE.2025-10-15T17-29-55Z` (community rebuild; official images pulled for AIStor); S3 still Phase 7 | `approved` | [ADR-0002](docs/decisions/0002-object-storage-minio-s3.md) |
 | D-003 | Table format | Parquet + Apache Iceberg (after PoC) | — | `proposed` | [ADR-0003](docs/decisions/0003-table-format-parquet-iceberg.md) |
 | D-004 | Table catalog / SQL | Local table catalog + SQL after PoC; Glue Catalog + Athena (AWS) | — | `proposed` | [ADR-0004](docs/decisions/0004-table-catalog-and-sql-engines.md) |
 | D-005 | Compute / transform | Apache Spark; dbt for Gold | — | `proposed` | [ADR-0005](docs/decisions/0005-compute-and-transform.md) |
@@ -57,6 +57,8 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-10-16 | D-002: noted MinIO official images removed for AIStor; community AGPLv3 builds remain OK for local use; Compose runtime verified |
+| 2026-10-16 | P0-13: approved D-001 and D-002; recorded Compose baseline and MinIO community image pin |
 | 2026-10-15 | Restructured to D-001–D-017: removed phase-0/K8s/placeholder ADRs; split compute vs orchestration and observability vs lineage; added medallion, contracts, coexistence, monorepo, discovery, dataviz |
 | 2026-10-15 | Index columns: Proposed stack vs Implemented stack |
 | 2026-10-15 | Initial decision log (P0-07) |

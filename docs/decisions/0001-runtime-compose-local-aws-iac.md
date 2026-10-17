@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` |
 | Date opened | 2026-10-15 |
-| Date decided | — |
+| Date decided | 2026-10-16 |
 | Owner | Platform architect |
 | Index ID | D-001 |
 | Related issues | P0-13, Phase 7 (`P7-01`–`P7-07`) |
@@ -18,6 +18,8 @@ The platform must be reproducible on a laptop (Windows 11 + WSL2 + Docker Deskto
 ## Decision
 
 Use **Docker Compose** as the environment for development and end-to-end verification. Deliver the **AWS target architecture as Terraform Infrastructure as Code** in Phase 7 (service mapping, modules, IAM/OIDC, cost model, case study). CI validates Terraform with `fmt` / `validate`; `terraform apply` / `destroy` remain approval-gated.
+
+Phase 0 Compose scope is limited to **PostgreSQL 16** and **MinIO** (see ADR-0002). Later phases add services to the same Compose model when those phases start.
 
 ## Alternatives considered
 
@@ -38,7 +40,9 @@ Use **Docker Compose** as the environment for development and end-to-end verific
 
 ## Evidence / validation
 
-None yet — pending P0-13 and Phase 7 artifacts.
+- `docker-compose.yml` defines pinned PostgreSQL 16 and MinIO services with health checks (P0-10).
+- `README.md` and `Makefile` document start/stop and verification commands (P0-11).
+- Runtime (2026-10-16): `docker compose up -d` → `odp-postgres` and `odp-minio` **healthy**; `pg_isready -U odp -d odp` accepting connections; MinIO put/get smoke passed.
 
 ## Revisit when
 
