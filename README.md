@@ -4,15 +4,16 @@ Reproducible open-source data platform: local development on Windows 11 + WSL2 +
 
 ## Platform report
 
-A short multi-page **platform report** (home, architecture, pipeline, operations, reference) is planned as **Phase 8** and will summarize the verified platform. Until that phase ships, this repository and [`PROJECT_STATUS.md`](PROJECT_STATUS.md) are the source of truth.
+A short multi-page **platform report** (home, architecture, pipeline, operations, reference) lives under [`site/`](site/) as an Astro [Starlight](https://starlight.astro.build/) app with the [Catppuccin](https://starlight-themes.netlify.app/catppuccin/) theme. Content reflects **verified** work only; public hosting is **Phase 8**. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) remains the source of truth.
 
 | | |
 | --- | --- |
 | Live report | *Not published yet* (Phase 8) |
+| Local preview | `cd site && npm install && npm run dev` — see [`site/README.md`](site/README.md) (Node.js 22.12+) |
 | Scheme | See [`ROADMAP.md`](ROADMAP.md) → Platform report site |
 | Status | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) → Platform report site |
 
-When the report is live, the URL will also be set on the GitHub repository **About → Website** field.
+When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
 **Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. Next work is Phase 1 ingestion.
 

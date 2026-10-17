@@ -1,0 +1,35 @@
+---
+title: Open Data Platform
+description: Reproducible open-source data platform with a verified local Compose baseline and a planned AWS Terraform path.
+---
+
+A reproducible open-source data platform for local development on Windows 11 + WSL2 + Docker Compose, with an AWS deployment path expressed later as Terraform Infrastructure as Code.
+
+## Current status
+
+| Status | Scope |
+| --- | --- |
+| **Verified** | Phase 0 — repository, Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, CI |
+| **Planned** | Phases 1–7 — ingestion, lakehouse, orchestration, CDC, observability, CI expansion, AWS IaC |
+| **Planned** | Phase 8 — report polish and public hosting |
+
+## Baseline sketch
+
+```text
+Phase 0 (verified)              Later (planned)
+─────────────────               ────────────────
+Python + uv + Ruff + pytest
+        │
+        ├── PostgreSQL 16  (Compose)
+        └── MinIO          (Compose)
+        │
+GitHub Actions: lint + unit tests
+
+                                Ingestion → Lakehouse → AWS Terraform
+```
+
+Source of truth for delivered work: [`PROJECT_STATUS.md`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/PROJECT_STATUS.md) in the [repository](https://github.com/FilipeOliveira94/open-data-platform).
+
+:::note
+This site summarizes **verified** facts only. Public hosting and final design polish are Phase 8.
+:::

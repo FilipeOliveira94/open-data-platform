@@ -267,19 +267,19 @@ caminho de provisionamento AWS via IaC.
 
 ### Fase 8 --- Site/relatório da plataforma (semanas 16--18)
 
-Objetivos: - Entregar o hub estático multi-página (Home, Architecture,
-Pipeline, Operations, Reference) sob `site/`. - Popular apenas com
-trabalho verificado. - Publicar hosting estático e preencher o campo
-Website do repositório GitHub. - Ligar o bloco Platform report do
-README à URL pública.
+Objetivos: - Completar o hub Starlight multi-página (Home, Architecture,
+Pipeline, Operations, Reference) sob `site/` com tema Catppuccin. -
+Popular apenas com trabalho verificado. - Publicar hosting estático e
+preencher o campo Website do repositório GitHub. - Ligar o bloco
+Platform report do README à URL pública.
 
 Critérios de aceite: - Cinco páginas do esquema publicadas. - Build
 local e CI documentados. - Conteúdo alinhado a `PROJECT_STATUS.md`
 (nada apresentado como pronto sem evidência). - URL no About → Website
 do GitHub e no README.
 
-Regra incremental (Fases 1--7): apenas fatos já verificados; não criar
-`site/` nem polir o design antes da Fase 8.
+Regra incremental (Fases 1--7): scaffold Starlight + Catppuccin em `site/`
+permitido; conteúdo só com fatos já verificados; hosting fica na Fase 8.
 
 ## 5. Estrutura de diretórios proposta
 
@@ -321,7 +321,7 @@ open-data-platform/
 ├── infrastructure/
 │   └── terraform/
 ├── observability/
-├── site/                    # Phase 8 platform report; do not create early
+├── site/                    # Starlight + Catppuccin report; hosting in Phase 8
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -746,9 +746,9 @@ Do not build the full platform report site in this phase (Phase 8).
 ``` text
 Work only on Phase 8 — Platform report site.
 
-Build the static multi-page report under site/: Home, Architecture, Pipeline, Operations, Reference.
+Complete the Starlight + Catppuccin report under site/: Home, Architecture, Pipeline, Operations, Reference.
 Use only verified platform material from PROJECT_STATUS.md, docs/, and the Phase 7 case study.
-Document local build; add CI build (and optional deploy).
+Document npm run build; add CI build (and optional deploy).
 Publish hosting and set the GitHub repository About → Website URL; link it from the README Platform report block.
 Keep tone factual (platform documentation).
 

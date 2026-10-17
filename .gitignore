@@ -25,6 +25,12 @@ coverage.xml
 # UV / tooling
 uv-cache/
 
+# Platform report site (Astro / Starlight)
+node_modules/
+.astro/
+site/dist/
+site/.astro/
+
 # IDE / OS
 .idea/
 .vscode/

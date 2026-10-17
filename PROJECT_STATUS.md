@@ -4,11 +4,11 @@
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-16 (Phase 8 report site added to roadmap; Phase 0 verified) |
+| Last updated | 2026-10-16 (Starlight + Catppuccin site scaffold) |
 | Current phase | Phase 1 — Multi-source ingestion |
 | Phase 0 | Verified |
 | Platform (ingestion through lakehouse; AWS path as IaC in Phase 7) | Not started |
-| Platform report site (Phase 8) | Not started |
+| Platform report site (Phase 8) | Scaffold in progress (Starlight/Catppuccin; no hosting) |
 
 This ledger records **delivered work and executed validation**. Planned architecture is not treated as complete.
 
@@ -138,15 +138,15 @@ None.
 
 ## Platform report site
 
-Planned public hub finalized in **Phase 8**. Until then: no `site/` tree; optional light notes only for verified facts. See `ROADMAP.md` → Platform report site growth scheme.
+Astro Starlight app under `site/` with [Catppuccin](https://starlight-themes.netlify.app/catppuccin/) (`@catppuccin/starlight`). Content uses **verified** facts only. Public hosting remains **Phase 8**. See `ROADMAP.md` → Platform report site growth scheme and `site/README.md` for local preview (`npm run dev`).
 
 | Page | Role | Status |
 | --- | --- | --- |
-| Home | Purpose, status, sketch | Not started |
-| Architecture | Stack, medallion, contracts, batch vs stream | Not started |
-| Pipeline | Ingestion → Gold, orchestration, CDC | Not started |
-| Operations | Quality, observability, lineage, CI, AWS IaC path | Not started |
-| Reference | Links to repo, ADRs, roadmap, setup | Not started |
+| Home | Purpose, status, sketch | Scaffold delivered (Phase 0 facts) |
+| Architecture | Verified Compose stack + planned layers labeled | Scaffold delivered (Phase 0 facts) |
+| Pipeline | Ingestion → Gold, orchestration, CDC | Stub (not verified yet) |
+| Operations | CI / secrets hygiene verified; observability and AWS path planned | Scaffold delivered (partial) |
+| Reference | Links to repo, ADRs, roadmap, setup | Scaffold delivered |
 
 ## Next work
 
@@ -164,9 +164,17 @@ Planned public hub finalized in **Phase 8**. Until then: no `site/` tree; option
 
 ## Log
 
+### 2026-10-16 — Platform report site on Starlight + Catppuccin
+
+Replaced the plain HTML scaffold with Astro Starlight and `@catppuccin/starlight` (preview: starlight-themes.netlify.app/catppuccin). Five pages keep Phase 0 verified content; Pipeline remains a stub. Preview: `cd site && npm run dev` (Node.js 22.12+). No public hosting (Phase 8).
+
+### 2026-10-16 — Platform report site scaffold (Phase 0 content)
+
+Added early `site/` scaffold with Phase 0 verified facts. Roadmap incremental rule updated to allow early scaffold; P8-01 marked in progress.
+
 ### 2026-10-16 — Phase 8 platform report site on roadmap
 
-Added Phase 8 as the program close-out: multi-page static report (Home, Architecture, Pipeline, Operations, Reference). Documented incremental growth (verified facts only before Phase 8) and P7-07 as in-repo case study feeding the site. Updated `ROADMAP.md`, this ledger, `README.md`, and `docs/project-context-for-cursor.md`. No `site/` scaffold yet.
+Added Phase 8 as the program close-out: multi-page static report (Home, Architecture, Pipeline, Operations, Reference). Documented incremental growth and P7-07 as in-repo case study feeding the site. Updated `ROADMAP.md`, this ledger, `README.md`, and `docs/project-context-for-cursor.md`.
 
 ### 2026-10-16 — Phase 0 verified; pin uv 0.13.1
 

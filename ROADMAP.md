@@ -53,7 +53,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | **Operations** | Quality, observability, lineage, CI, local→AWS IaC path | Phases 5–7 docs; P7 case study |
 | **Reference** | Links to repository, ADRs, roadmap, setup | Repo root docs |
 
-**Incremental rule (Phases 1–7):** optional light updates only—facts that are already **verified** in `PROJECT_STATUS.md` (status line, short paragraph, diagram placeholder). Do **not** build full page design, copy polish, or hosting until Phase 8. Do **not** create `site/` until Phase 8 starts.
+**Incremental rule (Phases 1–7):** a scaffold under `site/` may exist early (Astro Starlight + Catppuccin theme). Content updates must use only facts already **verified** in `PROJECT_STATUS.md`. Do **not** complete public hosting or final copy polish until Phase 8.
 
 **Phase 7 vs Phase 8:** P7-07 delivers the **in-repo case study** (markdown, diagrams, reproduction steps). Phase 8 turns that material into the **deployed multi-page report** and sets the GitHub repository Website URL.
 
@@ -346,7 +346,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
-| P8-01 | Site scaffold and page map | Phase 7 | Not started | `site/` with static toolchain chosen and documented; five routes stubbed (Home, Architecture, Pipeline, Operations, Reference); local build command works |
+| P8-01 | Site scaffold and page map | Phase 7 | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev`. Early scaffold allowed before Phase 7; Phase 8 completes content depth and hosting |
 | P8-02 | Home and Architecture pages | P8-01, P7-07 | Not started | Home states platform purpose and verified status; Architecture covers stack, medallion, contracts, batch vs stream with diagrams sourced from `docs/` |
 | P8-03 | Pipeline and Operations pages | P8-01, P7-07 | Not started | Pipeline covers ingestion through Gold, orchestration and CDC; Operations covers quality, observability, lineage, CI and local→AWS IaC path |
 | P8-04 | Reference page and repo cross-links | P8-02, P8-03 | Not started | Reference links to GitHub, ADRs, roadmap, setup; README Platform report block points to the live URL (or staging URL if deploy is gated) |
@@ -369,7 +369,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | Kubernetes | Out of scope unless an explicit approved requirement |
 | Secrets | Never commit credentials, tokens, live `.env`, or private datasets |
 | Cloud / AWS IaC | Phase 7 delivers the AWS path as Terraform IaC and local→AWS mapping. CI validates with `fmt`/`validate`. Cost models must state assumptions. Never invent metrics or spend figures. Do not run `terraform apply`/`destroy` without explicit user approval |
-| Platform report site | Finalized in Phase 8. Earlier phases may add verified facts only. Site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
+| Platform report site | Scaffold may land early; full content, design and hosting finalized in Phase 8. Earlier phases may add verified facts only. Site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
 | Empty dirs | Do not scaffold later-phase trees until that phase starts |
 | Language | Code/docs in English; agent↔user communication in Brazilian Portuguese |
 
@@ -393,4 +393,4 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | Last updated | 2026-10-16 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-16: Phase 8 (platform report site) added; growth scheme documented; window ~18 weeks. Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |
+| Changelog | 2026-10-16: Early `site/` scaffold allowed (verified facts only); Phase 8 remains design/hosting close-out. Phase 8 plan added. Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |
