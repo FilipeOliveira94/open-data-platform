@@ -7,7 +7,7 @@
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-014 |
-| Related issues | Cross-cutting; P1-06, P3-08, P3-09, Phase 4, P4-07 |
+| Related issues | Cross-cutting; P1-06, P3-04, P3-05, Phase 4, P4-07 |
 | Supersedes | — |
 | Superseded by | — |
 

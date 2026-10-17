@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | `proposed` |
 | Date opened | 2026-10-15 |
-| Date decided | — |
+| Date decided | — (Gold domain split recorded 2026-10-17; layer choice still proposed until Phase 2) |
 | Owner | Platform architect |
 | Index ID | D-012 |
 | Related issues | Phase 2 (`P2-03`–`P2-06`) |
@@ -21,6 +21,15 @@ Adopt **Bronze / Silver / Gold**:
 - **Bronze:** near-source payloads plus ingestion metadata; auditable; minimal destructive cleansing.
 - **Silver:** typed, deduplicated, validated entities; intentional null/duplicate/invalid handling.
 - **Gold:** business marts and analytical models (dbt) with documented grain and keys.
+
+**Gold domains (separate analytical products — do not merge schemas):**
+
+| Domain | Primary sources | Example layout |
+| --- | --- | --- |
+| `olist_analysis` | Olist files, Postgres seed/CDC, funnel, IBGE/CEP enrichment when present | e.g. `gold/olist_analysis/` or dbt package/schema `olist_analysis` |
+| `product_analysis` | DummyJSON products (P1-05) | e.g. `gold/product_analysis/` or dbt package/schema `product_analysis` |
+
+Shared platform infrastructure (Spark, Iceberg, catalog) may serve both; **marts, grains and keys stay domain-scoped**.
 
 ## Alternatives considered
 

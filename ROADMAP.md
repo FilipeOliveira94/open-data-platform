@@ -10,6 +10,7 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 - Mark an issue **verified** only when its acceptance checks have been run and the result is recorded in `PROJECT_STATUS.md`.
 - Do not start a phase until its listed dependencies are satisfied (or an explicit waiver is recorded in `DECISIONS.md`).
 - Do not create empty directories for later phases until that phase starts.
+- Within a phase, keep **feature / source issues before phase-closing** validation and docs issues (failure tests, regression checks, “Phase N documentation”). New work must not be appended after those closing IDs.
 
 ---
 
@@ -121,13 +122,15 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P1-02 | Raw storage layout and ingestion metadata conventions | Phase 0 | Not started | Paths, partition conventions, `_ingestion_ts`, source id, execution id documented and used by writers |
 | P1-03 | Data contracts for planned sources | P1-02 | Not started | Contracts under `config/contracts/` (or agreed path); schema/fields/null rules explicit |
 | P1-04 | Historical e-commerce dataset ingestion | P1-01, P1-02, P1-03 | Not started | Repeatable ingest of Olist e-commerce (+ marketing funnel join on `seller_id`) to raw layout; idempotent re-run; unit/integration coverage without private/vendored Olist data |
-| P1-05 | Paginated public API client | P1-02, P1-03 | Not started | Timeouts, retries, rate-limit handling; local fixtures; no live-API dependency in unit tests |
-| P1-06 | PostgreSQL incremental batch extract | P0-10, P1-02, P1-03 | Not started | Parameterized extract by watermark/window (`start`/`end` or high-water mark); grain/keys documented; same code path supports daily and weekly windows; idempotent re-run without corrupting raw |
+| P1-05 | Paginated public API client (DummyJSON products) | P1-02, P1-03 | Not started | DummyJSON `/products` (`limit`/`skip`); timeouts, retries, rate-limit handling; fixtures; no live API in unit tests; lands in Gold `product_analysis` (D-019, D-012) |
+| P1-06 | PostgreSQL incremental batch extract | P0-10, P1-02, P1-03 | Not started | Parameterized extract by watermark/window (`start`/`end` or high-water mark); grain/keys documented; same code path supports daily and weekly windows; idempotent re-run without corrupting raw; OLTP seed per `docs/sources/postgres-oltp.md` |
 | P1-07 | Synthetic event generator | P1-02 | Not started | Deterministic or seedable generator for later streaming scenarios; schema documented |
-| P1-08 | Failure and invalid-record behavior | P1-04–P1-07 | Not started | Explicit handling for nulls, duplicates, invalid schemas; tests for failure paths |
-| P1-09 | Phase 1 documentation and status | P1-08 | Not started | README/docs updated; three update patterns (daily batch, weekly batch, streaming) referenced; `PROJECT_STATUS.md` records verification evidence |
+| P1-08 | IBGE Localidades ingest | P1-02, P1-03 | Not started | Ingest IBGE localities into raw; contracts; geo reference for `olist_analysis` (D-019) |
+| P1-09 | BrasilAPI CEP enrichment (optional) | P1-02, P1-04 | Not started | Optional: small cached CEP lookups only; no CEP crawl; enrich Olist zip prefixes when scheduled |
+| P1-10 | Failure and invalid-record behavior | P1-04–P1-08 | Not started | Explicit handling for nulls, duplicates, invalid schemas; tests for failure paths |
+| P1-11 | Phase 1 documentation and status | P1-10 | Not started | README/docs updated; three update patterns (daily batch, weekly batch, streaming) referenced; `PROJECT_STATUS.md` records verification evidence |
 
-**Suggested order:** P1-01 ∥ P1-02 → P1-03 → P1-04 ∥ P1-05 ∥ P1-06 ∥ P1-07 → P1-08 → P1-09.
+**Suggested order:** P1-01 ∥ P1-02 → P1-03 → P1-04 ∥ P1-05 ∥ P1-06 ∥ P1-07 ∥ P1-08 → P1-10 → P1-11; P1-09 optional after P1-04 layout exists.
 
 ---
 
@@ -161,7 +164,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Suggested order:** P2-01 → P2-02 → P2-03 → P2-04 → P2-05 → P2-06 → P2-07 → P2-08.
 
-**Analytical models (placeholders until P2-05):** `fct_orders`, `fct_order_items`, `fct_payments`, `dim_customers`, `dim_products`, `dim_date`, `mart_daily_sales`, `mart_customer_retention`.
+**Analytical models (placeholders until P2-05), by Gold domain:**
+
+- `olist_analysis`: `fct_orders`, `fct_order_items`, `fct_payments`, `dim_customers`, `dim_products`, `dim_date`, `mart_daily_sales`, `mart_customer_retention` (plus funnel/geo as approved).
+- `product_analysis`: DummyJSON product marts (names locked in P2-05); separate schema/folder from Olist.
 
 ---
 
@@ -189,14 +195,14 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P3-01 | Airflow in local Compose | Phase 2 | Not started | Airflow runs locally; pinned images; documented UI/CLI access; business logic stays out of DAG bodies |
 | P3-02 | Ingestion DAGs (thin wrappers) | P3-01, Phase 1 | Not started | DAGs call package entrypoints; retries/timeouts configured; no duplicated business logic |
 | P3-03 | Transform / dbt DAGs | P3-01, Phase 2 | Not started | Orchestrates Bronze→Silver→Gold/dbt with clear task dependencies |
-| P3-04 | Idempotent backfill support | P3-02, P3-03 | Not started | Documented backfill parameters for daily and weekly windows; re-run evidence shows no corruption/undue duplicates |
-| P3-05 | Quality checks and quarantine | P3-03, P2-07 | Not started | Invalid records routed per contract; quarantine location and reprocess path documented |
-| P3-06 | Execution metadata and failure logging | P3-02–P3-05 | Not started | Execution IDs, failure reasons and run metadata are inspectable |
-| P3-07 | Orchestration success/failure tests | P3-04, P3-05, P3-08, P3-09 | Not started | Automated or scripted evidence for happy path, retry and failed-run handling for daily and weekly DAGs |
-| P3-08 | Daily batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Airflow DAG with daily schedule passes watermark/window into P1-06 extract; documented cadence, catchup policy and idempotency; manual trigger proves one successful daily-shaped run |
-| P3-09 | Weekly batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Distinct weekly schedule (separate DAG or explicit weekly timetable); purpose/grain vs daily documented; watermark/window for a week; manual trigger proves one successful weekly-shaped run |
+| P3-04 | Daily batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Airflow DAG with daily schedule passes watermark/window into P1-06 extract; documented cadence, catchup policy and idempotency; manual trigger proves one successful daily-shaped run |
+| P3-05 | Weekly batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Distinct weekly schedule (separate DAG or explicit weekly timetable); purpose/grain vs daily documented; watermark/window for a week; manual trigger proves one successful weekly-shaped run |
+| P3-06 | Idempotent backfill support | P3-02, P3-03 | Not started | Documented backfill parameters for daily and weekly windows; re-run evidence shows no corruption/undue duplicates |
+| P3-07 | Quality checks and quarantine | P3-03, P2-07 | Not started | Invalid records routed per contract; quarantine location and reprocess path documented |
+| P3-08 | Execution metadata and failure logging | P3-02–P3-07 | Not started | Execution IDs, failure reasons and run metadata are inspectable |
+| P3-09 | Orchestration success/failure tests | P3-04, P3-05, P3-06, P3-07 | Not started | Automated or scripted evidence for happy path, retry and failed-run handling for daily and weekly DAGs |
 
-**Suggested order:** P3-01 → P3-02 ∥ P3-03 → P3-08 ∥ P3-09 → P3-04 → P3-05 → P3-06 → P3-07.
+**Suggested order:** P3-01 → P3-02 ∥ P3-03 → P3-04 ∥ P3-05 → P3-06 → P3-07 → P3-08 → P3-09.
 
 ---
 
@@ -224,9 +230,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P4-02 | Debezium and Kafka Compose stack | P4-01 | Not started | Pinned versions; topic/connector config documented; health checks where supported |
 | P4-03 | CDC path for insert / update / delete | P4-02 | Not started | Reproducible demo of I/U/D landing in Kafka (or agreed sink) with schema documented |
 | P4-04 | Spark Structured Streaming consumer | P4-03, P2-01 | Not started | Consumer processes CDC events into lakehouse tables; checkpoints documented |
-| P4-05 | Semantics documentation (batch vs stream) | P4-03, P4-04, P3-08, P3-09 | Not started | Snapshots, duplicates, ordering, late events, deletes, checkpoints, replay and recovery documented; explicit comparison of daily batch, weekly batch and streaming CDC |
+| P4-05 | Semantics documentation (batch vs stream) | P4-03, P4-04, P3-04, P3-05 | Not started | Snapshots, duplicates, ordering, late events, deletes, checkpoints, replay and recovery documented; explicit comparison of daily batch, weekly batch and streaming CDC |
 | P4-06 | Streaming resilience scenarios | P4-04, P4-05 | Not started | Tests or runbooks for duplicates, out-of-order, restart/replay and deletes |
-| P4-07 | Batch path regression check | P3-08, P3-09, P4-04 | Not started | Evidence that daily and weekly batch extracts still succeed alongside the streaming path |
+| P4-07 | Batch path regression check | P3-04, P3-05, P4-04 | Not started | Evidence that daily and weekly batch extracts still succeed alongside the streaming path |
 
 **Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07.
 
@@ -285,7 +291,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P6-02 | CI: dbt checks | P2-06, P6-01 | Not started | dbt parse/build/test (or agreed subset) runs in CI |
 | P6-03 | CI: Terraform validate/fmt | Phase 7 scaffold or early `infrastructure/` | Not started | `terraform fmt -check` and `validate` in CI without apply |
 | P6-04 | Isolated integration test job | P0-10, Phase 1+ | Not started | Integration tests run in CI or documented Compose profile; deterministic fixtures |
-| P6-05 | Resilience test evidence | P3-07; P4-06 if present | Not started | Failure/retry/recovery scenarios executed and linked from `PROJECT_STATUS.md` |
+| P6-05 | Resilience test evidence | P3-09; P4-06 if present | Not started | Failure/retry/recovery scenarios executed and linked from `PROJECT_STATUS.md` |
 | P6-06 | Security checks | P6-01 | Not started | Appropriate secret scanning / dependency audit; no credential leakage in CI logs |
 
 **Suggested order:** P6-01 → P6-02 ∥ P6-04 → P6-03 (when Terraform exists) → P6-05 → P6-06.
@@ -393,4 +399,4 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | Last updated | 2026-10-17 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-17: Status ledger scoped to current phase; archive in `docs/status-log.md`. P1-01 verified (Olist e-commerce + marketing funnel; ADR-0018). 2026-10-16: Early `site/` scaffold allowed (verified facts only); Phase 8 remains design/hosting close-out. Phase 8 plan added. Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |
+| Changelog | 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

@@ -7,7 +7,7 @@
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-013 |
-| Related issues | Phase 1 (`P1-02`, `P1-03`, `P1-08`), Phase 3 quarantine (`P3-05`) |
+| Related issues | Phase 1 (`P1-02`, `P1-03`, `P1-10`), Phase 3 quarantine (`P3-07`) |
 | Supersedes | — |
 | Superseded by | — |
 

@@ -7,7 +7,7 @@
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-007 |
-| Related issues | P1-06, P3-08, P3-09 |
+| Related issues | P1-06, P3-04, P3-05 |
 | Supersedes | — |
 | Superseded by | — |
 
@@ -17,7 +17,7 @@ Scheduled loads and CDC are different patterns. This platform needs **both** cad
 
 ## Decision
 
-Implement **one** PostgreSQL incremental extract path parameterized by time/watermark window (P1-06). Drive it with **distinct Airflow schedules**: daily (P3-08) and weekly (P3-09). Document weekly grain and purpose when implemented. CDC ([ADR-0008](0008-streaming-cdc.md)) is complementary, not a replacement.
+Implement **one** PostgreSQL incremental extract path parameterized by time/watermark window (P1-06). Drive it with **distinct Airflow schedules**: daily (P3-04) and weekly (P3-05). Document weekly grain and purpose when implemented. CDC ([ADR-0008](0008-streaming-cdc.md)) is complementary, not a replacement.
 
 ## Alternatives considered
 

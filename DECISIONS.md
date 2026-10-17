@@ -36,13 +36,14 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-009 | Observability | Prometheus + Grafana locally; CloudWatch (+ optional Datadog/New Relic) on AWS | — | `proposed` | [ADR-0009](docs/decisions/0009-observability.md) |
 | D-010 | Lineage | OpenLineage where verified; dbt lineage | — | `proposed` | [ADR-0010](docs/decisions/0010-lineage.md) |
 | D-011 | IaC / CI | Terraform (`fmt`/`validate` in CI; apply gated); GitHub Actions; OIDC | — | `proposed` | [ADR-0011](docs/decisions/0011-iac-and-ci-credentials.md) |
-| D-012 | Medallion layers | Bronze / Silver / Gold | — | `proposed` | [ADR-0012](docs/decisions/0012-medallion-layers.md) |
+| D-012 | Medallion layers | Bronze / Silver / Gold; Gold domains `olist_analysis` + `product_analysis` | — | `proposed` | [ADR-0012](docs/decisions/0012-medallion-layers.md) |
 | D-013 | Data contracts | Contracts under `config/contracts/`; explicit quarantine/fail (no silent drops) | — | `proposed` | [ADR-0013](docs/decisions/0013-data-contracts.md) |
 | D-014 | Batch vs streaming | Daily batch, weekly batch, and CDC coexist; CDC does not replace batch | — | `proposed` | [ADR-0014](docs/decisions/0014-batch-vs-streaming-coexistence.md) |
 | D-015 | Monorepo boundaries | Package owns business logic; thin DAGs and IaC | — | `proposed` | [ADR-0015](docs/decisions/0015-monorepo-package-boundaries.md) |
 | D-016 | Discovery / metadata | Deferred; evaluate DataHub / Amundsen / OpenMetadata later | — | `proposed` | [ADR-0016](docs/decisions/0016-data-discovery.md) |
 | D-017 | Dataviz | Deferred until Gold; OSS BI locally; QuickSight as AWS counterpart | — | `proposed` | [ADR-0017](docs/decisions/0017-dataviz.md) |
 | D-018 | Historical Olist datasets | CC BY-NC-SA 4.0 e-commerce + marketing funnel; no vendor; fetch-from-source | Provenance under `docs/sources/`; no dataset binaries in git (P1-01) | `approved` | [ADR-0018](docs/decisions/0018-historical-dataset-redistribution.md) |
+| D-019 | HTTP API sources | P1-05 DummyJSON `/products`; IBGE Localidades planned; BrasilAPI CEP optional | — | `approved` | [ADR-0019](docs/decisions/0019-public-api-ingestion-source.md) |
 
 `—` means not yet implemented or not yet verified in the repository.
 
@@ -58,6 +59,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-10-17 | D-019 approved: DummyJSON (P1-05), IBGE Localidades planned, BrasilAPI CEP optional; D-012 Gold domains `olist_analysis` / `product_analysis` |
 | 2026-10-17 | Recording rule: mirror only active/current-phase decisions into `PROJECT_STATUS.md` (full index stays here) |
 | 2026-10-17 | D-018: approved — Olist Brazilian e-commerce + marketing funnel (CC BY-NC-SA 4.0); do not vendor; fetch-from-source (P1-01) |
 | 2026-10-16 | D-002: noted MinIO official images removed for AIStor; community AGPLv3 builds remain OK for local use; Compose runtime verified |

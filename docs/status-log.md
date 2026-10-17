@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-10-17 — D-019 sources package reviewed
+
+Owner approved DummyJSON (P1-05), IBGE (P1-08), BrasilAPI CEP optional (P1-09). Alternatives in ADR-0019; `docs/sources/` final choices with standardized metadata; Gold domains in ADR-0012; Phase 1 closing = P1-10/P1-11; Phase 3 daily/weekly = P3-04/P3-05. Validation: ruff PASS; pytest unit 6 passed; no vendored CSVs; field-schema check PASS.
+
 ### 2026-10-17 — PROJECT_STATUS ledger restructure
 
 Restructured `PROJECT_STATUS.md` for Phase 1+: current-phase progress only; no cumulative Delivered / Verified / full Open decisions tables. Historical entries moved here. Updated `DECISIONS.md` mirroring rule and related pointers.
@@ -54,7 +58,7 @@ Scope alignment: Phase 7 delivers the **AWS deployment path as Terraform IaC**�
 
 ### 2026-10-15 — Three update patterns (batch + stream)
 
-Scope review: CDC (Phase 4) covers **streaming** only, not daily/weekly PostgreSQL loads. Updated roadmap and status to require three use cases—daily batch (P1-06 + P3-08), weekly batch (P1-06 + P3-09), streaming CDC (Phase 4)—and added P4-07 batch regression after CDC.
+Scope review: CDC (Phase 4) covers **streaming** only, not daily/weekly PostgreSQL loads. Updated roadmap and status to require three use cases—daily batch (P1-06 + P3-04), weekly batch (P1-06 + P3-05), streaming CDC (Phase 4)—and added P4-07 batch regression after CDC.
 
 ### 2026-10-15 — P0-06 roadmap
 

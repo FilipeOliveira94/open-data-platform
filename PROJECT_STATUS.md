@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-17 (ledger restructure; P1-01 verified) |
+| Last updated | 2026-10-17 (D-019 sources + issue renumber; review validated) |
 | Current phase | Phase 1 — Multi-source ingestion |
 | Phase status | In progress (P1-01 verified) |
 
@@ -41,11 +41,13 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-02 | Raw storage layout and ingestion metadata conventions | Not started | — |
 | P1-03 | Data contracts for planned sources | Not started | — |
 | P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Not started | Blocked on P1-01✓, P1-02, P1-03 |
-| P1-05 | Paginated public API client | Not started | — |
+| P1-05 | Paginated public API client (DummyJSON) | Not started | D-019 approved |
 | P1-06 | PostgreSQL incremental batch extract | Not started | — |
 | P1-07 | Synthetic event generator | Not started | — |
-| P1-08 | Failure and invalid-record behavior | Not started | — |
-| P1-09 | Phase 1 documentation and status | Not started | — |
+| P1-08 | IBGE Localidades ingest | Not started | Planned (D-019) |
+| P1-09 | BrasilAPI CEP enrichment | Not started | Optional (D-019) |
+| P1-10 | Failure and invalid-record behavior | Not started | — |
+| P1-11 | Phase 1 documentation and status | Not started | — |
 
 Acceptance detail: `ROADMAP.md` → Phase 1.
 
@@ -66,8 +68,8 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 | --- | --- |
 | Date | 2026-10-17 |
 | Environment | WSL2 / Ubuntu |
-| Checks | P1-01: Kaggle listings CC BY-NC-SA 4.0 (e-commerce + marketing funnel); repo scan for vendored csv/olist data artifacts; provenance + ADR-0018 |
-| Result | P1-01 verified; no dataset download performed |
+| Checks | Source notes: standardized 9-field tables (script PASS); no stale `api-candidates`/`source-strategy` refs; no `*.csv` vendored; `uv run ruff check src tests` PASS; `uv run pytest tests/unit` → 6 passed |
+| Result | Docs/decision package for D-019 + source layout + issue renumber ready to commit; P1-02+ still not started |
 
 ---
 
@@ -93,6 +95,8 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | ID | Relevance | State |
 | --- | --- | --- |
 | D-018 | Olist datasets: no vendor; fetch-from-source (`docs/sources/`) | Approved (P1-01) |
+| D-019 | DummyJSON (P1-05); IBGE (P1-08); CEP optional (P1-09) | Approved |
+| D-012 | Gold domains `olist_analysis` / `product_analysis` | Proposed (domain split recorded) |
 | D-013 | Data contracts / no silent drops — gates P1-03+ | Proposed |
 | D-015 | Package owns logic; thin DAGs/IaC — gates ingestion layout | Proposed |
 | D-001 / D-002 | Compose + MinIO baseline (unchanged) | Approved |
@@ -105,8 +109,8 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 | Use case | Pattern | Phases | Status |
 | --- | --- | --- | --- |
-| Daily batch | Windowed incremental extract + Airflow daily schedule | 1 (P1-06), 3 (P3-08) | Not started |
-| Weekly batch | Windowed extract + Airflow weekly schedule | 1 (P1-06), 3 (P3-09) | Not started |
+| Daily batch | Windowed incremental extract + Airflow daily schedule | 1 (P1-06), 3 (P3-04) | Not started |
+| Weekly batch | Windowed extract + Airflow weekly schedule | 1 (P1-06), 3 (P3-05) | Not started |
 | Streaming | Logical replication → Debezium → Kafka → Spark SS | 4 | Not started |
 
 ---
@@ -155,6 +159,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-17 — D-019 approved; source docs slimmed
+
+Approved DummyJSON for P1-05, IBGE (P1-08), BrasilAPI CEP optional (P1-09). Gold domains in ADR-0012. Source metadata standardized. Phase 1 closing issues are P1-10/P1-11; Phase 3 daily/weekly renumbered to P3-04/P3-05 (tests P3-09).
 
 ### 2026-10-17 — Ledger restructure
 

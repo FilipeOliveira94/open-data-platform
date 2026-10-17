@@ -1,12 +1,16 @@
 # Data sources
 
-Provenance, license and redistribution notes for planned ingestion sources.
+Final chosen sources. Rationale: [ADR-0018](../decisions/0018-historical-dataset-redistribution.md), [ADR-0019](../decisions/0019-public-api-ingestion-source.md). Gold domains: [ADR-0012](../decisions/0012-medallion-layers.md).
 
-| Source | Doc | License (as published) | Repo policy |
-| --- | --- | --- | --- |
-| Brazilian E-Commerce Public Dataset by Olist | [olist-brazilian-ecommerce.md](olist-brazilian-ecommerce.md) | CC BY-NC-SA 4.0 | Do not vendor; fetch locally |
-| Marketing Funnel by Olist | [olist-marketing-funnel.md](olist-marketing-funnel.md) | CC BY-NC-SA 4.0 | Do not vendor; fetch locally |
+Each source note uses the same metadata fields: **Name**, **Type**, **Role**, **URL**, **Gold Domain**, **License**, **Access**, **Decision**, **Related Issue**.
 
-Join key between the two Olist datasets: `seller_id` (documented on both Kaggle pages). Detailed join semantics belong in contracts/ingestion work (P1-03 / P1-04), not here.
+| Name | Type | Gold Domain | Related Issue | Doc |
+| --- | --- | --- | --- | --- |
+| Brazilian E-Commerce Public Dataset by Olist | Files (Kaggle) | `olist_analysis` | P1-04 | [olist-brazilian-ecommerce.md](olist-brazilian-ecommerce.md) |
+| Marketing Funnel by Olist | Files (Kaggle) | `olist_analysis` | P1-04 | [olist-marketing-funnel.md](olist-marketing-funnel.md) |
+| DummyJSON products | HTTP (paginated) | `product_analysis` | P1-05 | [dummyjson-products.md](dummyjson-products.md) |
+| PostgreSQL OLTP | Database | `olist_analysis` | P1-06 / Phase 4 | [postgres-oltp.md](postgres-oltp.md) |
+| IBGE Localidades | HTTP (collection) | `olist_analysis` | P1-08 | [ibge-localidades.md](ibge-localidades.md) |
+| BrasilAPI CEP | HTTP (point lookup) | `olist_analysis` | P1-09 (optional) | [brasilapi-cep.md](brasilapi-cep.md) |
 
-**Policy:** see [ADR-0018](../decisions/0018-historical-dataset-redistribution.md) (D-018). The repository MIT license covers **software and documentation**, not bundled copies of these datasets.
+Olist binaries are not vendored (ADR-0018).

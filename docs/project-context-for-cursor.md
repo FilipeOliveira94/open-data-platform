@@ -87,12 +87,10 @@ Cursor Chat: https://docs.cursor.com/chat/overview
 
 ### Fontes de dados
 
--   Datasets históricos Olist (e-commerce + marketing funnel, join em
-    `seller_id`), após verificar licença e condições de redistribuição
-    (ver `docs/sources/` e ADR-0018).
--   API pública com paginação e limites de requisição.
--   Banco transacional PostgreSQL.
--   Eventos sintéticos para cenários de streaming.
+-   Olist (e-commerce + marketing funnel); DummyJSON products; IBGE
+    Localidades; Postgres OLTP (seed); eventos sintéticos; CEP BrasilAPI
+    opcional. Detalhe: `docs/sources/`, ADR-0018/0019. Gold:
+    `olist_analysis` e `product_analysis` (ADR-0012).
 
 ### Plataforma e processamento
 
@@ -638,7 +636,7 @@ Do not run destructive volume cleanup without approval.
 Work only on Phase 1 — Multi-source ingestion.
 
 Implement small, testable ingestion components for:
-1. Historical Olist datasets (Brazilian e-commerce + marketing funnel), after checking license and redistribution terms (`docs/sources/`, ADR-0018).
+1. Historical Olist datasets, DummyJSON products, IBGE Localidades, Postgres OLTP seed; optional BrasilAPI CEP (`docs/sources/`, ADR-0018/0019). Gold domains: `olist_analysis`, `product_analysis`.
 2. A paginated public API with timeouts, retries, rate-limit handling, and local fixtures.
 3. PostgreSQL source extraction.
 4. Synthetic event generation.
