@@ -87,8 +87,9 @@ Cursor Chat: https://docs.cursor.com/chat/overview
 
 ### Fontes de dados
 
--   Dataset histórico de e-commerce Olist, após verificar licença e
-    condições de redistribuição.
+-   Datasets históricos Olist (e-commerce + marketing funnel, join em
+    `seller_id`), após verificar licença e condições de redistribuição
+    (ver `docs/sources/` e ADR-0018).
 -   API pública com paginação e limites de requisição.
 -   Banco transacional PostgreSQL.
 -   Eventos sintéticos para cenários de streaming.
@@ -451,41 +452,40 @@ estado real do projeto.
 
 ### `PROJECT_STATUS.md`
 
+Ledger **da fase atual** (não inventário cumulativo). Issue backlog → `ROADMAP.md`; ADRs → `DECISIONS.md`; histórico longo → `docs/status-log.md`.
+
 Manter atualizado e factual. Modelo:
 
 ``` markdown
 # Project Status
 
-## Current phase
-Phase 0 — Foundation (update as work progresses)
-
 ## Current objective
-[One objective only]
+[One objective for the current phase]
 
-## Verified complete
-- [ ] Item — evidence/command/commit
+## Next work
+1. [Next issue]
+2. [Following issue]
 
-## In progress
-- [ ] Item — owner/next action
+## Phase N progress
+| ID | Title | Status | Evidence |
 
-## Blocked
-- None / explain blocker and required decision
-
-## Known limitations
-- [List current limitations]
-
-## Decisions requiring review
-- [List only decisions that need user input]
-
-## Next task
-[Smallest useful next task]
+## Phase N acceptance
+- [ ] … (from ROADMAP)
 
 ## Latest validation
-- Date:
-- Environment:
-- Command:
-- Result:
-- Evidence/notes:
+| Date | Environment | Checks | Result |
+
+## Foundation baseline
+[Short pointer to closed phases + re-check commands]
+
+## Decisions (active for this phase)
+[Only gates / recently approved — not the full DECISIONS.md index]
+
+## Risks and limitations
+## Blocked
+## Program roadmap (compact)
+## Log
+[Recent entries only; archive older in docs/status-log.md]
 ```
 
 ### `ROADMAP.md`
@@ -638,7 +638,7 @@ Do not run destructive volume cleanup without approval.
 Work only on Phase 1 — Multi-source ingestion.
 
 Implement small, testable ingestion components for:
-1. A historical e-commerce dataset, after checking its license and redistribution terms.
+1. Historical Olist datasets (Brazilian e-commerce + marketing funnel), after checking license and redistribution terms (`docs/sources/`, ADR-0018).
 2. A paginated public API with timeouts, retries, rate-limit handling, and local fixtures.
 3. PostgreSQL source extraction.
 4. Synthetic event generation.

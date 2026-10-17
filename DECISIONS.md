@@ -8,7 +8,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | Detail | [`docs/decisions/`](docs/decisions/) (one ADR per decision) |
 | Related | `PROJECT_STATUS.md`, `ROADMAP.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
 
-**How to use:** skim the table for direction and implementation status; open the ADR for *why*. **Proposed** is the planned stack; **Implemented** is what is verified in the repository (update when evidence lands in `PROJECT_STATUS.md`).
+**How to use:** skim the table for direction and implementation status; open the ADR for *why*. **Proposed** is the planned stack; **Implemented** is what is verified in the repository (update when evidence lands in `PROJECT_STATUS.md` / `docs/status-log.md`).
 
 ## Lifecycle
 
@@ -42,6 +42,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-015 | Monorepo boundaries | Package owns business logic; thin DAGs and IaC | — | `proposed` | [ADR-0015](docs/decisions/0015-monorepo-package-boundaries.md) |
 | D-016 | Discovery / metadata | Deferred; evaluate DataHub / Amundsen / OpenMetadata later | — | `proposed` | [ADR-0016](docs/decisions/0016-data-discovery.md) |
 | D-017 | Dataviz | Deferred until Gold; OSS BI locally; QuickSight as AWS counterpart | — | `proposed` | [ADR-0017](docs/decisions/0017-dataviz.md) |
+| D-018 | Historical Olist datasets | CC BY-NC-SA 4.0 e-commerce + marketing funnel; no vendor; fetch-from-source | Provenance under `docs/sources/`; no dataset binaries in git (P1-01) | `approved` | [ADR-0018](docs/decisions/0018-historical-dataset-redistribution.md) |
 
 `—` means not yet implemented or not yet verified in the repository.
 
@@ -50,13 +51,15 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 1. Copy [`docs/decisions/_template.md`](docs/decisions/_template.md) to `docs/decisions/NNNN-short-slug.md`.
 2. Fill context, decision, alternatives, consequences, evidence, revisit triggers.
 3. Add one row to the index above (proposed stack, implemented stack, state, ADR link).
-4. Mirror status in `PROJECT_STATUS.md` → Open decisions when relevant.
+4. In `PROJECT_STATUS.md` → **Decisions (active)**, list only decisions that **gate the current phase** or were **approved in this phase**. Do not copy this full index.
 5. When the choice is built and verified, set **Implemented stack** to the concrete versions/services (not a copy of Proposed until evidence exists).
 
 ## Changelog
 
 | Date | Change |
 | --- | --- |
+| 2026-10-17 | Recording rule: mirror only active/current-phase decisions into `PROJECT_STATUS.md` (full index stays here) |
+| 2026-10-17 | D-018: approved — Olist Brazilian e-commerce + marketing funnel (CC BY-NC-SA 4.0); do not vendor; fetch-from-source (P1-01) |
 | 2026-10-16 | D-002: noted MinIO official images removed for AIStor; community AGPLv3 builds remain OK for local use; Compose runtime verified |
 | 2026-10-16 | P0-13: approved D-001 and D-002; recorded Compose baseline and MinIO community image pin |
 | 2026-10-15 | Restructured to D-001–D-017: removed phase-0/K8s/placeholder ADRs; split compute vs orchestration and observability vs lineage; added medallion, contracts, coexistence, monorepo, discovery, dataviz |

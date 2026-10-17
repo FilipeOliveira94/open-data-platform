@@ -1,6 +1,6 @@
 # Roadmap
 
-Issue-level plan for the Open Data Platform. This file is the source of truth for **scope, dependencies and acceptance criteria**. `PROJECT_STATUS.md` records what has been **delivered and verified**.
+Issue-level plan for the Open Data Platform. This file is the source of truth for **scope, dependencies, issue status and acceptance criteria**. `PROJECT_STATUS.md` is the **current-phase** operational ledger (progress, latest validation, active gates). Longer history lives in `docs/status-log.md`.
 
 **Estimated window:** ~16 weeks / 240–320 hours at 15+ h/week. Windows are planning guides, not delivery promises.
 
@@ -32,7 +32,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Phase | Scope | Window | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
-| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | Not started |
+| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01 verified) |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
@@ -117,10 +117,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
-| P1-01 | Historical dataset license and redistribution check | Phase 0 | Not started | License/terms recorded; no dataset vendored until redistribution is allowed (or fetch-from-source documented) |
+| P1-01 | Historical dataset license and redistribution check | Phase 0 | Verified | License/terms recorded for Olist e-commerce + marketing funnel (CC BY-NC-SA 4.0); no dataset vendored; fetch-from-source documented (`docs/sources/`, ADR-0018) |
 | P1-02 | Raw storage layout and ingestion metadata conventions | Phase 0 | Not started | Paths, partition conventions, `_ingestion_ts`, source id, execution id documented and used by writers |
 | P1-03 | Data contracts for planned sources | P1-02 | Not started | Contracts under `config/contracts/` (or agreed path); schema/fields/null rules explicit |
-| P1-04 | Historical e-commerce dataset ingestion | P1-01, P1-02, P1-03 | Not started | Repeatable ingest to raw layout; idempotent re-run; unit/integration coverage without private data |
+| P1-04 | Historical e-commerce dataset ingestion | P1-01, P1-02, P1-03 | Not started | Repeatable ingest of Olist e-commerce (+ marketing funnel join on `seller_id`) to raw layout; idempotent re-run; unit/integration coverage without private/vendored Olist data |
 | P1-05 | Paginated public API client | P1-02, P1-03 | Not started | Timeouts, retries, rate-limit handling; local fixtures; no live-API dependency in unit tests |
 | P1-06 | PostgreSQL incremental batch extract | P0-10, P1-02, P1-03 | Not started | Parameterized extract by watermark/window (`start`/`end` or high-water mark); grain/keys documented; same code path supports daily and weekly windows; idempotent re-run without corrupting raw |
 | P1-07 | Synthetic event generator | P1-02 | Not started | Deterministic or seedable generator for later streaming scenarios; schema documented |
@@ -380,7 +380,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 1. Pick the next issue from the current phase (see `PROJECT_STATUS.md` → Next work).
 2. Plan with the issue ID (see `docs/agent-workflow.md`); wait for approval on non-trivial changes.
 3. Implement one coherent issue; run its acceptance checks.
-4. Update `PROJECT_STATUS.md` with evidence; mark the issue verified only with evidence.
+4. Update `PROJECT_STATUS.md` (current-phase row + latest validation); mark the issue verified only with evidence; append older narrative to `docs/status-log.md` when trimming.
 5. Record architecture choices as ADRs in `docs/decisions/` and update the one-line row in `DECISIONS.md` when a proposed item is approved or replaced.
 
 ---
@@ -390,7 +390,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-10-16 |
+| Last updated | 2026-10-17 |
 | Owns | Program scope and issue acceptance |
-| Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-16: Early `site/` scaffold allowed (verified facts only); Phase 8 remains design/hosting close-out. Phase 8 plan added. Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |
+| Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
+| Changelog | 2026-10-17: Status ledger scoped to current phase; archive in `docs/status-log.md`. P1-01 verified (Olist e-commerce + marketing funnel; ADR-0018). 2026-10-16: Early `site/` scaffold allowed (verified facts only); Phase 8 remains design/hosting close-out. Phase 8 plan added. Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |

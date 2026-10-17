@@ -87,9 +87,11 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | Agent and contributor operating contract |
 | [`ROADMAP.md`](ROADMAP.md) | Issue-level scope and acceptance criteria (phases 0–8) |
-| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Delivered vs verified ledger |
+| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Current-phase status ledger (verified work + next steps) |
+| [`docs/status-log.md`](docs/status-log.md) | Chronological status archive |
 | [`DECISIONS.md`](DECISIONS.md) | Architecture decision index |
 | [`docs/decisions/`](docs/decisions/) | ADR detail |
+| [`docs/sources/`](docs/sources/) | Historical dataset license and redistribution notes |
 
 ## Out of scope for Phase 0
 

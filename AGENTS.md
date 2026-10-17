@@ -29,10 +29,12 @@ For each task:
 5. Implement the smallest coherent increment.
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
-8. Update documentation and `PROJECT_STATUS.md`.
+8. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
 9. Summarize changed files, commands executed, test results, limitations and the next step.
 
 Do not mark a task complete unless its acceptance criteria have been verified.
+
+`PROJECT_STATUS.md` tracks the **current phase** (progress, acceptance, latest validation, active decision gates). Issue inventory lives in `ROADMAP.md`; full ADRs in `DECISIONS.md`; chronological archive in `docs/status-log.md`.
 
 ## 4. Architecture Principles
 

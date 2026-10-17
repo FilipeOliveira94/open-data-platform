@@ -10,6 +10,7 @@ alwaysApply: true
 - For non-trivial work, present a plan before editing files.
 - Run relevant validation commands and report their actual results.
 - Update documentation and project status after completing verified work.
+- Keep `PROJECT_STATUS.md` scoped to the **current phase** (progress, acceptance, latest validation, active decision gates). Do not rebuild cumulative Delivered/Verified/full Open-decisions tables. Issue backlog stays in `ROADMAP.md`; full decisions in `DECISIONS.md`; older narrative in `docs/status-log.md`.
 - Do not silently change architecture, dependencies or acceptance criteria.
 - Do not mark a task complete unless its acceptance criteria have been verified.
 - At the end of every task, report: objective, files changed, commands run, tests (passed and failed), acceptance criteria, limitations and the suggested next issue.

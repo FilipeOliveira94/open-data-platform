@@ -32,7 +32,7 @@ Positive, negative, and follow-up work this choice creates.
 
 ## Evidence / validation
 
-Commands, PoC results, links to `PROJECT_STATUS.md` log entries. Write “none yet” while still proposed.
+Commands, PoC results, links to `PROJECT_STATUS.md` and/or `docs/status-log.md`. Write “none yet” while still proposed.
 
 ## Revisit when
 
