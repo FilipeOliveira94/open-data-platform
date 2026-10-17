@@ -31,7 +31,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 
 | Phase | Scope | Window | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | In progress |
+| 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
 | 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | Not started |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
@@ -55,7 +55,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 - [x] A smoke test can write and read an object in MinIO.
 - [x] Lint and tests run via documented commands.
 - [x] No secrets, live `.env` files, or private datasets are in version control.
-- [ ] CI runs the same lint and test checks.
+- [x] CI runs the same lint and test checks.
 
 ### Issues
 
@@ -72,7 +72,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | P0-09 | Ruff and pytest smoke | P0-08 | Verified | Lint and a toolchain smoke test pass via documented commands |
 | P0-10 | Docker Compose: PostgreSQL 16 and MinIO | — | Verified | Pinned image tags; health checks; documented start/stop; no unverified tags |
 | P0-11 | Repo hygiene and README | P0-08, P0-10 | Delivered | `.gitignore`, `.env.example` (names/placeholders only), Makefile, `README.md` with setup |
-| P0-12 | GitHub Actions: lint and tests | P0-09 | Delivered | Workflow runs lint + tests; no cloud deploy |
+| P0-12 | GitHub Actions: lint and tests | P0-09 | Verified | Workflow runs lint + tests; no cloud deploy |
 | P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Delivered | Approve/update D-001 (and D-002 as applicable) in `DECISIONS.md`/ADRs: Compose for local verification; AWS as Terraform IaC in Phase 7 |
 
 **Suggested order:** P0-06 → P0-07 → P0-08 → P0-09 → P0-10 → P0-11 → P0-12 → P0-13 (P0-08 and P0-10 may proceed in parallel after P0-07).
@@ -343,4 +343,4 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Last updated | 2026-10-16 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-16: Compose runtime verified; D-002 AGPL/AIStor note; CI still pending. Earlier same day: P0-08–P0-13 delivered. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |
+| Changelog | 2026-10-16: Phase 0 verified (CI green; uv pinned to 0.13.1). Compose runtime; D-002 AGPL/AIStor; P0-08–P0-13. 2026-10-15: ADRs D-001–D-017; Phase 7 as AWS IaC; three update patterns |

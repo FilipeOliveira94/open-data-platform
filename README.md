@@ -2,12 +2,12 @@
 
 Reproducible open-source data platform: local development on Windows 11 + WSL2 + Docker Compose, with an AWS deployment path expressed later as Terraform Infrastructure as Code (Phase 7).
 
-This repository is in **Phase 0** (foundation): Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI.
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. Next work is Phase 1 ingestion.
 
 ## Prerequisites
 
 - WSL2 Ubuntu (or Linux) with Docker Desktop and WSL integration enabled
-- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- [uv](https://docs.astral.sh/uv/) 0.13.1 (pinned in `pyproject.toml` / CI; install matching version)
 - Docker Compose v2 (`docker compose version`)
 - GNU Make (optional; targets mirror the commands below)
 

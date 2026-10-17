@@ -4,9 +4,9 @@
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-16 (Compose runtime verified; D-002 AGPL/AIStor note) |
-| Current phase | Phase 0 — Repository and environment foundation |
-| Phase 0 | In progress (awaiting CI green on GitHub Actions) |
+| Last updated | 2026-10-16 (Phase 0 verified; uv 0.13.1 pinned) |
+| Current phase | Phase 1 — Multi-source ingestion |
+| Phase 0 | Verified |
 | Platform (ingestion through lakehouse; AWS path as IaC in Phase 7) | Not started |
 
 This ledger records **delivered work and executed validation**. Planned architecture is not treated as complete.
@@ -17,9 +17,9 @@ This ledger records **delivered work and executed validation**. Planned architec
 
 ## Current objective
 
-Observe GitHub Actions CI green for lint + unit tests after push/PR, then mark Phase 0 verified and start Phase 1.
+Start Phase 1 with **P1-01** (historical dataset license/redistribution check) and **P1-02** (raw storage layout and ingestion metadata conventions).
 
-Out of scope for Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and the AWS Terraform path (Phase 7).
+Out of scope leftover from Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and the AWS Terraform path (Phase 7).
 
 ## Verified
 
@@ -31,6 +31,7 @@ Out of scope for Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and
 | Documented local setup (toolchain + Compose) | Passed | `uv sync`, `docker compose up -d`, documented checks (2026-10-16) |
 | PostgreSQL healthy and reachable | Passed | `odp-postgres` healthy; `pg_isready -U odp -d odp` accepting connections |
 | MinIO write/read smoke | Passed | `uv run pytest tests/integration/test_minio_smoke.py` → 1 passed; `odp-minio` healthy |
+| CI lint + unit tests | Passed | GitHub Actions workflow green after push of Phase 0 baseline (2026-10-16) |
 
 ## Delivered
 
@@ -43,18 +44,16 @@ Out of scope for Phase 0: Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, and
 | P0-05 | Program context: objectives, constraints, target architecture, and phase backlog | `docs/` |
 | P0-06 | Program roadmap: phases 0–7, issue IDs, dependencies, acceptance criteria | `ROADMAP.md` |
 | P0-07 | Decision log: summary index + ADRs for proposed stack D-001–D-017 | `DECISIONS.md`, `docs/decisions/` |
-| P0-08 | Python 3.12 package with `uv` and committed lockfile | `pyproject.toml`, `uv.lock`, `src/open_data_platform/` |
-| P0-09 | Ruff and pytest, including toolchain smoke | Ruff + `tests/unit/` (verified above) |
+| P0-08 | Python 3.12 package with `uv` and committed lockfile | `pyproject.toml`, `uv.lock`, `src/open_data_platform/`; `uv` required-version `==0.13.1` |
+| P0-09 | Ruff and pytest, including toolchain smoke | Ruff + `tests/unit/` (verified) |
 | P0-10 | Docker Compose: PostgreSQL 16 and MinIO, health checks, pinned tags | `docker-compose.yml`; runtime verified 2026-10-16 |
 | P0-11 | `.gitignore`, `.env.example`, Makefile, `README.md` | Root hygiene files |
-| P0-12 | GitHub Actions: lint and unit tests (no cloud deploy) | `.github/workflows/ci.yml` (not yet observed green on GitHub Actions) |
+| P0-12 | GitHub Actions: lint and unit tests (no cloud deploy) | `.github/workflows/ci.yml` green on GitHub; `uv` pinned to `0.13.1` |
 | P0-13 | Initial decision note: Compose local; AWS as Terraform IaC in Phase 7; Phase 0 = PostgreSQL + MinIO | D-001 / D-002 `approved`; D-002 notes AGPLv3 community images vs AIStor |
 
 ## Phase 0 remaining
 
-| ID | Item |
-| --- | --- |
-| — | Observe CI green on GitHub Actions after push |
+None. Phase 0 acceptance criteria are all verified.
 
 Do not create empty directories for later phases until those phases start.
 
@@ -67,7 +66,7 @@ Phase 0 is complete only when all of the following are true and recorded:
 - [x] A smoke test can write and read an object in MinIO.
 - [x] Lint and tests run via documented commands.
 - [x] No secrets, live `.env` files, or private datasets are in version control.
-- [ ] CI runs the same lint and test checks.
+- [x] CI runs the same lint and test checks.
 
 ## Required update patterns
 
@@ -85,7 +84,7 @@ Issue-level detail belongs in `ROADMAP.md`.
 
 | Phase | Scope | Window | Status |
 | --- | --- | --- | --- |
-| 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 | In progress |
+| 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 | Verified |
 | 1 | Multi-source ingestion: historical dataset, API, PostgreSQL incremental extract (daily/weekly windows), synthetic events | Sprint 2 | Not started |
 | 2 | Lakehouse PoC (Spark, Iceberg, catalog, query engine), Bronze / Silver / Gold, initial dbt models | Sprint 3 | Not started |
 | 3 | Airflow: daily + weekly batch schedules, idempotent backfills, quality checks and quarantine | Sprint 4 | Not started |
@@ -123,7 +122,7 @@ Analytical model names (`fct_*`, `dim_*`, `mart_*`) remain roadmap placeholders 
 ## Risks and limitations
 
 - Official MinIO public images were withdrawn for commercial AIStor; community MinIO remains AGPLv3. Phase 0 pins `coollabsio/minio:RELEASE.2025-10-15T17-29-55Z` (see ADR-0002).
-- CI workflow is in-repo but has not yet been observed running on GitHub Actions.
+- `uv` is pinned to `0.13.1` in `pyproject.toml` (`required-version`) and CI (`astral-sh/setup-uv` `version`). Bump deliberately when upgrading the toolchain.
 - Agent shells may lack Docker socket access unless run with host permissions; the host terminal Compose path is the source of truth for local ops.
 - Spark, Iceberg, catalog, and query-engine compatibility is unproven. That combination will not be expanded until a minimal create/write/query PoC succeeds.
 - The historical e-commerce dataset will not be vendored until license and redistribution terms are confirmed.
@@ -137,19 +136,23 @@ None.
 
 ## Next work
 
-1. Push/PR and confirm GitHub Actions CI is green for lint + unit tests (last Phase 0 acceptance item).
-2. When Phase 0 is fully verified, start Phase 1 with **P1-01** / **P1-02** (dataset license check and raw storage conventions).
+1. Phase 1 — **P1-01**: historical dataset license and redistribution check.
+2. Phase 1 — **P1-02**: raw storage layout and ingestion metadata conventions (can proceed in parallel with P1-01).
 
 ## Latest validation
 
 | | |
 | --- | --- |
 | Date | 2026-10-16 |
-| Environment | WSL2 / Ubuntu, repository root; `uv` 0.13.1; CPython 3.12.15; Docker Compose v5.3.1 |
-| Runtime checks | `docker compose up -d` → postgres + minio healthy; `pg_isready -U odp -d odp` OK; MinIO smoke 1 passed; unit tests 6 passed; Ruff passed |
-| Result | Local Phase 0 runtime acceptance verified; remote CI not yet observed |
+| Environment | WSL2 / Ubuntu + GitHub Actions `ubuntu-latest` |
+| Runtime checks | Local: Compose healthy, Postgres reachable, MinIO smoke, Ruff, unit tests. Remote: GitHub Actions lint + unit tests green after Phase 0 push |
+| Result | Phase 0 acceptance complete; `uv` pin to 0.13.1 added for reproducible CI installs |
 
 ## Log
+
+### 2026-10-16 — Phase 0 verified; pin uv 0.13.1
+
+GitHub Actions CI reported green for lint and unit tests after push. Marked Phase 0 verified. Pinned `uv` to `0.13.1` in `pyproject.toml` (`required-version`) and `.github/workflows/ci.yml` to avoid unpinned “latest” installs.
 
 ### 2026-10-16 — Compose runtime verified + D-002 AGPL/AIStor note
 
