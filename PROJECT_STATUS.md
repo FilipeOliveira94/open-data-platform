@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-17 (D-019 sources + issue renumber; review validated) |
+| Last updated | 2026-10-18 (P1-02 verified — raw layout + metadata) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01 verified) |
+| Phase status | In progress (P1-01, P1-02 verified) |
 
 **Status values:** not started · in progress · delivered · verified · blocked
 
@@ -22,14 +22,14 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P1-02** — raw storage layout and ingestion metadata conventions.
+**P1-03** — data contracts for planned sources.
 
 Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms, AWS Terraform apply, Phase 8 hosting polish.
 
 ## Next work
 
-1. **P1-02** — raw storage layout and ingestion metadata conventions.
-2. **P1-03** — data contracts for planned sources (after P1-02).
+1. **P1-03** — data contracts for planned sources.
+2. **P1-04** — historical e-commerce (+ marketing funnel) ingestion (depends on P1-03).
 
 ---
 
@@ -38,9 +38,9 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | ID | Title | Status | Evidence |
 | --- | --- | --- | --- |
 | P1-01 | Historical dataset license and redistribution check | Verified | `docs/sources/`; ADR-0018 / D-018; no Olist binaries in git (2026-10-17) |
-| P1-02 | Raw storage layout and ingestion metadata conventions | Not started | — |
+| P1-02 | Raw storage layout and ingestion metadata conventions | Verified | ADR-0020; `docs/architecture/raw-storage-layout.md`; `src/open_data_platform/ingestion/`; unit tests 2026-10-18 |
 | P1-03 | Data contracts for planned sources | Not started | — |
-| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Not started | Blocked on P1-01✓, P1-02, P1-03 |
+| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Not started | Blocked on P1-03 |
 | P1-05 | Paginated public API client (DummyJSON) | Not started | D-019 approved |
 | P1-06 | PostgreSQL incremental batch extract | Not started | — |
 | P1-07 | Synthetic event generator | Not started | — |
@@ -66,10 +66,10 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 
 | | |
 | --- | --- |
-| Date | 2026-10-17 |
+| Date | 2026-10-18 |
 | Environment | WSL2 / Ubuntu |
-| Checks | Source notes: standardized 9-field tables (script PASS); no stale `api-candidates`/`source-strategy` refs; no `*.csv` vendored; `uv run ruff check src tests` PASS; `uv run pytest tests/unit` → 6 passed |
-| Result | Docs/decision package for D-019 + source layout + issue renumber ready to commit; P1-02+ still not started |
+| Checks | `uv run ruff check src tests` PASS; `uv run pytest tests/unit` → 21 passed |
+| Result | P1-02 verified: raw object-store layout, ingestion metadata helpers, and minimal writer with unit coverage (no live MinIO required) |
 
 ---
 
@@ -94,6 +94,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 
 | ID | Relevance | State |
 | --- | --- | --- |
+| D-020 | Raw object-store layout + ingestion metadata (P1-02) | Approved |
 | D-018 | Olist datasets: no vendor; fetch-from-source (`docs/sources/`) | Approved (P1-01) |
 | D-019 | DummyJSON (P1-05); IBGE (P1-08); CEP optional (P1-09) | Approved |
 | D-012 | Gold domains `olist_analysis` / `product_analysis` | Proposed (domain split recorded) |
@@ -120,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01 verified) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02 verified) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -159,6 +160,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-18 — P1-02 verified
+
+Approved D-020: auditable raw in object store (`raw/{source_id}/{dataset}/dt=…/execution_id=…/`); `data/raw/` remains local staging only. Package helpers + minimal writer under `src/open_data_platform/ingestion/`. Unit tests: 21 passed; ruff clean.
 
 ### 2026-10-17 — D-019 approved; source docs slimmed
 

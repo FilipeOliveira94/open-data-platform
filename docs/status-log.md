@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-10-18 — P1-02 raw storage layout and ingestion metadata
+
+Approved D-020 / ADR-0020: auditable raw in object store under `raw/{source_id}/{dataset}/dt=…/execution_id=…/{object_name}`; required metadata `source_id`, `execution_id`, `_ingestion_ts`; local `data/raw/` remains fetch staging only. Package helpers and minimal writer in `src/open_data_platform/ingestion/`. Validation: `uv run ruff check src tests` PASS; `uv run pytest tests/unit` → 21 passed.
+
 ### 2026-10-17 — D-019 sources package reviewed
 
 Owner approved DummyJSON (P1-05), IBGE (P1-08), BrasilAPI CEP optional (P1-09). Alternatives in ADR-0019; `docs/sources/` final choices with standardized metadata; Gold domains in ADR-0012; Phase 1 closing = P1-10/P1-11; Phase 3 daily/weekly = P3-04/P3-05. Validation: ruff PASS; pytest unit 6 passed; no vendored CSVs; field-schema check PASS.

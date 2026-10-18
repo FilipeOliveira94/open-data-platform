@@ -33,7 +33,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Phase | Scope | Window | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
-| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01 verified) |
+| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01, P1-02 verified) |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
@@ -119,7 +119,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
 | P1-01 | Historical dataset license and redistribution check | Phase 0 | Verified | License/terms recorded for Olist e-commerce + marketing funnel (CC BY-NC-SA 4.0); no dataset vendored; fetch-from-source documented (`docs/sources/`, ADR-0018) |
-| P1-02 | Raw storage layout and ingestion metadata conventions | Phase 0 | Not started | Paths, partition conventions, `_ingestion_ts`, source id, execution id documented and used by writers |
+| P1-02 | Raw storage layout and ingestion metadata conventions | Phase 0 | Verified | Paths, partition conventions, `_ingestion_ts`, source id, execution id documented and used by writers |
 | P1-03 | Data contracts for planned sources | P1-02 | Not started | Contracts under `config/contracts/` (or agreed path); schema/fields/null rules explicit |
 | P1-04 | Historical e-commerce dataset ingestion | P1-01, P1-02, P1-03 | Not started | Repeatable ingest of Olist e-commerce (+ marketing funnel join on `seller_id`) to raw layout; idempotent re-run; unit/integration coverage without private/vendored Olist data |
 | P1-05 | Paginated public API client (DummyJSON products) | P1-02, P1-03 | Not started | DummyJSON `/products` (`limit`/`skip`); timeouts, retries, rate-limit handling; fixtures; no live API in unit tests; lands in Gold `product_analysis` (D-019, D-012) |
@@ -396,7 +396,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-10-17 |
+| Last updated | 2026-10-18 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

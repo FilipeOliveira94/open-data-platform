@@ -44,6 +44,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-017 | Dataviz | Deferred until Gold; OSS BI locally; QuickSight as AWS counterpart | — | `proposed` | [ADR-0017](docs/decisions/0017-dataviz.md) |
 | D-018 | Historical Olist datasets | CC BY-NC-SA 4.0 e-commerce + marketing funnel; no vendor; fetch-from-source | Provenance under `docs/sources/`; no dataset binaries in git (P1-01) | `approved` | [ADR-0018](docs/decisions/0018-historical-dataset-redistribution.md) |
 | D-019 | HTTP API sources | P1-05 DummyJSON `/products`; IBGE Localidades planned; BrasilAPI CEP optional | — | `approved` | [ADR-0019](docs/decisions/0019-public-api-ingestion-source.md) |
+| D-020 | Raw storage layout | Object-store `raw/{source_id}/{dataset}/dt=…/execution_id=…/`; metadata `source_id`, `execution_id`, `_ingestion_ts`; `data/raw/` is local staging only | Package helpers + unit tests (P1-02) | `approved` | [ADR-0020](docs/decisions/0020-raw-storage-layout.md) |
 
 `—` means not yet implemented or not yet verified in the repository.
 
@@ -59,6 +60,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-10-18 | D-020 approved: raw object-store layout + ingestion metadata conventions (P1-02) |
 | 2026-10-17 | D-019 approved: DummyJSON (P1-05), IBGE Localidades planned, BrasilAPI CEP optional; D-012 Gold domains `olist_analysis` / `product_analysis` |
 | 2026-10-17 | Recording rule: mirror only active/current-phase decisions into `PROJECT_STATUS.md` (full index stays here) |
 | 2026-10-17 | D-018: approved — Olist Brazilian e-commerce + marketing funnel (CC BY-NC-SA 4.0); do not vendor; fetch-from-source (P1-01) |

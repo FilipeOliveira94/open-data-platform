@@ -15,7 +15,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 
 When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. Next work is Phase 1 ingestion.
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. Phase 1 is in progress: raw object-store layout and ingestion metadata are documented in [`docs/architecture/raw-storage-layout.md`](docs/architecture/raw-storage-layout.md) (ADR-0020).
 
 ## Prerequisites
 
