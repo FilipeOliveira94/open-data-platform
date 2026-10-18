@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-18 (P1-02 verified — raw layout + metadata) |
+| Last updated | 2026-10-18 (P1-03 verified — data contracts) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01, P1-02 verified) |
+| Phase status | In progress (P1-01, P1-02, P1-03 verified) |
 
 **Status values:** not started · in progress · delivered · verified · blocked
 
@@ -22,14 +22,14 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P1-03** — data contracts for planned sources.
+**P1-04** — historical e-commerce (+ marketing funnel) ingestion.
 
 Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms, AWS Terraform apply, Phase 8 hosting polish.
 
 ## Next work
 
-1. **P1-03** — data contracts for planned sources.
-2. **P1-04** — historical e-commerce (+ marketing funnel) ingestion (depends on P1-03).
+1. **P1-04** — historical e-commerce (+ marketing funnel) ingestion.
+2. **P1-05**, **P1-06**, and **P1-08** can proceed in parallel with P1-04; each depends on P1-03, now verified.
 
 ---
 
@@ -39,8 +39,8 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | --- | --- | --- | --- |
 | P1-01 | Historical dataset license and redistribution check | Verified | `docs/sources/`; ADR-0018 / D-018; no Olist binaries in git (2026-10-17) |
 | P1-02 | Raw storage layout and ingestion metadata conventions | Verified | ADR-0020; `docs/architecture/raw-storage-layout.md`; `src/open_data_platform/ingestion/`; unit tests 2026-10-18 |
-| P1-03 | Data contracts for planned sources | Not started | — |
-| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Not started | Blocked on P1-03 |
+| P1-03 | Data contracts for planned sources | Verified | `config/contracts/`; `docs/architecture/data-contracts.md`; `src/open_data_platform/contracts/`; unit tests 2026-10-18 |
+| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Not started | — |
 | P1-05 | Paginated public API client (DummyJSON) | Not started | D-019 approved |
 | P1-06 | PostgreSQL incremental batch extract | Not started | — |
 | P1-07 | Synthetic event generator | Not started | — |
@@ -56,7 +56,7 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 - [ ] Ingestions can be repeated without undue duplication or corruption.
 - [ ] Unit tests do not require the public API to be online.
 - [ ] Raw data is traceable by source and execution.
-- [ ] Contracts and expected fields are documented.
+- [x] Contracts and expected fields are documented.
 - [ ] Invalid records and errors have explicit, documented behavior.
 - [ ] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
 
@@ -68,8 +68,8 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 | --- | --- |
 | Date | 2026-10-18 |
 | Environment | WSL2 / Ubuntu |
-| Checks | `uv run ruff check src tests` PASS; `uv run pytest tests/unit` → 21 passed |
-| Result | P1-02 verified: raw object-store layout, ingestion metadata helpers, and minimal writer with unit coverage (no live MinIO required) |
+| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 40 passed |
+| Result | P1-03 verified: YAML contracts for planned sources (schema, nulls, classification, provenance) and a structural loader. No live API and no Olist rows |
 
 ---
 
@@ -98,7 +98,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | D-018 | Olist datasets: no vendor; fetch-from-source (`docs/sources/`) | Approved (P1-01) |
 | D-019 | DummyJSON (P1-05); IBGE (P1-08); CEP optional (P1-09) | Approved |
 | D-012 | Gold domains `olist_analysis` / `product_analysis` | Proposed (domain split recorded) |
-| D-013 | Data contracts / no silent drops — gates P1-03+ | Proposed |
+| D-013 | Data contracts / no silent drops — gates P1-03+ | Proposed (P1-03 evidence landed; not approved) |
 | D-015 | Package owns logic; thin DAGs/IaC — gates ingestion layout | Proposed |
 | D-001 / D-002 | Compose + MinIO baseline (unchanged) | Approved |
 
@@ -121,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01, P1-02 verified) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03 verified) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -160,6 +160,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-18 — P1-03 verified
+
+YAML contracts under `config/contracts/` for Olist e-commerce, marketing funnel, DummyJSON products, PostgreSQL v1 (`sellers`, `customers`, `orders`, `order_items`), and IBGE `municipios`. Structural loader only. `uv run pytest tests/unit` → 40 passed; ruff clean. D-013 stays `proposed`. Synthetic events and BrasilAPI CEP are out of this set.
 
 ### 2026-10-18 — P1-02 verified
 

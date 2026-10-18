@@ -1,0 +1,46 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: order_payments
+description: "Payment rows for historical Olist orders."
+payload_format: csv
+grain: "One row per payment sequence on an order."
+primary_key:
+  - order_id
+  - payment_sequential
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: order_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Order identifier."
+  - name: payment_sequential
+    type: integer
+    nullable: false
+    classification: internal
+    description: "Payment sequence on the order."
+  - name: payment_type
+    type: string
+    nullable: false
+    classification: internal
+    description: "Payment method."
+  - name: payment_installments
+    type: integer
+    nullable: false
+    classification: internal
+    description: "Number of installments."
+  - name: payment_value
+    type: number
+    nullable: false
+    classification: internal
+    description: "Amount of this payment."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."

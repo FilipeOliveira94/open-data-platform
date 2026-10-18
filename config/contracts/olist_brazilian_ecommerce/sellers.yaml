@@ -1,0 +1,40 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: sellers
+description: "Olist sellers. Location describes the business, not a customer."
+payload_format: csv
+grain: "One row per seller."
+primary_key:
+  - seller_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: seller_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller identifier."
+  - name: seller_zip_code_prefix
+    type: integer
+    nullable: false
+    classification: internal
+    description: "Seller ZIP prefix as published (numeric)."
+  - name: seller_city
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller city."
+  - name: seller_state
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller state code."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."

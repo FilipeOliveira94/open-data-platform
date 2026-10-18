@@ -33,7 +33,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Phase | Scope | Window | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
-| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01, P1-02 verified) |
+| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01, P1-02, P1-03 verified) |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
@@ -110,7 +110,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Ingestions can be repeated without undue duplication or corruption.
 - [ ] Unit tests do not require the public API to be online.
 - [ ] Raw data is traceable by source and execution.
-- [ ] Contracts and expected fields are documented.
+- [x] Contracts and expected fields are documented.
 - [ ] Invalid records and errors have explicit, documented behavior.
 - [ ] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
 
@@ -120,7 +120,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | --- | --- | --- | --- | --- |
 | P1-01 | Historical dataset license and redistribution check | Phase 0 | Verified | License/terms recorded for Olist e-commerce + marketing funnel (CC BY-NC-SA 4.0); no dataset vendored; fetch-from-source documented (`docs/sources/`, ADR-0018) |
 | P1-02 | Raw storage layout and ingestion metadata conventions | Phase 0 | Verified | Paths, partition conventions, `_ingestion_ts`, source id, execution id documented and used by writers |
-| P1-03 | Data contracts for planned sources | P1-02 | Not started | Contracts under `config/contracts/` (or agreed path); schema/fields/null rules explicit |
+| P1-03 | Data contracts for planned sources | P1-02 | Verified | Contracts under `config/contracts/` (or agreed path); schema/fields/null rules explicit |
 | P1-04 | Historical e-commerce dataset ingestion | P1-01, P1-02, P1-03 | Not started | Repeatable ingest of Olist e-commerce (+ marketing funnel join on `seller_id`) to raw layout; idempotent re-run; unit/integration coverage without private/vendored Olist data |
 | P1-05 | Paginated public API client (DummyJSON products) | P1-02, P1-03 | Not started | DummyJSON `/products` (`limit`/`skip`); timeouts, retries, rate-limit handling; fixtures; no live API in unit tests; lands in Gold `product_analysis` (D-019, D-012) |
 | P1-06 | PostgreSQL incremental batch extract | P0-10, P1-02, P1-03 | Not started | Parameterized extract by watermark/window (`start`/`end` or high-water mark); grain/keys documented; same code path supports daily and weekly windows; idempotent re-run without corrupting raw; OLTP seed per `docs/sources/postgres-oltp.md` |

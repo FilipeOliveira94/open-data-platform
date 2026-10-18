@@ -1,0 +1,90 @@
+contract_version: 1
+source_id: olist_marketing_funnel
+dataset: closed_deals
+description: "Closed seller deals. File olist_closed_deals_dataset.csv. Joins to e-commerce sellers on seller_id. Self-declared commercial attributes are often null."
+payload_format: csv
+grain: "One row per closed marketing qualified lead."
+primary_key:
+  - mql_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: mql_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Marketing qualified lead identifier."
+  - name: seller_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller identifier after the deal closed."
+  - name: sdr_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Sales development representative identifier."
+  - name: sr_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Sales representative identifier."
+  - name: won_date
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "When the deal was won."
+  - name: business_segment
+    type: string
+    nullable: true
+    classification: internal
+    description: "Declared business segment."
+  - name: lead_type
+    type: string
+    nullable: true
+    classification: internal
+    description: "Declared lead type."
+  - name: lead_behaviour_profile
+    type: string
+    nullable: true
+    classification: internal
+    description: "Behaviour profile recorded by the SDR."
+  - name: has_company
+    type: boolean
+    nullable: true
+    classification: internal
+    description: "Whether the lead declared a formal company."
+  - name: has_gtin
+    type: boolean
+    nullable: true
+    classification: internal
+    description: "Whether the lead declared a GTIN for its products."
+  - name: average_stock
+    type: string
+    nullable: true
+    classification: internal
+    description: "Declared average stock band, as published (text, not a number)."
+  - name: business_type
+    type: string
+    nullable: true
+    classification: internal
+    description: "Declared business type."
+  - name: declared_product_catalog_size
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Published column declared_product_catalog_size."
+  - name: declared_monthly_revenue
+    type: number
+    nullable: true
+    classification: internal
+    description: "Seller-declared monthly revenue."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Marketing Funnel by Olist (Kaggle olistbr/marketing-funnel-olist). No sample rows are stored."

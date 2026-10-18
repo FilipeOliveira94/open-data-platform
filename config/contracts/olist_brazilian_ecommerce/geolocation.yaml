@@ -1,0 +1,44 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: geolocation
+description: "Brazilian ZIP-prefix coordinates published with the Olist e-commerce dataset. The zip prefix is not unique, so this contract has no primary key."
+payload_format: csv
+grain: "One published geolocation row. Zip prefix repeats across rows."
+primary_key: []
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: geolocation_zip_code_prefix
+    type: integer
+    nullable: false
+    classification: pii
+    description: "ZIP prefix. Not unique in this file."
+  - name: geolocation_lat
+    type: number
+    nullable: false
+    classification: pii
+    description: "Latitude."
+  - name: geolocation_lng
+    type: number
+    nullable: false
+    classification: pii
+    description: "Longitude."
+  - name: geolocation_city
+    type: string
+    nullable: false
+    classification: pii
+    description: "City name for the prefix."
+  - name: geolocation_state
+    type: string
+    nullable: false
+    classification: pii
+    description: "State code for the prefix."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."

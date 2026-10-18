@@ -1,0 +1,40 @@
+contract_version: 1
+source_id: olist_marketing_funnel
+dataset: qualified_leads
+description: "Marketing qualified leads. File olist_marketing_qualified_leads_dataset.csv."
+payload_format: csv
+grain: "One row per marketing qualified lead."
+primary_key:
+  - mql_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: mql_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Marketing qualified lead identifier."
+  - name: first_contact_date
+    type: date
+    nullable: false
+    classification: internal
+    description: "Date of first contact."
+  - name: landing_page_id
+    type: string
+    nullable: true
+    classification: internal
+    description: "Landing page identifier. Null when absent."
+  - name: origin
+    type: string
+    nullable: true
+    classification: internal
+    description: "Lead origin. Null when absent."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Marketing Funnel by Olist (Kaggle olistbr/marketing-funnel-olist). No sample rows are stored."

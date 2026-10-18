@@ -1,0 +1,100 @@
+contract_version: 1
+source_id: ibge_localidades
+dataset: municipios
+description: "IBGE Localidades municipalities using view=nivelado. The payload is a JSON array. UF and region attributes are columns on this row. Separate region and UF endpoints are not datasets in contract version 1."
+payload_format: json
+grain: "One municipality object in the nivelado array."
+primary_key:
+  - municipio-id
+update_pattern: full_refresh
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: ibge
+fields:
+  - name: municipio-id
+    type: integer
+    nullable: false
+    classification: public
+    description: "IBGE municipality id."
+  - name: municipio-nome
+    type: string
+    nullable: false
+    classification: public
+    description: "Municipality name."
+  - name: microrregiao-id
+    type: integer
+    nullable: true
+    classification: public
+    description: "Microregion id. Null for a municipality outside that hierarchy."
+  - name: microrregiao-nome
+    type: string
+    nullable: true
+    classification: public
+    description: "Microregion name. Null when microrregiao-id is null."
+  - name: mesorregiao-id
+    type: integer
+    nullable: true
+    classification: public
+    description: "Mesoregion id. Null for a municipality outside that hierarchy."
+  - name: mesorregiao-nome
+    type: string
+    nullable: true
+    classification: public
+    description: "Mesoregion name. Null when mesorregiao-id is null."
+  - name: regiao-imediata-id
+    type: integer
+    nullable: false
+    classification: public
+    description: "Immediate region id."
+  - name: regiao-imediata-nome
+    type: string
+    nullable: false
+    classification: public
+    description: "Immediate region name."
+  - name: regiao-intermediaria-id
+    type: integer
+    nullable: false
+    classification: public
+    description: "Intermediate region id."
+  - name: regiao-intermediaria-nome
+    type: string
+    nullable: false
+    classification: public
+    description: "Intermediate region name."
+  - name: UF-id
+    type: integer
+    nullable: false
+    classification: public
+    description: "State id."
+  - name: UF-sigla
+    type: string
+    nullable: false
+    classification: public
+    description: "State abbreviation."
+  - name: UF-nome
+    type: string
+    nullable: false
+    classification: public
+    description: "State name."
+  - name: regiao-id
+    type: integer
+    nullable: false
+    classification: public
+    description: "Macro region id."
+  - name: regiao-sigla
+    type: string
+    nullable: false
+    classification: public
+    description: "Macro region abbreviation."
+  - name: regiao-nome
+    type: string
+    nullable: false
+    classification: public
+    description: "Macro region name."
+changelog:
+  - version: 1
+    note: "Initial contract. Field names from GET /api/v1/localidades/municipios?view=nivelado checked 2026-10-18. Micro and meso region id and name were null on one municipality. No response rows are stored."

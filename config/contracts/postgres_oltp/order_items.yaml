@@ -1,0 +1,61 @@
+contract_version: 1
+source_id: postgres_oltp
+dataset: order_items
+description: "PostgreSQL OLTP order items. JSON array of rows."
+payload_format: json
+grain: "One row per item within an order."
+primary_key:
+  - order_id
+  - order_item_id
+update_pattern: incremental_window
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: postgres
+fields:
+  - name: order_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Order identifier."
+  - name: order_item_id
+    type: integer
+    nullable: false
+    classification: internal
+    description: "Item sequence within the order."
+  - name: product_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Product identifier."
+  - name: seller_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller identifier."
+  - name: shipping_limit_date
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "Seller shipping deadline."
+  - name: price
+    type: number
+    nullable: false
+    classification: internal
+    description: "Item price."
+  - name: freight_value
+    type: number
+    nullable: false
+    classification: internal
+    description: "Freight charged for the item."
+  - name: updated_at
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "Platform watermark for windowed extract. Not an Olist source column."
+changelog:
+  - version: 1
+    note: "Initial v1 contract. Columns align with the Olist dataset of the same grain, plus updated_at for the P1-06 watermark."

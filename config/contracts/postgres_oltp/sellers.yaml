@@ -1,0 +1,45 @@
+contract_version: 1
+source_id: postgres_oltp
+dataset: sellers
+description: "PostgreSQL OLTP sellers. JSON array of rows."
+payload_format: json
+grain: "One row per seller."
+primary_key:
+  - seller_id
+update_pattern: incremental_window
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: postgres
+fields:
+  - name: seller_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller identifier."
+  - name: seller_zip_code_prefix
+    type: integer
+    nullable: false
+    classification: internal
+    description: "Seller ZIP prefix."
+  - name: seller_city
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller city."
+  - name: seller_state
+    type: string
+    nullable: false
+    classification: internal
+    description: "Seller state code."
+  - name: updated_at
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "Platform watermark for windowed extract. Not an Olist source column."
+changelog:
+  - version: 1
+    note: "Initial v1 contract. Columns align with the Olist dataset of the same grain, plus updated_at for the P1-06 watermark."

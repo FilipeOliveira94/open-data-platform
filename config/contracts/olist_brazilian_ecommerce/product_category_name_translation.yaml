@@ -1,0 +1,30 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: product_category_name_translation
+description: "Portuguese to English product category labels published with Olist."
+payload_format: csv
+grain: "One row per Portuguese category name."
+primary_key:
+  - product_category_name
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: product_category_name
+    type: string
+    nullable: false
+    classification: public
+    description: "Portuguese category name."
+  - name: product_category_name_english
+    type: string
+    nullable: false
+    classification: public
+    description: "English category label."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."

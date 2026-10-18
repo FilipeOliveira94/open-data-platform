@@ -35,7 +35,14 @@ Define **explicit data contracts** (expected fields, types, null rules) under `c
 
 ## Evidence / validation
 
-None yet — Phase 1 contracts and tests.
+P1-03 (2026-10-18), status of this ADR unchanged (`proposed`):
+
+- Vocabulary: [`docs/architecture/data-contracts.md`](../architecture/data-contracts.md)
+- Files: `config/contracts/{source_id}/{dataset}.yaml`
+- Loader: `src/open_data_platform/contracts/` (structure only; no payload checks)
+- Unit tests: `tests/unit/test_contracts.py` (no live API, no Olist rows)
+
+Row quarantine and `fail_batch` are declared on each contract. Runtime enforcement remains P1-10 / P3-07.
 
 ## Revisit when
 

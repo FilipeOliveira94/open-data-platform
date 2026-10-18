@@ -45,7 +45,7 @@ raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_na
 | IBGE Localidades | `raw/ibge_localidades/municipios/dt=2026-10-18/execution_id=run-001/municipios.json` |
 | Synthetic events | `raw/synthetic_events/clickstream/dt=2026-10-18/execution_id=run-001/events.jsonl` |
 
-`source_id` / `dataset` values above are **conventions for writers**; formal field contracts are P1-03.
+`source_id` / `dataset` values above are the writer conventions. Field lists, null rules, and classification live in [`config/contracts/`](../../config/contracts/) ([data contracts](data-contracts.md)).
 
 ## Ingestion metadata
 
@@ -84,7 +84,7 @@ Writers in later issues must call these helpers rather than inventing paths.
 
 ## Out of scope (this document)
 
-- Data contracts / schemas (`config/contracts/`) — P1-03
+- Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
 - Source-specific extract clients — P1-04+
 - Bronze/Iceberg tables — P2-03
 - Quarantine layout — P1-10 / P3-07

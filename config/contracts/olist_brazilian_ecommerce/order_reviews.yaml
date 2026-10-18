@@ -1,0 +1,55 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: order_reviews
+description: "Customer reviews for historical Olist orders. Comment title and message are often null. The published file contains duplicate review_id values; those rows violate this key and are quarantined later, not dropped here."
+payload_format: csv
+grain: "One row per review submission."
+primary_key:
+  - review_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: review_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Review identifier."
+  - name: order_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Order identifier."
+  - name: review_score
+    type: integer
+    nullable: false
+    classification: internal
+    description: "Score from 1 to 5."
+  - name: review_comment_title
+    type: string
+    nullable: true
+    classification: pii
+    description: "Free-text review title. May identify a person or place."
+  - name: review_comment_message
+    type: string
+    nullable: true
+    classification: pii
+    description: "Free-text review body. May identify a person or place."
+  - name: review_creation_date
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "When the review was created."
+  - name: review_answer_timestamp
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "When the review was answered."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."

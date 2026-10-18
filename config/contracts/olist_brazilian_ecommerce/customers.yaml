@@ -1,0 +1,45 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: customers
+description: "Order-scoped Olist customers. customer_id changes per order; customer_unique_id is the stable person identifier."
+payload_format: csv
+grain: "One row per order-scoped customer."
+primary_key:
+  - customer_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: customer_id
+    type: string
+    nullable: false
+    classification: pii
+    description: "Order-scoped customer key. Not stable across a person's orders."
+  - name: customer_unique_id
+    type: string
+    nullable: false
+    classification: pii
+    description: "Stable identifier of the person across orders."
+  - name: customer_zip_code_prefix
+    type: integer
+    nullable: false
+    classification: pii
+    description: "Five-digit ZIP prefix as published. The source file is numeric, so leading zeros are not preserved."
+  - name: customer_city
+    type: string
+    nullable: false
+    classification: pii
+    description: "Customer city."
+  - name: customer_state
+    type: string
+    nullable: false
+    classification: pii
+    description: "Customer state code."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."

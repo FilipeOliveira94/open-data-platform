@@ -12,4 +12,4 @@
 | Decision | ADR-0007 / ADR-0008 (patterns); seed notes with D-019 sources |
 | Related Issue | P1-06 (extract); Phase 4 (CDC) |
 
-Mutable tables need explicit PKs and `updated_at` (or equivalent). Minimal v1 (lock in P1-03): `sellers`, `customers`, `orders`, `order_items`.
+Minimal v1 is locked in [`config/contracts/postgres_oltp/`](../../config/contracts/postgres_oltp/): `sellers`, `customers`, `orders`, `order_items`. Each table has an explicit primary key and a non-null `updated_at` watermark for windowed extract. Other columns follow the Olist dataset of the same grain. Vocabulary: [`docs/architecture/data-contracts.md`](../architecture/data-contracts.md).

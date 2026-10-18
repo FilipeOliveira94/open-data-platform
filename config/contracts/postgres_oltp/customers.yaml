@@ -1,0 +1,50 @@
+contract_version: 1
+source_id: postgres_oltp
+dataset: customers
+description: "PostgreSQL OLTP customers. JSON array of rows. Seed may come from local Olist files or synthetic stand-ins."
+payload_format: json
+grain: "One row per order-scoped customer."
+primary_key:
+  - customer_id
+update_pattern: incremental_window
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: postgres
+fields:
+  - name: customer_id
+    type: string
+    nullable: false
+    classification: pii
+    description: "Order-scoped customer key."
+  - name: customer_unique_id
+    type: string
+    nullable: false
+    classification: pii
+    description: "Stable person identifier."
+  - name: customer_zip_code_prefix
+    type: integer
+    nullable: false
+    classification: pii
+    description: "ZIP prefix aligned with the Olist customers file."
+  - name: customer_city
+    type: string
+    nullable: false
+    classification: pii
+    description: "Customer city."
+  - name: customer_state
+    type: string
+    nullable: false
+    classification: pii
+    description: "Customer state code."
+  - name: updated_at
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "Platform watermark for windowed extract. Not an Olist source column."
+changelog:
+  - version: 1
+    note: "Initial v1 contract. Columns align with the Olist dataset of the same grain, plus updated_at for the P1-06 watermark."

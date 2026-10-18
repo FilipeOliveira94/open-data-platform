@@ -1,0 +1,152 @@
+contract_version: 1
+source_id: dummyjson_products
+dataset: products
+description: "DummyJSON GET /products page. The raw object is the JSON page. The record grain is one element of products. DummyJSON id is not an Olist product_id."
+payload_format: json
+grain: "One product object inside the products array of a paginated response."
+primary_key:
+  - id
+update_pattern: full_refresh
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: product_analysis
+  owner: platform
+provenance:
+  system: dummyjson
+fields:
+  - name: id
+    type: integer
+    nullable: false
+    classification: public
+    description: "DummyJSON product id. Not an Olist product_id."
+  - name: title
+    type: string
+    nullable: false
+    classification: public
+    description: "Product title."
+  - name: description
+    type: string
+    nullable: false
+    classification: public
+    description: "Product description."
+  - name: category
+    type: string
+    nullable: false
+    classification: public
+    description: "DummyJSON category slug."
+  - name: price
+    type: number
+    nullable: false
+    classification: public
+    description: "List price."
+  - name: discountPercentage
+    type: number
+    nullable: false
+    classification: public
+    description: "Discount percentage."
+  - name: rating
+    type: number
+    nullable: false
+    classification: public
+    description: "Average rating."
+  - name: stock
+    type: integer
+    nullable: false
+    classification: public
+    description: "Units in stock."
+  - name: tags
+    type: json
+    nullable: false
+    classification: public
+    description: "Array of tag strings."
+  - name: brand
+    type: string
+    nullable: false
+    classification: public
+    description: "Brand name on the documented product object."
+  - name: sku
+    type: string
+    nullable: false
+    classification: public
+    description: "Stock keeping unit."
+  - name: weight
+    type: number
+    nullable: false
+    classification: public
+    description: "Product weight."
+  - name: dimensions
+    type: json
+    nullable: false
+    classification: public
+    description: "Object with width, height and depth."
+  - name: warrantyInformation
+    type: string
+    nullable: false
+    classification: public
+    description: "Warranty text."
+  - name: shippingInformation
+    type: string
+    nullable: false
+    classification: public
+    description: "Shipping text."
+  - name: availabilityStatus
+    type: string
+    nullable: false
+    classification: public
+    description: "Availability label."
+  - name: reviews
+    type: json
+    nullable: false
+    classification: public
+    description: "Array of synthetic reviews. reviewerName and reviewerEmail are demo values, not real people."
+  - name: returnPolicy
+    type: string
+    nullable: false
+    classification: public
+    description: "Return policy text."
+  - name: minimumOrderQuantity
+    type: integer
+    nullable: false
+    classification: public
+    description: "Minimum order quantity."
+  - name: meta
+    type: json
+    nullable: false
+    classification: public
+    description: "Object with createdAt, updatedAt, barcode and qrCode."
+  - name: thumbnail
+    type: string
+    nullable: false
+    classification: public
+    description: "Thumbnail URL or placeholder."
+  - name: images
+    type: json
+    nullable: false
+    classification: public
+    description: "Array of image URLs or placeholders."
+record_locator: products
+envelope_fields:
+  - name: products
+    type: json
+    nullable: false
+    classification: public
+    description: "Array of product objects."
+  - name: total
+    type: integer
+    nullable: false
+    classification: public
+    description: "Total products reported by the API."
+  - name: skip
+    type: integer
+    nullable: false
+    classification: public
+    description: "Offset requested for this page."
+  - name: limit
+    type: integer
+    nullable: false
+    classification: public
+    description: "Page size requested for this page."
+changelog:
+  - version: 1
+    note: "Initial contract. Page envelope and product object follow https://dummyjson.com/docs/products checked 2026-10-18. Nested objects stay json. Values are synthetic demo data."

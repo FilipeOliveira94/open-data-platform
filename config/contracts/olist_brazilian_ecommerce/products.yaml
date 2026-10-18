@@ -1,0 +1,65 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: products
+description: "Olist product catalog attributes. The published column product_name_lenght keeps the source spelling."
+payload_format: csv
+grain: "One row per product."
+primary_key:
+  - product_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: product_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Product identifier."
+  - name: product_category_name
+    type: string
+    nullable: true
+    classification: internal
+    description: "Portuguese category name. Null when the product has no category."
+  - name: product_name_lenght
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Published column name (lenght). Character length of the product name."
+  - name: product_description_lenght
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Published column name (lenght). Character length of the description."
+  - name: product_photos_qty
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Number of product photos."
+  - name: product_weight_g
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Weight in grams."
+  - name: product_length_cm
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Length in centimeters."
+  - name: product_height_cm
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Height in centimeters."
+  - name: product_width_cm
+    type: integer
+    nullable: true
+    classification: internal
+    description: "Width in centimeters."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."

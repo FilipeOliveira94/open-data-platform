@@ -1,0 +1,60 @@
+contract_version: 1
+source_id: olist_brazilian_ecommerce
+dataset: orders
+description: "Historical Olist orders. One published CSV row per order. Approval and delivery timestamps are null when that step did not occur."
+payload_format: csv
+grain: "One row per order."
+primary_key:
+  - order_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: olist_analysis
+  owner: platform
+provenance:
+  system: kaggle
+fields:
+  - name: order_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Unique order identifier."
+  - name: customer_id
+    type: string
+    nullable: false
+    classification: pii
+    description: "Order-scoped customer identifier. Joins to customers.customer_id."
+  - name: order_status
+    type: string
+    nullable: false
+    classification: internal
+    description: "Current order status."
+  - name: order_purchase_timestamp
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "When the order was placed."
+  - name: order_approved_at
+    type: timestamp
+    nullable: true
+    classification: internal
+    description: "When payment was approved. Null when the order was not approved."
+  - name: order_delivered_carrier_date
+    type: timestamp
+    nullable: true
+    classification: internal
+    description: "When the order was handed to the carrier. Null when that did not occur."
+  - name: order_delivered_customer_date
+    type: timestamp
+    nullable: true
+    classification: internal
+    description: "When the order was delivered to the customer. Null when that did not occur."
+  - name: order_estimated_delivery_date
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "Delivery date estimated at purchase."
+changelog:
+  - version: 1
+    note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
