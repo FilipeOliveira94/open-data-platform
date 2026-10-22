@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-10-22 — P1-04 Olist historical ingestion
+
+Package fetch of `olistbr/brazilian-ecommerce` and `olistbr/marketing-funnel-olist` through `GET /api/v1/datasets/download/{owner}/{slug}`. One slug is extracted and its CSVs are written one at a time before the next slug starts. Published join: `closed_deals.seller_id` = `sellers.seller_id` or `order_items.seller_id` (those three contracts are version 2). Validation: `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 76 passed; `uv run pytest tests/integration/test_olist_ingest.py` → 1 passed on local MinIO. A live Kaggle run downloaded the e-commerce zip and stopped on the category-file BOM; the full live run after that fix was not re-executed. No Olist rows committed.
+
 ### 2026-10-18 — P1-02 raw storage layout and ingestion metadata
 
 Approved D-020 / ADR-0020: auditable raw in object store under `raw/{source_id}/{dataset}/dt=…/execution_id=…/{object_name}`; required metadata `source_id`, `execution_id`, `_ingestion_ts`; local `data/raw/` remains fetch staging only. Package helpers and minimal writer in `src/open_data_platform/ingestion/`. Validation: `uv run ruff check src tests` PASS; `uv run pytest tests/unit` → 21 passed.

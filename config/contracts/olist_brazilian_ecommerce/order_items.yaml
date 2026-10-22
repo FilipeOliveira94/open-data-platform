@@ -1,7 +1,7 @@
-contract_version: 1
+contract_version: 2
 source_id: olist_brazilian_ecommerce
 dataset: order_items
-description: "Items inside historical Olist orders."
+description: "Items inside historical Olist orders. seller_id matches closed_deals.seller_id in the marketing funnel."
 payload_format: csv
 grain: "One row per item within an order."
 primary_key:
@@ -35,7 +35,7 @@ fields:
     type: string
     nullable: false
     classification: internal
-    description: "Seller identifier."
+    description: "Seller identifier. Equals olist_marketing_funnel closed_deals.seller_id."
   - name: shipping_limit_date
     type: timestamp
     nullable: false
@@ -54,3 +54,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
+  - version: 2
+    note: "Document the published seller_id join: closed_deals.seller_id matches sellers.seller_id or order_items.seller_id."

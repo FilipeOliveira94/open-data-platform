@@ -44,6 +44,10 @@ data/private/
 *.parquet
 *.csv.gz
 
+# Kaggle credentials
+kaggle.json
+.kaggle/
+
 # Terraform (Phase 7+)
 **/.terraform/
 *.tfstate

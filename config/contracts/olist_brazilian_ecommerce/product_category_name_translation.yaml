@@ -1,7 +1,7 @@
-contract_version: 1
+contract_version: 2
 source_id: olist_brazilian_ecommerce
 dataset: product_category_name_translation
-description: "Portuguese to English product category labels published with Olist."
+description: "Portuguese to English product category labels published with Olist. The published CSV starts with a UTF-8 BOM. Column names are the names below."
 payload_format: csv
 grain: "One row per Portuguese category name."
 primary_key:
@@ -28,3 +28,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
+  - version: 2
+    note: "Record that the published file starts with a UTF-8 BOM. Logical column names are unchanged."

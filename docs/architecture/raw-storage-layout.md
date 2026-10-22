@@ -79,12 +79,14 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 | `open_data_platform.ingestion.paths` | Build and validate raw object keys |
 | `open_data_platform.ingestion.metadata` | Typed metadata → object user-metadata map |
 | `open_data_platform.ingestion.writer` | Put bytes to `ODP_RAW_BUCKET` with key + metadata |
+| `open_data_platform.ingestion.kaggle_download` | Download one Kaggle dataset zip and extract an expected file set |
+| `open_data_platform.ingestion.olist` | Fetch the Olist snapshots and write each CSV through the raw writer |
 
-Writers in later issues must call these helpers rather than inventing paths.
+Olist historical ingestion calls these helpers. Later source writers do the same.
 
 ## Out of scope (this document)
 
 - Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
-- Source-specific extract clients — P1-04+
+- Other Phase 1 source clients (DummyJSON, PostgreSQL, IBGE, synthetic events)
 - Bronze/Iceberg tables — P2-03
 - Quarantine layout — P1-10 / P3-07

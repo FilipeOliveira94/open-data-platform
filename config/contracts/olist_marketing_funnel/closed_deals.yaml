@@ -1,7 +1,7 @@
-contract_version: 1
+contract_version: 2
 source_id: olist_marketing_funnel
 dataset: closed_deals
-description: "Closed seller deals. File olist_closed_deals_dataset.csv. Joins to e-commerce sellers on seller_id. Self-declared commercial attributes are often null."
+description: "Closed seller deals. File olist_closed_deals_dataset.csv. seller_id equals olist_brazilian_ecommerce sellers.seller_id or order_items.seller_id. Self-declared commercial attributes are often null."
 payload_format: csv
 grain: "One row per closed marketing qualified lead."
 primary_key:
@@ -24,7 +24,7 @@ fields:
     type: string
     nullable: false
     classification: internal
-    description: "Seller identifier after the deal closed."
+    description: "Seller identifier. Equals sellers.seller_id or order_items.seller_id in olist_brazilian_ecommerce."
   - name: sdr_id
     type: string
     nullable: false
@@ -88,3 +88,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Marketing Funnel by Olist (Kaggle olistbr/marketing-funnel-olist). No sample rows are stored."
+  - version: 2
+    note: "Document the published seller_id join: closed_deals.seller_id matches sellers.seller_id or order_items.seller_id."

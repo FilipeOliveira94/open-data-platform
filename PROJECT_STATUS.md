@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-18 (P1-03 verified — data contracts) |
+| Last updated | 2026-10-22 (P1-04 verified — Olist historical ingestion) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01, P1-02, P1-03 verified) |
+| Phase status | In progress (P1-01, P1-02, P1-03, P1-04 verified) |
 
 **Status values:** not started · in progress · delivered · verified · blocked
 
@@ -22,14 +22,14 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P1-04** — historical e-commerce (+ marketing funnel) ingestion.
+**P1-05** — paginated public API client (DummyJSON).
 
 Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms, AWS Terraform apply, Phase 8 hosting polish.
 
 ## Next work
 
-1. **P1-04** — historical e-commerce (+ marketing funnel) ingestion.
-2. **P1-05**, **P1-06**, and **P1-08** can proceed in parallel with P1-04; each depends on P1-03, now verified.
+1. **P1-05** — paginated public API client (DummyJSON).
+2. **P1-06**, **P1-07**, and **P1-08** are unblocked and can proceed in parallel with P1-05.
 
 ---
 
@@ -40,7 +40,7 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-01 | Historical dataset license and redistribution check | Verified | `docs/sources/`; ADR-0018 / D-018; no Olist binaries in git (2026-10-17) |
 | P1-02 | Raw storage layout and ingestion metadata conventions | Verified | ADR-0020; `docs/architecture/raw-storage-layout.md`; `src/open_data_platform/ingestion/`; unit tests 2026-10-18 |
 | P1-03 | Data contracts for planned sources | Verified | `config/contracts/`; `docs/architecture/data-contracts.md`; `src/open_data_platform/contracts/`; unit tests 2026-10-18 |
-| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Not started | — |
+| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Verified | `ingestion/olist.py`, `ingestion/kaggle_download.py`; unit tests 76 passed; MinIO round-trip 1 passed (2026-10-22). Category translation CSV may start with a UTF-8 BOM |
 | P1-05 | Paginated public API client (DummyJSON) | Not started | D-019 approved |
 | P1-06 | PostgreSQL incremental batch extract | Not started | — |
 | P1-07 | Synthetic event generator | Not started | — |
@@ -66,10 +66,10 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 
 | | |
 | --- | --- |
-| Date | 2026-10-18 |
-| Environment | WSL2 / Ubuntu |
-| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 40 passed |
-| Result | P1-03 verified: YAML contracts for planned sources (schema, nulls, classification, provenance) and a structural loader. No live API and no Olist rows |
+| Date | 2026-10-22 |
+| Environment | WSL2 / Ubuntu; local Compose MinIO healthy |
+| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 76 passed; `uv run pytest tests/integration/test_olist_ingest.py` → 1 passed |
+| Result | P1-04 verified on fake transport and synthetic MinIO writes: 11 raw CSV objects and the published `closed_deals.seller_id` join. A live Kaggle run downloaded the e-commerce zip and stopped on the category-file BOM; that check is covered by unit tests. The full live run after the fix was not re-executed. No Olist rows in git |
 
 ---
 
@@ -121,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03 verified) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04 verified) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -160,6 +160,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-22 — P1-04 verified
+
+Olist historical ingestion: Kaggle download client, safe unzip into gitignored staging, and raw writes for the 11 published CSVs. `closed_deals.seller_id` joins `sellers.seller_id` or `order_items.seller_id` (contract version 2). Each CSV is read and written on its own; a structural failure stops the remaining files. A leading UTF-8 BOM on `product_category_name_translation` is ignored for the header check and kept in the raw bytes. `uv run pytest tests/unit` → 76 passed; MinIO integration → 1 passed.
 
 ### 2026-10-18 — P1-03 verified
 
