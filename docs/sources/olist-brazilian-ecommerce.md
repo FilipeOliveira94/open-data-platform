@@ -16,7 +16,7 @@
 
 **Join:** `olist_closed_deals_dataset.seller_id` equals `olist_sellers_dataset.seller_id` or `olist_order_items_dataset.seller_id`. The raw landing keeps one object per CSV.
 
-Slug: `olistbr/brazilian-ecommerce`. Default staging: `data/raw/olist/brazilian-ecommerce` (`ODP_OLIST_ECOMMERCE_DIR`).
+Slug: `olistbr/brazilian-ecommerce`. Default staging: `data/raw/olist_brazilian_ecommerce` (`ODP_OLIST_ECOMMERCE_DIR`), the same name as the contract directory and `source_id`.
 
 From the repository root, with raw-bucket and MinIO settings in the environment:
 

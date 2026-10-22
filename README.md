@@ -48,7 +48,7 @@ docker compose exec postgres pg_isready -U odp -d odp
 
 # 6) MinIO write/read smoke
 set -a && source .env.example && set +a
-uv run pytest tests/integration/test_minio_smoke.py
+uv run pytest tests/integration/infrastructure/test_minio_smoke.py
 # or: make test-minio
 
 # 7) Stop services (volumes retained)

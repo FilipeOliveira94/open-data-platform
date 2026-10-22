@@ -34,7 +34,7 @@ test-minio: ## MinIO write/read smoke (Compose MinIO must be healthy)
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
-	$(PYTEST) tests/integration/test_minio_smoke.py
+	$(PYTEST) tests/integration/infrastructure/test_minio_smoke.py
 
 up: ## Start PostgreSQL and MinIO
 	$(COMPOSE) up -d

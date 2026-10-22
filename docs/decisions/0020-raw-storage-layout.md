@@ -48,7 +48,7 @@ Package helpers under `src/open_data_platform/ingestion/` own path building, met
 
 - Conventions: [`docs/architecture/raw-storage-layout.md`](../architecture/raw-storage-layout.md)
 - Package: `src/open_data_platform/ingestion/`
-- Unit tests: `tests/unit/test_ingestion_*.py` (no live MinIO required)
+- Unit tests: `tests/unit/ingestion/` (no live MinIO required)
 
 ## Revisit when
 

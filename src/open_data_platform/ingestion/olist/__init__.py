@@ -111,15 +111,15 @@ def olist_staging_dirs(
     """Return ``(ecommerce_dir, funnel_dir)``.
 
     Set paths come from the environment as given. Unset paths are the
-    documented ``data/raw/olist/...`` directories under the repository root.
+    documented ``data/raw/{source_id}`` directories under the repository root.
     """
     root = _repo_root() if repo_root is None else repo_root
     ecommerce = env.get("ODP_OLIST_ECOMMERCE_DIR", "").strip()
     funnel = env.get("ODP_OLIST_FUNNEL_DIR", "").strip()
     ecommerce_dir = (
-        Path(ecommerce) if ecommerce else root / "data/raw/olist/brazilian-ecommerce"
+        Path(ecommerce) if ecommerce else root / "data/raw/olist_brazilian_ecommerce"
     )
-    funnel_dir = Path(funnel) if funnel else root / "data/raw/olist/marketing-funnel"
+    funnel_dir = Path(funnel) if funnel else root / "data/raw/olist_marketing_funnel"
     return ecommerce_dir, funnel_dir
 
 
@@ -395,7 +395,3 @@ def _csv_header(body: bytes, object_name: str) -> list[str]:
         msg = f"staged file has an invalid header: {object_name}"
         raise OlistIngestError(msg)
     return header
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

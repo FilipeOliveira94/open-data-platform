@@ -147,8 +147,8 @@ def test_require_seller_join_rejects_a_missing_column() -> None:
 
 def test_default_staging_dirs_are_repo_relative(tmp_path: Path) -> None:
     ecommerce, funnel = olist_staging_dirs({}, repo_root=tmp_path)
-    assert ecommerce == tmp_path / "data/raw/olist/brazilian-ecommerce"
-    assert funnel == tmp_path / "data/raw/olist/marketing-funnel"
+    assert ecommerce == tmp_path / "data/raw/olist_brazilian_ecommerce"
+    assert funnel == tmp_path / "data/raw/olist_marketing_funnel"
 
 
 def test_staging_dirs_use_environment_paths(tmp_path: Path) -> None:

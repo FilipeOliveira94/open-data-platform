@@ -46,8 +46,8 @@ Use **MinIO** locally and **Amazon S3** on the AWS path as the object store for 
 ## Evidence / validation
 
 - Compose service and pin: `docker-compose.yml` (`coollabsio/minio:RELEASE.2025-10-15T17-29-55Z`).
-- Package helper + unit tests: `src/open_data_platform/object_storage.py`, `tests/unit/test_object_storage.py`.
-- Live put/get smoke: `uv run pytest tests/integration/test_minio_smoke.py` → **1 passed** (2026-10-16); container `odp-minio` healthy.
+- Package helper + unit tests: `src/open_data_platform/object_storage.py`, `tests/unit/infrastructure/test_object_storage.py`.
+- Live put/get smoke: `uv run pytest tests/integration/infrastructure/test_minio_smoke.py` → **1 passed** (2026-10-16); container `odp-minio` healthy.
 
 ## Revisit when
 

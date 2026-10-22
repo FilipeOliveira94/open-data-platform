@@ -40,7 +40,7 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-01 | Historical dataset license and redistribution check | Verified | `docs/sources/`; ADR-0018 / D-018; no Olist binaries in git (2026-10-17) |
 | P1-02 | Raw storage layout and ingestion metadata conventions | Verified | ADR-0020; `docs/architecture/raw-storage-layout.md`; `src/open_data_platform/ingestion/`; unit tests 2026-10-18 |
 | P1-03 | Data contracts for planned sources | Verified | `config/contracts/`; `docs/architecture/data-contracts.md`; `src/open_data_platform/contracts/`; unit tests 2026-10-18 |
-| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Verified | `ingestion/olist.py`, `ingestion/kaggle_download.py`; unit tests 76 passed; MinIO round-trip 1 passed (2026-10-22). Category translation CSV may start with a UTF-8 BOM |
+| P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Verified | `ingestion/olist/`, `ingestion/kaggle_download.py`; unit tests 76 passed; MinIO round-trip 1 passed (2026-10-22). Category translation CSV may start with a UTF-8 BOM |
 | P1-05 | Paginated public API client (DummyJSON) | Not started | D-019 approved |
 | P1-06 | PostgreSQL incremental batch extract | Not started | — |
 | P1-07 | Synthetic event generator | Not started | — |
@@ -68,7 +68,7 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 | --- | --- |
 | Date | 2026-10-22 |
 | Environment | WSL2 / Ubuntu; local Compose MinIO healthy |
-| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 76 passed; `uv run pytest tests/integration/test_olist_ingest.py` → 1 passed |
+| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 76 passed; `uv run pytest tests/integration/ingestion/test_olist_ingest.py` → 1 passed |
 | Result | P1-04 verified on fake transport and synthetic MinIO writes: 11 raw CSV objects and the published `closed_deals.seller_id` join. A live Kaggle run downloaded the e-commerce zip and stopped on the category-file BOM; that check is covered by unit tests. The full live run after the fix was not re-executed. No Olist rows in git |
 
 ---
@@ -81,7 +81,7 @@ Phase 0 is **verified**. Re-check when touching toolchain or Compose:
 uv run ruff check src tests
 uv run pytest tests/unit
 docker compose up -d && docker compose exec postgres pg_isready -U odp -d odp
-set -a && source .env.example && set +a && uv run pytest tests/integration/test_minio_smoke.py
+set -a && source .env.example && set +a && uv run pytest tests/integration/infrastructure/test_minio_smoke.py
 ```
 
 Closed Phase 0 issues and narrative: [`ROADMAP.md`](ROADMAP.md) (Phase 0), [`docs/status-log.md`](docs/status-log.md).
