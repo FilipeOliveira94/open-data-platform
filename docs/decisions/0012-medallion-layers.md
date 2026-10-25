@@ -26,7 +26,7 @@ Adopt **Bronze / Silver / Gold**:
 
 | Domain | Primary sources | Example layout |
 | --- | --- | --- |
-| `olist_analysis` | Olist files, Postgres seed/CDC, funnel, IBGE/CEP enrichment when present | e.g. `gold/olist_analysis/` or dbt package/schema `olist_analysis` |
+| `olist_analysis` | Olist files, Postgres seed/CDC, funnel, IBGE geography (P1-08) | e.g. `gold/olist_analysis/` or dbt package/schema `olist_analysis` |
 | `product_analysis` | DummyJSON products (P1-05) | e.g. `gold/product_analysis/` or dbt package/schema `product_analysis` |
 
 Shared platform infrastructure (Spark, Iceberg, catalog) may serve both; **marts, grains and keys stay domain-scoped**.

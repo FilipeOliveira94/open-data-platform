@@ -61,7 +61,7 @@ IBGE `municipios` is a JSON array. UF and macro-region attributes are columns on
 
 Demo storefront `clickstream` is JSONL: one user action per line, with no envelope. `event_time` is UTC with millisecond precision and a `Z` suffix. Actions are spaced at 500 per second of event time. `product_id` is null on some `page_view` rows. Identifiers are generated tokens and do not join Olist or DummyJSON. Daily batch, weekly batch, and CDC stay on PostgreSQL.
 
-Out of this set: BrasilAPI CEP (optional P1-09).
+BrasilAPI CEP is not a contracted source ([ADR-0021](../decisions/0021-withdraw-brasilapi-cep.md)). IBGE and Olist geolocation cover the joinable geography.
 
 ## Package
 

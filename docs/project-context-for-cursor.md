@@ -89,7 +89,7 @@ Cursor Chat: https://docs.cursor.com/chat/overview
 
 -   Olist (e-commerce + marketing funnel); DummyJSON products; IBGE
     Localidades; Postgres OLTP (seed); clickstream de loja fictícia
-    (`demo_storefront`); CEP BrasilAPI opcional. Detalhe: `docs/sources/`,
+    (`demo_storefront`). BrasilAPI CEP não é fonte (ADR-0021). Detalhe: `docs/sources/`,
     ADR-0018/0019. Gold: `olist_analysis` e `product_analysis` (ADR-0012).
 
 ### Plataforma e processamento
@@ -636,7 +636,7 @@ Do not run destructive volume cleanup without approval.
 Work only on Phase 1 — Multi-source ingestion.
 
 Implement small, testable ingestion components for:
-1. Historical Olist datasets, DummyJSON products, IBGE Localidades, Postgres OLTP seed; optional BrasilAPI CEP (`docs/sources/`, ADR-0018/0019). Gold domains: `olist_analysis`, `product_analysis`.
+1. Historical Olist datasets, DummyJSON products, IBGE Localidades, Postgres OLTP seed. BrasilAPI CEP is not a platform source (ADR-0021). Gold domains: `olist_analysis`, `product_analysis` (`docs/sources/`, ADR-0018/0019).
 2. A paginated public API with timeouts, retries, rate-limit handling, and local fixtures.
 3. PostgreSQL source extraction.
 4. Fictional storefront clickstream (`demo_storefront` / `clickstream`), as a seedable JSONL batch. CDC stays on PostgreSQL.

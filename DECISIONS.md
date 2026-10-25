@@ -43,8 +43,9 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-016 | Discovery / metadata | Deferred; evaluate DataHub / Amundsen / OpenMetadata later | — | `proposed` | [ADR-0016](docs/decisions/0016-data-discovery.md) |
 | D-017 | Dataviz | Deferred until Gold; OSS BI locally; QuickSight as AWS counterpart | — | `proposed` | [ADR-0017](docs/decisions/0017-dataviz.md) |
 | D-018 | Historical Olist datasets | CC BY-NC-SA 4.0 e-commerce + marketing funnel; no vendor; fetch-from-source | Provenance under `docs/sources/`; no dataset binaries in git (P1-01) | `approved` | [ADR-0018](docs/decisions/0018-historical-dataset-redistribution.md) |
-| D-019 | HTTP API sources | P1-05 DummyJSON `/products`; IBGE Localidades planned; BrasilAPI CEP optional | — | `approved` | [ADR-0019](docs/decisions/0019-public-api-ingestion-source.md) |
+| D-019 | HTTP API sources | P1-05 DummyJSON `/products`; IBGE Localidades (P1-08). BrasilAPI CEP withdrawn | DummyJSON products client; IBGE `municipios` client. No CEP dataset | `approved` | [ADR-0019](docs/decisions/0019-public-api-ingestion-source.md) |
 | D-020 | Raw storage layout | Object-store `raw/{source_id}/{dataset}/dt=…/execution_id=…/`; metadata `source_id`, `execution_id`, `_ingestion_ts`; `data/raw/` is local staging only | Package helpers + unit tests (P1-02) | `approved` | [ADR-0020](docs/decisions/0020-raw-storage-layout.md) |
+| D-021 | BrasilAPI CEP | Not a platform source. Geography for `olist_analysis` is Olist geolocation plus IBGE | No CEP dataset (P1-09 withdrawn) | `approved` | [ADR-0021](docs/decisions/0021-withdraw-brasilapi-cep.md) |
 
 `—` means not yet implemented or not yet verified in the repository.
 
@@ -60,6 +61,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-10-25 | D-021 approved: BrasilAPI CEP withdrawn as obsolete. D-019 CEP clause superseded; DummyJSON and IBGE stay |
 | 2026-10-18 | D-013: P1-03 landed YAML contracts and a structural loader; state stays `proposed` until approval |
 | 2026-10-18 | D-020 approved: raw object-store layout + ingestion metadata conventions (P1-02) |
 | 2026-10-17 | D-019 approved: DummyJSON (P1-05), IBGE Localidades planned, BrasilAPI CEP optional; D-012 Gold domains `olist_analysis` / `product_analysis` |

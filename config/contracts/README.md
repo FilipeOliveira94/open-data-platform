@@ -13,6 +13,6 @@ Path: `config/contracts/{source_id}/{dataset}.yaml`.
 | `ibge_localidades` | `municipios` |
 | `demo_storefront` | `clickstream` |
 
-Not contracted here: BrasilAPI CEP (P1-09).
+BrasilAPI CEP is not a source ([ADR-0021](../../docs/decisions/0021-withdraw-brasilapi-cep.md)).
 
 No Olist rows and no API payloads are stored in this directory.

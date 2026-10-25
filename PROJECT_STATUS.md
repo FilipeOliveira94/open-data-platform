@@ -6,11 +6,11 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-25 (P1-08 verified — IBGE Localidades) |
+| Last updated | 2026-10-25 (P1-09 withdrawn — BrasilAPI CEP obsolete) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified) |
+| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified; P1-09 withdrawn) |
 
-**Status values:** not started · in progress · delivered · verified · blocked
+**Status values:** not started · in progress · delivered · verified · blocked · withdrawn
 
 **Verified** means acceptance checks were run and evidence is recorded (here and/or in `docs/status-log.md`). Do not treat planned architecture as complete.
 
@@ -29,7 +29,6 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 ## Next work
 
 1. **P1-10** — Failure and invalid-record behavior.
-2. **P1-09** — BrasilAPI CEP enrichment. Optional; unblocked after P1-04.
 
 ---
 
@@ -45,7 +44,7 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-06 | PostgreSQL incremental batch extract | Verified | `ingestion/postgres_oltp/`; unit tests 135 passed; Postgres + MinIO round-trip 1 passed (2026-10-25). Half-open `updated_at` window on UTC midnights; synthetic seed replaces schema `oltp` |
 | P1-07 | Demo storefront clickstream | Verified | `ingestion/demo_storefront/`; unit tests 152 passed; MinIO round-trip 1 passed (2026-10-25). One `events.jsonl` per execution, 500 actions per second of event time, no batch-size cap. Live rerun wrote 30_000 lines in one key |
 | P1-08 | IBGE Localidades ingest | Verified | `ingestion/ibge_localidades/`; unit tests 194 passed; MinIO fixture round-trip 1 passed; live run `p108-live-20261025` wrote 5_571 municipalities (2026-10-25). Gzip is decoded before the contract check. Quarantine stays in P1-10 |
-| P1-09 | BrasilAPI CEP enrichment | Not started | Optional (D-019) |
+| P1-09 | BrasilAPI CEP enrichment | Withdrawn | ADR-0021 / D-021. An 8-digit CEP lookup does not join to the Olist zip prefix. IBGE and Olist geolocation cover that geography |
 | P1-10 | Failure and invalid-record behavior | Not started | — |
 | P1-11 | Phase 1 documentation and status | Not started | — |
 
@@ -67,9 +66,9 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 | | |
 | --- | --- |
 | Date | 2026-10-25 |
-| Environment | WSL2 / Ubuntu; local Compose MinIO healthy |
-| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 194 passed; live `dummyjson_products --execution-id p105-live-20261025` exit 0; live `ibge_localidades --execution-id p108-live-20261025b` exit 0 |
-| Result | The shared GET leaves a response with no `Content-Encoding` unchanged and decodes gzip. DummyJSON sent plain JSON: 7 pages, 194 products, each object starts with `{`. IBGE sent gzip and landed 5_571 municipalities as a JSON array. |
+| Environment | WSL2 / Ubuntu |
+| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 194 passed |
+| Result | `uv run pytest tests/unit` → 194 passed. BrasilAPI CEP is not a dataset (ADR-0021). |
 
 ---
 
@@ -96,7 +95,8 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | --- | --- | --- |
 | D-020 | Raw object-store layout + ingestion metadata (P1-02) | Approved |
 | D-018 | Olist datasets: no vendor; fetch-from-source (`docs/sources/`) | Approved (P1-01) |
-| D-019 | DummyJSON (P1-05); IBGE (P1-08); CEP optional (P1-09) | Approved |
+| D-019 | DummyJSON (P1-05); IBGE (P1-08). CEP clause superseded | Approved |
+| D-021 | BrasilAPI CEP withdrawn; no raw dataset | Approved |
 | D-012 | Gold domains `olist_analysis` / `product_analysis` | Proposed (domain split recorded) |
 | D-013 | Data contracts / no silent drops — gates P1-03+ | Proposed (P1-03 evidence landed; not approved) |
 | D-015 | Package owns logic; thin DAGs/IaC — gates ingestion layout | Proposed |
@@ -121,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified; P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -160,6 +160,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-25 — P1-09 withdrawn
+
+BrasilAPI CEP is withdrawn (ADR-0021 / D-021). Olist publishes a 5-digit zip prefix, and geolocation already carries city, state, and coordinates at that grain. IBGE `municipios` covers every Olist state and the normalized municipality name on nearly all customer, seller, and geolocation rows. An 8-digit CEP lookup does not join to that prefix. DummyJSON and IBGE remain the HTTP sources.
 
 ### 2026-10-25 — shared GET checked against both live APIs
 
