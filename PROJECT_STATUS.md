@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-25 (P1-07 verified — demo storefront clickstream) |
+| Last updated | 2026-10-25 (P1-08 verified — IBGE Localidades) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07 verified) |
+| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified) |
 
 **Status values:** not started · in progress · delivered · verified · blocked
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P1-08** — IBGE Localidades ingest.
+**P1-10** — Failure and invalid-record behavior.
 
 Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms, AWS Terraform apply, Phase 8 hosting polish.
 
 ## Next work
 
-1. **P1-08** — IBGE Localidades ingest.
+1. **P1-10** — Failure and invalid-record behavior.
 2. **P1-09** — BrasilAPI CEP enrichment. Optional; unblocked after P1-04.
 
 ---
@@ -44,7 +44,7 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-05 | Paginated public API client (DummyJSON) | Verified | `ingestion/dummyjson_products/`; unit tests 105 passed; MinIO fixture round-trip 1 passed; live run wrote 7 pages / 194 products (2026-10-24). Contract v2: `brand` nullable |
 | P1-06 | PostgreSQL incremental batch extract | Verified | `ingestion/postgres_oltp/`; unit tests 135 passed; Postgres + MinIO round-trip 1 passed (2026-10-25). Half-open `updated_at` window on UTC midnights; synthetic seed replaces schema `oltp` |
 | P1-07 | Demo storefront clickstream | Verified | `ingestion/demo_storefront/`; unit tests 152 passed; MinIO round-trip 1 passed (2026-10-25). One `events.jsonl` per execution, 500 actions per second of event time, no batch-size cap. Live rerun wrote 30_000 lines in one key |
-| P1-08 | IBGE Localidades ingest | Not started | Planned (D-019) |
+| P1-08 | IBGE Localidades ingest | Verified | `ingestion/ibge_localidades/`; unit tests 194 passed; MinIO fixture round-trip 1 passed; live run `p108-live-20261025` wrote 5_571 municipalities (2026-10-25). Gzip is decoded before the contract check. Quarantine stays in P1-10 |
 | P1-09 | BrasilAPI CEP enrichment | Not started | Optional (D-019) |
 | P1-10 | Failure and invalid-record behavior | Not started | — |
 | P1-11 | Phase 1 documentation and status | Not started | — |
@@ -68,8 +68,8 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 | --- | --- |
 | Date | 2026-10-25 |
 | Environment | WSL2 / Ubuntu; local Compose MinIO healthy |
-| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 152 passed; `uv run pytest tests/integration/ingestion/test_demo_storefront_ingest.py` → 1 passed |
-| Result | P1-07 clickstream: fictional storefront actions in one `events.jsonl`, 2 ms apart (500 per second of event time), with no batch-size cap. The same `execution_id` and ingestion timestamp overwrite the object. A second `execution_id` keeps the previous key. Silver and Gold are documented for P2-03, P2-04, and P2-05 and were not built. |
+| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 194 passed; live `dummyjson_products --execution-id p105-live-20261025` exit 0; live `ibge_localidades --execution-id p108-live-20261025b` exit 0 |
+| Result | The shared GET leaves a response with no `Content-Encoding` unchanged and decodes gzip. DummyJSON sent plain JSON: 7 pages, 194 products, each object starts with `{`. IBGE sent gzip and landed 5_571 municipalities as a JSON array. |
 
 ---
 
@@ -121,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07 verified) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -160,6 +160,18 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-25 — shared GET checked against both live APIs
+
+DummyJSON `/products` responds with no `Content-Encoding`. The body already starts with `{`. `--execution-id p105-live-20261025` wrote 7 plain JSON pages and 194 products, the same catalog size as the 2026-10-24 run. IBGE still sends gzip. `--execution-id p108-live-20261025b` wrote the decoded array, 5_571 municipalities, starting with `[`. Gzip decoding runs only when that header is present.
+
+### 2026-10-25 — P1-08 live run
+
+The first live call returned HTTP 200 with `Content-Encoding: gzip` (239_529 compressed bytes). `urllib` left the body compressed, so the contract check rejected it as non-JSON. `ingestion.http` now decodes gzip before the size check and the write. The rerun `--execution-id p108-live-20261025` wrote 2_372_050 decoded bytes: 5_571 municipalities, unique 7-digit `municipio-id`, 27 `UF-sigla` values, and one null micro/meso pair (`Boa Esperança do Norte`, MT). No contract change. Against the local Olist extract, `UF-sigla` covers every customer, seller, and geolocation state. Exact `municipio-nome` matches zero rows. Normalized names match 98_713 of 99_441 customer rows, 2_988 of 3_095 seller rows, and 993_930 of 1_000_163 geolocation rows. `uv run pytest tests/unit` → 194 passed.
+
+### 2026-10-25 — P1-08 verified
+
+IBGE Localidades: one JSON array of municipalities (`ibge_localidades` / `municipios`) from `GET /api/v1/localidades/municipios?orderBy=nome&view=nivelado`. The GET uses `ingestion.http` with this client's retry and no-redirect policy, and a 64 MiB response cap. The same execution overwrites `municipios.json`; a new `execution_id` keeps the previous object. Contract key mismatches and an empty array fail before the write. Null micro and meso region values, and a null or duplicate `municipio-id`, stay in the object. `uv run pytest tests/unit` → 191 passed; MinIO integration → 1 passed. The public API was not called. Gold geography for `olist_analysis` stays in P2-05. Quarantine stays in P1-10.
 
 ### 2026-10-25 — P1-07 verified
 

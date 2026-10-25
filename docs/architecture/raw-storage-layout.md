@@ -85,12 +85,12 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 | `open_data_platform.ingestion.dummyjson_products` | Fetch DummyJSON `/products` pages and write each page through the raw writer |
 | `open_data_platform.ingestion.postgres_oltp` | Extract a half-open `updated_at` window from schema `oltp` and write one JSON array per dataset |
 | `open_data_platform.ingestion.demo_storefront` | Generate a fictional storefront clickstream and write one JSONL object |
+| `open_data_platform.ingestion.ibge_localidades` | Fetch the IBGE municipality list and write one JSON array through the raw writer |
 
-Olist historical ingestion, the DummyJSON products client, the PostgreSQL windowed extract, and the demo storefront generator call these helpers. Later source writers do the same. DummyJSON products calls `ingestion.http`. The Kaggle download client keeps its own redirect and credential handling.
+Olist historical ingestion, the DummyJSON products client, the PostgreSQL windowed extract, the demo storefront generator, and the IBGE localidades client call these helpers. DummyJSON products and IBGE localidades call `ingestion.http`.
 
 ## Out of scope (this document)
 
 - Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
-- Other Phase 1 source clients (IBGE)
 - Bronze/Iceberg tables — P2-03
 - Quarantine layout — P1-10 / P3-07

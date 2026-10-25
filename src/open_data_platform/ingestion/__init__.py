@@ -12,6 +12,7 @@ __all__ = [
     "fetch_olist_snapshots",
     "ingest_demo_storefront",
     "ingest_dummyjson_products",
+    "ingest_ibge_localidades",
     "ingest_olist_historical",
     "run_olist_historical",
     "write_raw_object",
@@ -27,6 +28,7 @@ _OLIST_EXPORTS = frozenset(
 _DUMMYJSON_PRODUCTS_EXPORTS = frozenset({"ingest_dummyjson_products"})
 _POSTGRES_OLTP_EXPORTS = frozenset({"extract_postgres_oltp"})
 _DEMO_STOREFRONT_EXPORTS = frozenset({"ingest_demo_storefront"})
+_IBGE_LOCALIDADES_EXPORTS = frozenset({"ingest_ibge_localidades"})
 
 
 def __getattr__(name: str) -> object:
@@ -45,6 +47,8 @@ def __getattr__(name: str) -> object:
         from open_data_platform.ingestion import postgres_oltp as source_module
     elif name in _DEMO_STOREFRONT_EXPORTS:
         from open_data_platform.ingestion import demo_storefront as source_module
+    elif name in _IBGE_LOCALIDADES_EXPORTS:
+        from open_data_platform.ingestion import ibge_localidades as source_module
     else:
         msg = f"module {__name__!r} has no attribute {name!r}"
         raise AttributeError(msg)

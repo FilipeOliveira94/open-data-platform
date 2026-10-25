@@ -1,0 +1,38 @@
+[
+  {
+    "municipio-id": 1,
+    "municipio-nome": "Fixture Municipality",
+    "microrregiao-id": 10,
+    "microrregiao-nome": "Fixture Microregion",
+    "mesorregiao-id": 20,
+    "mesorregiao-nome": "Fixture Mesoregion",
+    "regiao-imediata-id": 30,
+    "regiao-imediata-nome": "Fixture Immediate Region",
+    "regiao-intermediaria-id": 40,
+    "regiao-intermediaria-nome": "Fixture Intermediate Region",
+    "UF-id": 50,
+    "UF-sigla": "FX",
+    "UF-nome": "Fixture State",
+    "regiao-id": 60,
+    "regiao-sigla": "F",
+    "regiao-nome": "Fixture Region"
+  },
+  {
+    "municipio-id": 2,
+    "municipio-nome": "Outside Hierarchy",
+    "microrregiao-id": null,
+    "microrregiao-nome": null,
+    "mesorregiao-id": null,
+    "mesorregiao-nome": null,
+    "regiao-imediata-id": 31,
+    "regiao-imediata-nome": "Coastal Immediate Region",
+    "regiao-intermediaria-id": 41,
+    "regiao-intermediaria-nome": "Coastal Intermediate Region",
+    "UF-id": 51,
+    "UF-sigla": "FY",
+    "UF-nome": "Second Fixture State",
+    "regiao-id": 61,
+    "regiao-sigla": "G",
+    "regiao-nome": "Second Fixture Region"
+  }
+]

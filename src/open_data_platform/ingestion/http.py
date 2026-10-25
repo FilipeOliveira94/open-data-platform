@@ -5,12 +5,18 @@ The transport returns 3xx responses. It does not follow redirects.
 the original headers to the next URL. A caller that must not resend a
 header sets ``follow`` to false.
 
-Error text does not include the response body. The Kaggle download client
-keeps its own redirect and credential handling.
+Error text does not include the response body. A response with no
+``Content-Encoding``, or with ``identity``, is returned unchanged. A
+``gzip`` body is decoded before it is returned, and the size limit applies
+to the decoded bytes.
+DummyJSON products and IBGE localidades call this helper. The Kaggle
+download client keeps its own redirect and credential handling.
 """
 
 from __future__ import annotations
 
+import gzip
+import io
 import re
 import time
 import urllib.error
@@ -195,10 +201,17 @@ def _urllib_transport(
                     message_prefix,
                 )
                 status = int(getattr(response, "status", 200))
+                headers = _header_map(response.headers)
                 return HttpResponse(
                     status=status,
-                    headers=_header_map(response.headers),
-                    body=body,
+                    headers=headers,
+                    body=_decode_body(
+                        body,
+                        headers,
+                        max_response_bytes,
+                        error_type,
+                        message_prefix,
+                    ),
                 )
         except TimeoutError:
             raise
@@ -218,7 +231,17 @@ def _urllib_transport(
             status = int(exc.code)
             headers = _header_map(exc.headers)
             exc.close()
-            return HttpResponse(status=status, headers=headers, body=body)
+            return HttpResponse(
+                status=status,
+                headers=headers,
+                body=_decode_body(
+                    body,
+                    headers,
+                    max_response_bytes,
+                    error_type,
+                    message_prefix,
+                ),
+            )
         except urllib.error.URLError as exc:
             if isinstance(exc.reason, TimeoutError):
                 raise TimeoutError(f"{message_prefix} request timed out") from exc
@@ -233,6 +256,58 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
         raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
+
+
+def _decode_body(
+    body: bytes,
+    headers: Mapping[str, str],
+    limit: int,
+    error_type: type[Exception],
+    message_prefix: str,
+) -> bytes:
+    encoding = (_header(headers, "content-encoding") or "").strip().lower()
+    if encoding in {"", "identity"}:
+        return body
+    if encoding in {"gzip", "x-gzip"}:
+        return _gzip_limited(body, limit, error_type, message_prefix)
+    msg = f"{message_prefix} response content encoding is not supported"
+    raise error_type(msg)
+
+
+def _gzip_limited(
+    body: bytes,
+    limit: int,
+    error_type: type[Exception],
+    message_prefix: str,
+) -> bytes:
+    try:
+        reader = gzip.GzipFile(fileobj=io.BytesIO(body))
+    except (OSError, EOFError) as exc:
+        msg = f"{message_prefix} request failed"
+        raise error_type(msg) from exc
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        while True:
+            chunk = reader.read(_CHUNK_BYTES)
+            if not chunk:
+                break
+            if not isinstance(chunk, bytes):
+                msg = f"{message_prefix} request failed"
+                raise error_type(msg)
+            total += len(chunk)
+            if total > limit:
+                msg = f"{message_prefix} response exceeded the size limit"
+                raise error_type(msg)
+            chunks.append(chunk)
+    except error_type:
+        raise
+    except (OSError, EOFError) as exc:
+        msg = f"{message_prefix} request failed"
+        raise error_type(msg) from exc
+    finally:
+        reader.close()
+    return b"".join(chunks)
 
 
 def _read_limited(

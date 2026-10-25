@@ -18,7 +18,7 @@ Each response is one raw object:
 
 `raw/dummyjson_products/products/dt={YYYY-MM-DD}/execution_id={execution_id}/products-skip-{skip:06d}.json`
 
-The object body is the response bytes. `source_id` is `dummyjson_products`. The contract domain is `product_analysis`. Gold marts for that domain stay in P2-05.
+The object body is the JSON entity. DummyJSON responses have no ``Content-Encoding`` and are stored as received. A gzip response would be decoded first, and the 5 MiB cap applies to the stored bytes. `source_id` is `dummyjson_products`. The contract domain is `product_analysis`. Gold marts for that domain stay in P2-05.
 
 Requests send `User-Agent: open-data-platform/<version> (dummyjson-products)`. Cloudflare rejects the default Python urllib agent with HTTP 403. `brand` may be absent. On a short final page the response `limit` is the number of products returned, not the requested page size.
 

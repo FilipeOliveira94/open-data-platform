@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -411,3 +412,105 @@ def test_default_transport_follows_one_redirect_when_asked() -> None:
 
     assert body == b"landed"
     assert hits == ["/start", "/done"]
+
+
+def _serve(handler: type[BaseHTTPRequestHandler]) -> tuple[ThreadingHTTPServer, int]:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    port = int(server.server_address[1])
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, port
+
+
+def test_default_transport_decodes_gzip_before_returning_the_body() -> None:
+    payload = b'[{"municipio-id":1}]'
+    encoded = gzip.compress(payload)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, format: str, *args: object) -> None:
+            del format, args
+
+    server, port = _serve(Handler)
+    try:
+        body = get_with_retries(
+            HttpRequest(url=f"http://127.0.0.1:{port}/municipios", headers={}),
+            timeout=5,
+            max_response_bytes=64,
+            retry=_retry(max_attempts=1),
+            redirect=RedirectPolicy(follow=False, max_redirects=0),
+            error_type=ExampleError,
+            message_prefix="Example",
+            sleep=lambda _seconds: None,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert body == payload
+
+
+def test_gzip_body_that_expands_past_the_limit_fails() -> None:
+    encoded = gzip.compress(b"a" * 64)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Encoding", "gzip")
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, format: str, *args: object) -> None:
+            del format, args
+
+    server, port = _serve(Handler)
+    try:
+        with pytest.raises(ExampleError, match="size limit"):
+            get_with_retries(
+                HttpRequest(url=f"http://127.0.0.1:{port}/blob", headers={}),
+                timeout=5,
+                max_response_bytes=8,
+                retry=_retry(max_attempts=1),
+                redirect=RedirectPolicy(follow=False, max_redirects=0),
+                error_type=ExampleError,
+                message_prefix="Example",
+                sleep=lambda _seconds: None,
+            )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_unsupported_content_encoding_fails() -> None:
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Encoding", "br")
+            self.end_headers()
+            self.wfile.write(b"not-json")
+
+        def log_message(self, format: str, *args: object) -> None:
+            del format, args
+
+    server, port = _serve(Handler)
+    try:
+        with pytest.raises(ExampleError, match="content encoding is not supported"):
+            get_with_retries(
+                HttpRequest(url=f"http://127.0.0.1:{port}/blob", headers={}),
+                timeout=5,
+                max_response_bytes=64,
+                retry=_retry(max_attempts=1),
+                redirect=RedirectPolicy(follow=False, max_redirects=0),
+                error_type=ExampleError,
+                message_prefix="Example",
+                sleep=lambda _seconds: None,
+            )
+    finally:
+        server.shutdown()
+        server.server_close()
