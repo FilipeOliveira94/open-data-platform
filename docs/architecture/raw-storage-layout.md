@@ -40,7 +40,7 @@ raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_na
 | --- | --- |
 | Olist e-commerce | `raw/olist_brazilian_ecommerce/orders/dt=2026-10-18/execution_id=run-001/olist_orders_dataset.csv` |
 | Olist marketing funnel | `raw/olist_marketing_funnel/qualified_leads/dt=2026-10-18/execution_id=run-001/olist_marketing_qualified_leads_dataset.csv` |
-| DummyJSON products | `raw/dummyjson_products/products/dt=2026-10-18/execution_id=run-001/products.json` |
+| DummyJSON products | `raw/dummyjson_products/products/dt=2026-10-18/execution_id=run-001/products-skip-000000.json` |
 | PostgreSQL extract | `raw/postgres_oltp/orders/dt=2026-10-18/execution_id=run-001/orders_2026-10-17_2026-10-18.json` |
 | IBGE Localidades | `raw/ibge_localidades/municipios/dt=2026-10-18/execution_id=run-001/municipios.json` |
 | Synthetic events | `raw/synthetic_events/clickstream/dt=2026-10-18/execution_id=run-001/events.jsonl` |
@@ -81,12 +81,13 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 | `open_data_platform.ingestion.writer` | Put bytes to `ODP_RAW_BUCKET` with key + metadata |
 | `open_data_platform.ingestion.kaggle_download` | Download one Kaggle dataset zip and extract an expected file set |
 | `open_data_platform.ingestion.olist` | Fetch the Olist snapshots and write each CSV through the raw writer |
+| `open_data_platform.ingestion.dummyjson_products` | Fetch DummyJSON `/products` pages and write each page through the raw writer |
 
-Olist historical ingestion calls these helpers. Later source writers do the same.
+Olist historical ingestion and the DummyJSON products client call these helpers. Later source writers do the same.
 
 ## Out of scope (this document)
 
 - Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
-- Other Phase 1 source clients (DummyJSON, PostgreSQL, IBGE, synthetic events)
+- Other Phase 1 source clients (PostgreSQL, IBGE, synthetic events)
 - Bronze/Iceberg tables — P2-03
 - Quarantine layout — P1-10 / P3-07

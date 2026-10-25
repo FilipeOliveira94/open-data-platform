@@ -1,0 +1,44 @@
+{
+  "products": [
+    {
+      "id": 3,
+      "title": "Fixture product 3",
+      "description": "Synthetic fixture",
+      "category": "fixture",
+      "price": 9.5,
+      "discountPercentage": 1.5,
+      "rating": 4.5,
+      "stock": 3,
+      "tags": [
+        "fixture"
+      ],
+      "brand": "Fixture",
+      "sku": "FIX-3",
+      "weight": 2,
+      "dimensions": {
+        "width": 1,
+        "height": 2,
+        "depth": 3
+      },
+      "warrantyInformation": "none",
+      "shippingInformation": "none",
+      "availabilityStatus": "In Stock",
+      "reviews": [],
+      "returnPolicy": "none",
+      "minimumOrderQuantity": 1,
+      "meta": {
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z",
+        "barcode": "0",
+        "qrCode": "0"
+      },
+      "thumbnail": "https://example.invalid/thumb.png",
+      "images": [
+        "https://example.invalid/image.png"
+      ]
+    }
+  ],
+  "total": 3,
+  "skip": 2,
+  "limit": 2
+}

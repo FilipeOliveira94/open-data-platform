@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 source_id: dummyjson_products
 dataset: products
 description: "DummyJSON GET /products page. The raw object is the JSON page. The record grain is one element of products. DummyJSON id is not an Olist product_id."
@@ -62,9 +62,9 @@ fields:
     description: "Array of tag strings."
   - name: brand
     type: string
-    nullable: false
+    nullable: true
     classification: public
-    description: "Brand name on the documented product object."
+    description: "Brand name when the product includes it. Some products omit this key."
   - name: sku
     type: string
     nullable: false
@@ -146,7 +146,9 @@ envelope_fields:
     type: integer
     nullable: false
     classification: public
-    description: "Page size requested for this page."
+    description: "Page size. A full page echoes the requested limit. A short final page echoes the number of products returned."
 changelog:
   - version: 1
     note: "Initial contract. Page envelope and product object follow https://dummyjson.com/docs/products checked 2026-10-18. Nested objects stay json. Values are synthetic demo data."
+  - version: 2
+    note: "brand is nullable. Checked live on 2026-10-24: 92 of 194 products omit brand, and a short final page sets limit to the returned count."

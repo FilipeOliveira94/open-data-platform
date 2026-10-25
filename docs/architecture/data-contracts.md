@@ -52,7 +52,7 @@ Raise `contract_version` and append a `changelog` note in the same change as any
 
 Olist column `product_name_lenght` and `product_description_lenght` keep the published spelling.
 
-DummyJSON `id` is not Olist `product_id`. Nested product objects (`dimensions`, `reviews`, `meta`, `tags`, `images`) stay type `json`. Reviewer names and emails inside `reviews` are synthetic demo values and are classified `public` with the rest of that API.
+DummyJSON `id` is not Olist `product_id`. Nested product objects (`dimensions`, `reviews`, `meta`, `tags`, `images`) stay type `json`. Reviewer names and emails inside `reviews` are synthetic demo values and are classified `public` with the rest of that API. `brand` is nullable: a live check on 2026-10-24 found products that omit the key. The response `limit` on a short final page is the number of products returned.
 
 PostgreSQL v1 adds `updated_at` (`timestamp`, not null) on each table. It is the watermark for windowed extract. Other columns follow the Olist dataset of the same grain. The raw payload is a JSON array of rows.
 
