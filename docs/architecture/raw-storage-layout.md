@@ -82,12 +82,13 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 | `open_data_platform.ingestion.kaggle_download` | Download one Kaggle dataset zip and extract an expected file set |
 | `open_data_platform.ingestion.olist` | Fetch the Olist snapshots and write each CSV through the raw writer |
 | `open_data_platform.ingestion.dummyjson_products` | Fetch DummyJSON `/products` pages and write each page through the raw writer |
+| `open_data_platform.ingestion.postgres_oltp` | Extract a half-open `updated_at` window from schema `oltp` and write one JSON array per dataset |
 
-Olist historical ingestion and the DummyJSON products client call these helpers. Later source writers do the same.
+Olist historical ingestion, the DummyJSON products client, and the PostgreSQL windowed extract call these helpers. Later source writers do the same.
 
 ## Out of scope (this document)
 
 - Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
-- Other Phase 1 source clients (PostgreSQL, IBGE, synthetic events)
+- Other Phase 1 source clients (IBGE, synthetic events)
 - Bronze/Iceberg tables — P2-03
 - Quarantine layout — P1-10 / P3-07

@@ -1,0 +1,103 @@
+{
+  "sellers": [
+    {
+      "seller_id": "seller-16",
+      "seller_zip_code_prefix": 1600,
+      "seller_city": "santos",
+      "seller_state": "SP",
+      "updated_at": "2026-10-16T23:00:00Z"
+    },
+    {
+      "seller_id": "seller-17",
+      "seller_zip_code_prefix": 1700,
+      "seller_city": "sao paulo",
+      "seller_state": "SP",
+      "updated_at": "2026-10-17T00:00:00Z"
+    },
+    {
+      "seller_id": "seller-17b",
+      "seller_zip_code_prefix": 1710,
+      "seller_city": "campinas",
+      "seller_state": "SP",
+      "updated_at": "2026-10-17T18:00:00Z"
+    },
+    {
+      "seller_id": "seller-18",
+      "seller_zip_code_prefix": 1800,
+      "seller_city": "rio de janeiro",
+      "seller_state": "RJ",
+      "updated_at": "2026-10-18T00:00:00Z"
+    },
+    {
+      "seller_id": "seller-24",
+      "seller_zip_code_prefix": 2400,
+      "seller_city": "curitiba",
+      "seller_state": "PR",
+      "updated_at": "2026-10-24T00:00:00Z"
+    }
+  ],
+  "customers": [
+    {
+      "customer_id": "customer-17",
+      "customer_unique_id": "person-17",
+      "customer_zip_code_prefix": 1700,
+      "customer_city": "sao paulo",
+      "customer_state": "SP",
+      "updated_at": "2026-10-17T09:00:00Z"
+    },
+    {
+      "customer_id": "customer-20",
+      "customer_unique_id": "person-20",
+      "customer_zip_code_prefix": 2000,
+      "customer_city": "salvador",
+      "customer_state": "BA",
+      "updated_at": "2026-10-20T09:00:00Z"
+    }
+  ],
+  "orders": [
+    {
+      "order_id": "order-17",
+      "customer_id": "customer-17",
+      "order_status": "delivered",
+      "order_purchase_timestamp": "2026-10-01T10:00:00Z",
+      "order_approved_at": "2026-10-01T12:00:00Z",
+      "order_delivered_carrier_date": null,
+      "order_delivered_customer_date": null,
+      "order_estimated_delivery_date": "2026-10-15T00:00:00Z",
+      "updated_at": "2026-10-17T10:00:00Z"
+    },
+    {
+      "order_id": "order-19",
+      "customer_id": "customer-20",
+      "order_status": "shipped",
+      "order_purchase_timestamp": "2026-10-02T10:00:00Z",
+      "order_approved_at": null,
+      "order_delivered_carrier_date": null,
+      "order_delivered_customer_date": null,
+      "order_estimated_delivery_date": "2026-10-20T00:00:00Z",
+      "updated_at": "2026-10-19T10:00:00Z"
+    }
+  ],
+  "order_items": [
+    {
+      "order_id": "order-17",
+      "order_item_id": 1,
+      "product_id": "product-1",
+      "seller_id": "seller-17",
+      "shipping_limit_date": "2026-10-10T00:00:00Z",
+      "price": 10.5,
+      "freight_value": 2.5,
+      "updated_at": "2026-10-17T11:00:00Z"
+    },
+    {
+      "order_id": "order-19",
+      "order_item_id": 1,
+      "product_id": "product-2",
+      "seller_id": "seller-18",
+      "shipping_limit_date": "2026-10-12T00:00:00Z",
+      "price": 20,
+      "freight_value": 3.25,
+      "updated_at": "2026-10-19T11:00:00Z"
+    }
+  ]
+}

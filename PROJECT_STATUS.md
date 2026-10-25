@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-25 (P1-05 review — DummyJSON products) |
+| Last updated | 2026-10-25 (P1-06 verified — PostgreSQL incremental extract) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05 verified) |
+| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06 verified) |
 
 **Status values:** not started · in progress · delivered · verified · blocked
 
@@ -22,14 +22,14 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P1-06** — PostgreSQL incremental batch extract.
+**P1-07** — Synthetic event generator.
 
 Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms, AWS Terraform apply, Phase 8 hosting polish.
 
 ## Next work
 
-1. **P1-06** — PostgreSQL incremental batch extract.
-2. **P1-07** and **P1-08** are unblocked and can proceed in parallel with P1-06.
+1. **P1-07** — Synthetic event generator.
+2. **P1-08** — IBGE Localidades ingest. Unblocked; can proceed in parallel with P1-07.
 
 ---
 
@@ -42,7 +42,7 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-03 | Data contracts for planned sources | Verified | `config/contracts/`; `docs/architecture/data-contracts.md`; `src/open_data_platform/contracts/`; unit tests 2026-10-18 |
 | P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Verified | `ingestion/olist/`, `ingestion/kaggle_download.py`; unit tests 76 passed; MinIO round-trip 1 passed (2026-10-22). Category translation CSV may start with a UTF-8 BOM |
 | P1-05 | Paginated public API client (DummyJSON) | Verified | `ingestion/dummyjson_products/`; unit tests 105 passed; MinIO fixture round-trip 1 passed; live run wrote 7 pages / 194 products (2026-10-24). Contract v2: `brand` nullable |
-| P1-06 | PostgreSQL incremental batch extract | Not started | — |
+| P1-06 | PostgreSQL incremental batch extract | Verified | `ingestion/postgres_oltp/`; unit tests 135 passed; Postgres + MinIO round-trip 1 passed (2026-10-25). Half-open `updated_at` window on UTC midnights; synthetic seed replaces schema `oltp` |
 | P1-07 | Synthetic event generator | Not started | — |
 | P1-08 | IBGE Localidades ingest | Not started | Planned (D-019) |
 | P1-09 | BrasilAPI CEP enrichment | Not started | Optional (D-019) |
@@ -58,7 +58,7 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 - [ ] Raw data is traceable by source and execution.
 - [x] Contracts and expected fields are documented.
 - [ ] Invalid records and errors have explicit, documented behavior.
-- [ ] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
+- [x] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
 
 ---
 
@@ -67,9 +67,9 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 | | |
 | --- | --- |
 | Date | 2026-10-25 |
-| Environment | WSL2 / Ubuntu; local Compose MinIO healthy |
-| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 105 passed; `uv run pytest tests/integration/ingestion/test_dummyjson_products_ingest.py` → 1 passed |
-| Result | Review re-ran lint, unit tests, and the MinIO fixture round-trip. The 2026-10-24 live run remains the API evidence: 7 pages, 194 products, execution `p105-live-20261024`. The last page echoes `limit=14`. 92 products omit `brand`. |
+| Environment | WSL2 / Ubuntu; local Compose PostgreSQL 16 and MinIO healthy |
+| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 135 passed; `uv run pytest tests/unit tests/integration/ingestion/test_postgres_oltp_ingest.py` → 136 passed |
+| Result | P1-06 extract: half-open `updated_at` window, same function for a 1-day and a 7-day window, synthetic seed in schema `oltp`. The integration test re-seeded, overwrote one raw key, and wrote a second key for a new `execution_id`. |
 
 ---
 
@@ -110,8 +110,8 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 | Use case | Pattern | Phases | Status |
 | --- | --- | --- | --- |
-| Daily batch | Windowed incremental extract + Airflow daily schedule | 1 (P1-06), 3 (P3-04) | Not started |
-| Weekly batch | Windowed extract + Airflow weekly schedule | 1 (P1-06), 3 (P3-05) | Not started |
+| Daily batch | Windowed incremental extract + Airflow daily schedule | 1 (P1-06), 3 (P3-04) | Extract verified; schedule not started |
+| Weekly batch | Windowed extract + Airflow weekly schedule | 1 (P1-06), 3 (P3-05) | Extract verified; schedule not started |
 | Streaming | Logical replication → Debezium → Kafka → Spark SS | 4 | Not started |
 
 ---
@@ -121,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05 verified) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06 verified) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -160,6 +160,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-25 — P1-06 verified
+
+PostgreSQL incremental extract for `sellers`, `customers`, `orders`, and `order_items`. The window is `updated_at >= start AND updated_at < end`, both bounds on UTC midnight. A one-day window and a seven-day window call the same function. Each dataset lands as one JSON array named `{dataset}_{start}_{end}.json`. The synthetic seed replaces schema `oltp`. `uv run pytest tests/unit` → 135 passed; Postgres + MinIO integration → 1 passed. Added `psycopg[binary]` 3.3.6. Quarantine, Airflow schedules, and missed-window detection stay in later issues.
 
 ### 2026-10-24 — P1-05 live run
 
