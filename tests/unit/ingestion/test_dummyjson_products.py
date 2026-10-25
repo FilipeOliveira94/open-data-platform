@@ -20,13 +20,15 @@ from open_data_platform.ingestion.dummyjson_products import (
     MAX_RETRY_AFTER_SECONDS,
     USER_AGENT,
     DummyJsonProductsError,
-    PageRequest,
-    PageResponse,
-    Transport,
     fetch_products_page,
     ingest_dummyjson_products,
     main,
     page_object_name,
+)
+from open_data_platform.ingestion.http import (
+    HttpRequest,
+    HttpResponse,
+    Transport,
 )
 
 _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "dummyjson_products"
@@ -51,21 +53,21 @@ class _Pages:
         self.pages = pages
         self.urls: list[str] = []
 
-    def __call__(self, request: PageRequest, timeout: float) -> PageResponse:
+    def __call__(self, request: HttpRequest, timeout: float) -> HttpResponse:
         del timeout
         self.urls.append(request.url)
         skip = int(parse_qs(urlsplit(request.url).query)["skip"][0])
-        return PageResponse(status=200, headers={}, body=self.pages[skip])
+        return HttpResponse(status=200, headers={}, body=self.pages[skip])
 
 
 class _Steps:
     """Return or raise the next scripted step."""
 
-    def __init__(self, steps: list[PageResponse | Exception]) -> None:
+    def __init__(self, steps: list[HttpResponse | Exception]) -> None:
         self.steps = steps
         self.calls = 0
 
-    def __call__(self, request: PageRequest, timeout: float) -> PageResponse:
+    def __call__(self, request: HttpRequest, timeout: float) -> HttpResponse:
         del request, timeout
         step = self.steps[self.calls]
         self.calls += 1
@@ -392,14 +394,14 @@ def test_total_above_the_page_budget_writes_nothing() -> None:
     ("steps", "sleeps", "calls"),
     [
         (
-            [TimeoutError("slow"), TimeoutError("slow"), PageResponse(200, {}, b"{}")],
+            [TimeoutError("slow"), TimeoutError("slow"), HttpResponse(200, {}, b"{}")],
             [1.0, 2.0],
             3,
         ),
         (
             [
-                PageResponse(500, {}, b"no"),
-                PageResponse(200, {}, b"{}"),
+                HttpResponse(500, {}, b"no"),
+                HttpResponse(200, {}, b"{}"),
             ],
             [1.0],
             2,
@@ -407,7 +409,7 @@ def test_total_above_the_page_budget_writes_nothing() -> None:
     ],
 )
 def test_transient_failures_retry(
-    steps: list[PageResponse | Exception],
+    steps: list[HttpResponse | Exception],
     sleeps: list[float],
     calls: int,
 ) -> None:
@@ -433,7 +435,7 @@ def test_timeout_exhausts_three_attempts() -> None:
 
 
 def test_server_error_backoff_includes_four_seconds_on_a_fourth_attempt() -> None:
-    transport = _Steps([PageResponse(500, {}, b"no")] * 4)
+    transport = _Steps([HttpResponse(500, {}, b"no")] * 4)
     seen: list[float] = []
 
     with pytest.raises(DummyJsonProductsError, match="status 500"):
@@ -446,8 +448,8 @@ def test_server_error_backoff_includes_four_seconds_on_a_fourth_attempt() -> Non
 def test_retry_after_seconds_replace_the_backoff_and_are_capped() -> None:
     transport = _Steps(
         [
-            PageResponse(429, {"Retry-After": "120"}, b"later"),
-            PageResponse(200, {}, b"{}"),
+            HttpResponse(429, {"Retry-After": "120"}, b"later"),
+            HttpResponse(200, {}, b"{}"),
         ]
     )
     seen: list[float] = []
@@ -459,12 +461,12 @@ def test_retry_after_seconds_replace_the_backoff_and_are_capped() -> None:
 def test_http_date_retry_after_keeps_the_numeric_backoff() -> None:
     transport = _Steps(
         [
-            PageResponse(
+            HttpResponse(
                 429,
                 {"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"},
                 b"later",
             ),
-            PageResponse(200, {}, b"{}"),
+            HttpResponse(200, {}, b"{}"),
         ]
     )
     seen: list[float] = []
@@ -476,7 +478,7 @@ def test_http_date_retry_after_keeps_the_numeric_backoff() -> None:
 @pytest.mark.parametrize("status", [301, 400, 404])
 def test_non_retryable_status_fails_immediately(status: int) -> None:
     marker = "super-secret-body"
-    transport = _Steps([PageResponse(status, {}, marker.encode())])
+    transport = _Steps([HttpResponse(status, {}, marker.encode())])
     seen: list[float] = []
 
     with pytest.raises(DummyJsonProductsError) as caught:
@@ -504,7 +506,7 @@ def test_connection_error_is_not_retried() -> None:
 
 
 def test_oversized_success_body_is_not_retried() -> None:
-    transport = _Steps([PageResponse(200, {}, b"abcdef")])
+    transport = _Steps([HttpResponse(200, {}, b"abcdef")])
     seen: list[float] = []
 
     with pytest.raises(DummyJsonProductsError, match="size limit"):
@@ -515,12 +517,12 @@ def test_oversized_success_body_is_not_retried() -> None:
 
 
 def test_fetch_requests_limit_and_skip() -> None:
-    seen: list[PageRequest] = []
+    seen: list[HttpRequest] = []
 
-    def transport(request: PageRequest, timeout: float) -> PageResponse:
+    def transport(request: HttpRequest, timeout: float) -> HttpResponse:
         del timeout
         seen.append(request)
-        return PageResponse(status=200, headers={}, body=b"{}")
+        return HttpResponse(status=200, headers={}, body=b"{}")
 
     assert _fetch(transport, limit=30, skip=0) == b"{}"
     assert seen[0].url == "https://dummyjson.test/products?limit=30&skip=0"

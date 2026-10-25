@@ -12,12 +12,8 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
 
-from open_data_platform.ingestion.dummyjson_products import (
-    PageRequest,
-    PageResponse,
-    Transport,
-    ingest_dummyjson_products,
-)
+from open_data_platform.ingestion.dummyjson_products import ingest_dummyjson_products
+from open_data_platform.ingestion.http import HttpRequest, HttpResponse, Transport
 from open_data_platform.object_storage import client_from_env
 
 pytestmark = pytest.mark.integration
@@ -39,10 +35,10 @@ def _minio_env() -> dict[str, str]:
 
 
 def _pages(bodies: dict[int, bytes]) -> Transport:
-    def transport(request: PageRequest, timeout: float) -> PageResponse:
+    def transport(request: HttpRequest, timeout: float) -> HttpResponse:
         del timeout
         skip = int(parse_qs(urlsplit(request.url).query)["skip"][0])
-        return PageResponse(status=200, headers={}, body=bodies[skip])
+        return HttpResponse(status=200, headers={}, body=bodies[skip])
 
     return transport
 

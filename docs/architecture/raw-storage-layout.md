@@ -79,13 +79,14 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 | `open_data_platform.ingestion.paths` | Build and validate raw object keys |
 | `open_data_platform.ingestion.metadata` | Typed metadata → object user-metadata map |
 | `open_data_platform.ingestion.writer` | Put bytes to `ODP_RAW_BUCKET` with key + metadata |
+| `open_data_platform.ingestion.http` | GET with the caller's retry, redirect, and response-size policy |
 | `open_data_platform.ingestion.kaggle_download` | Download one Kaggle dataset zip and extract an expected file set |
 | `open_data_platform.ingestion.olist` | Fetch the Olist snapshots and write each CSV through the raw writer |
 | `open_data_platform.ingestion.dummyjson_products` | Fetch DummyJSON `/products` pages and write each page through the raw writer |
 | `open_data_platform.ingestion.postgres_oltp` | Extract a half-open `updated_at` window from schema `oltp` and write one JSON array per dataset |
 | `open_data_platform.ingestion.demo_storefront` | Generate a fictional storefront clickstream and write one JSONL object |
 
-Olist historical ingestion, the DummyJSON products client, the PostgreSQL windowed extract, and the demo storefront generator call these helpers. Later source writers do the same.
+Olist historical ingestion, the DummyJSON products client, the PostgreSQL windowed extract, and the demo storefront generator call these helpers. Later source writers do the same. DummyJSON products calls `ingestion.http`. The Kaggle download client keeps its own redirect and credential handling.
 
 ## Out of scope (this document)
 

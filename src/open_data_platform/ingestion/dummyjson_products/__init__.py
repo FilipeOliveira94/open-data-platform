@@ -4,7 +4,8 @@ The client calls ``GET {origin}/products?limit={n}&skip={n}`` until
 ``skip + limit >= total``. One response becomes one object named
 ``products-skip-{skip:06d}.json`` under ``raw/dummyjson_products/products/``.
 The stored bytes are the response body. Unit tests inject a transport and
-do not call the public API.
+do not call the public API. The GET itself goes through ``ingestion.http``
+with this client's retry and redirect policy.
 """
 
 from __future__ import annotations
@@ -12,12 +13,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
-import time
-import urllib.error
-import urllib.request
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -25,6 +22,13 @@ from urllib.parse import urlencode
 
 from open_data_platform import __version__
 from open_data_platform.contracts.load import load_contracts
+from open_data_platform.ingestion.http import (
+    HttpRequest,
+    RedirectPolicy,
+    RetryPolicy,
+    Transport,
+    get_with_retries,
+)
 from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
 from open_data_platform.object_storage import client_from_env
 
@@ -43,32 +47,11 @@ DEFAULT_MAX_ATTEMPTS = 3
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 MAX_RETRY_AFTER_SECONDS = 30.0
 MAX_PAGES = 1000
-_CHUNK_BYTES = 64 * 1024
-_RETRY_AFTER_RE = re.compile(r"\d+(?:\.\d+)?")
+_PRODUCTS_REDIRECT = RedirectPolicy(follow=False, max_redirects=0)
 
 
 class DummyJsonProductsError(ValueError):
     """A DummyJSON products page could not be fetched or landed."""
-
-
-@dataclass(frozen=True, slots=True)
-class PageRequest:
-    """One GET issued by the products client. Redirects are not followed."""
-
-    url: str
-    headers: Mapping[str, str]
-
-
-@dataclass(frozen=True, slots=True)
-class PageResponse:
-    """HTTP response visible to the retry loop."""
-
-    status: int
-    headers: Mapping[str, str]
-    body: bytes
-
-
-Transport = Callable[[PageRequest, float], PageResponse]
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,57 +95,29 @@ def fetch_products_page(
     _require_positive_int("max_response_bytes", max_response_bytes)
     _require_timeout(timeout)
     origin = _origin(base_url)
-    pause = time.sleep if sleep is None else sleep
-    active = _urllib_transport if transport is None else transport
     query = urlencode((("limit", str(page_limit)), ("skip", str(page_skip))))
     url = f"{origin}/products?{query}"
-    attempt = 0
-    while True:
-        request = PageRequest(
+    return get_with_retries(
+        HttpRequest(
             url=url,
             headers={"Accept": "application/json", "User-Agent": USER_AGENT},
-        )
-        try:
-            response = active(request, float(timeout))
-        except TimeoutError:
-            attempt = _pause_for_retry(
-                attempt=attempt,
-                max_attempts=attempts,
-                pause=pause,
-                delay=_backoff(attempt + 1),
-                message="DummyJSON products request timed out",
-            )
-            continue
-        except DummyJsonProductsError:
-            raise
-        except OSError as exc:
-            msg = "DummyJSON products request failed"
-            raise DummyJsonProductsError(msg) from exc
-
-        if response.status == 200:
-            if len(response.body) > max_response_bytes:
-                msg = "DummyJSON products response exceeded the size limit"
-                raise DummyJsonProductsError(msg)
-            return response.body
-
-        if response.status == 429 or response.status >= 500:
-            retry_after = None
-            if response.status == 429:
-                retry_after = _retry_after_seconds(response.headers)
-            delay = _backoff(attempt + 1) if retry_after is None else retry_after
-            attempt = _pause_for_retry(
-                attempt=attempt,
-                max_attempts=attempts,
-                pause=pause,
-                delay=delay,
-                message=(
-                    f"DummyJSON products request failed with status {response.status}"
-                ),
-            )
-            continue
-
-        msg = f"DummyJSON products request failed with status {response.status}"
-        raise DummyJsonProductsError(msg)
+        ),
+        timeout=float(timeout),
+        max_response_bytes=max_response_bytes,
+        retry=RetryPolicy(
+            max_attempts=attempts,
+            retry_timeouts=True,
+            retry_status_codes=frozenset({429}),
+            retry_status_at_least=500,
+            retry_after_status_codes=frozenset({429}),
+            retry_after_cap_seconds=MAX_RETRY_AFTER_SECONDS,
+        ),
+        redirect=_PRODUCTS_REDIRECT,
+        error_type=DummyJsonProductsError,
+        message_prefix="DummyJSON products",
+        transport=transport,
+        sleep=sleep,
+    )
 
 
 def ingest_dummyjson_products(
@@ -393,43 +348,6 @@ def _require_page_count(page: _Page, *, skip: int, limit: int) -> None:
         raise DummyJsonProductsError(msg)
 
 
-def _pause_for_retry(
-    *,
-    attempt: int,
-    max_attempts: int,
-    pause: Callable[[float], None],
-    delay: float,
-    message: str,
-) -> int:
-    attempt += 1
-    if attempt >= max_attempts:
-        raise DummyJsonProductsError(message)
-    pause(delay)
-    return attempt
-
-
-def _backoff(failed_attempt: int) -> float:
-    return float(2 ** (failed_attempt - 1))
-
-
-def _retry_after_seconds(headers: Mapping[str, str]) -> float | None:
-    raw = _header(headers, "retry-after")
-    if raw is None:
-        return None
-    text = raw.strip()
-    if _RETRY_AFTER_RE.fullmatch(text) is None:
-        return None
-    return min(float(text), MAX_RETRY_AFTER_SECONDS)
-
-
-def _header(headers: Mapping[str, str], name: str) -> str | None:
-    wanted = name.lower()
-    for key, value in headers.items():
-        if key.lower() == wanted:
-            return value
-    return None
-
-
 def _origin(base_url: str) -> str:
     if (
         base_url.strip() != base_url
@@ -477,74 +395,3 @@ def _json_non_negative_int(name: str, value: object) -> int:
         msg = f"DummyJSON products page field {name} must be a non-negative integer"
         raise DummyJsonProductsError(msg)
     return value
-
-
-class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """Surface 3xx to the caller instead of following it."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
-        raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
-
-
-def _urllib_transport(request: PageRequest, timeout: float) -> PageResponse:
-    opener = urllib.request.build_opener(_NoRedirectHandler)
-    outgoing = urllib.request.Request(
-        request.url,
-        headers=dict(request.headers),
-        method="GET",
-    )
-    try:
-        with opener.open(outgoing, timeout=timeout) as response:
-            body = _read_limited(response, MAX_RESPONSE_BYTES)
-            status = int(getattr(response, "status", 200))
-            return PageResponse(
-                status=status,
-                headers=_header_map(response.headers),
-                body=body,
-            )
-    except TimeoutError:
-        raise
-    except urllib.error.HTTPError as exc:
-        try:
-            body = _read_limited(exc, MAX_RESPONSE_BYTES)
-        except DummyJsonProductsError:
-            exc.close()
-            raise
-        status = int(exc.code)
-        headers = _header_map(exc.headers)
-        exc.close()
-        return PageResponse(status=status, headers=headers, body=body)
-    except urllib.error.URLError as exc:
-        if isinstance(exc.reason, TimeoutError):
-            raise TimeoutError("DummyJSON products request timed out") from exc
-        msg = "DummyJSON products request failed"
-        raise DummyJsonProductsError(msg) from exc
-
-
-def _read_limited(stream: object, limit: int) -> bytes:
-    read = getattr(stream, "read", None)
-    if not callable(read):
-        msg = "DummyJSON products request failed"
-        raise DummyJsonProductsError(msg)
-    chunks: list[bytes] = []
-    total = 0
-    while True:
-        chunk = read(_CHUNK_BYTES)
-        if not chunk:
-            break
-        if not isinstance(chunk, bytes):
-            msg = "DummyJSON products request failed"
-            raise DummyJsonProductsError(msg)
-        total += len(chunk)
-        if total > limit:
-            msg = "DummyJSON products response exceeded the size limit"
-            raise DummyJsonProductsError(msg)
-        chunks.append(chunk)
-    return b"".join(chunks)
-
-
-def _header_map(headers: object) -> dict[str, str]:
-    items = getattr(headers, "items", None)
-    if not callable(items):
-        return {}
-    return {str(key).lower(): str(value) for key, value in items()}
