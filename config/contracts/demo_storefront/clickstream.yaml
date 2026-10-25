@@ -1,0 +1,50 @@
+contract_version: 1
+source_id: demo_storefront
+dataset: clickstream
+description: "Seedable clickstream from a fictional retail website. One record is one user action: page_view, add_to_cart, or purchase. event_id identifies the action. event_time is the time of the action. Session, user, and product identifiers are generated tokens. The batch lands as JSONL. Ingestion time stays on the object metadata. This source has no join to Olist or DummyJSON. Daily batch, weekly batch, and CDC remain the PostgreSQL paths."
+payload_format: jsonl
+grain: "One user action on the fictional storefront."
+primary_key:
+  - event_id
+update_pattern: snapshot
+on_invalid: quarantine
+on_structural_error: fail_batch
+governance:
+  domain: product_analysis
+  owner: platform
+provenance:
+  system: generator
+fields:
+  - name: event_id
+    type: string
+    nullable: false
+    classification: public
+    description: "Stable identifier of one generated action. Unique within a batch."
+  - name: event_time
+    type: timestamp
+    nullable: false
+    classification: public
+    description: "UTC time of the action, millisecond precision, Z suffix. Independent of ingestion time."
+  - name: event_type
+    type: string
+    nullable: false
+    classification: public
+    description: "Closed set: page_view, add_to_cart, purchase."
+  - name: session_id
+    type: string
+    nullable: false
+    classification: public
+    description: "Generated session token. Not a browser identifier from a real user."
+  - name: user_id
+    type: string
+    nullable: false
+    classification: public
+    description: "Generated user token. Not a person. Classified public with the rest of this demo log."
+  - name: product_id
+    type: string
+    nullable: true
+    classification: public
+    description: "Generated product token. Null on some page_view actions. Does not join Olist product_id or DummyJSON id."
+changelog:
+  - version: 1
+    note: "Initial contract for the fictional storefront clickstream. JSONL, 500 actions per second of event time, millisecond timestamps. No stored sample rows."

@@ -34,7 +34,7 @@ raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_na
 | `execution_id` | Single pipeline/run identifier (UUID or orchestrator run id) |
 | `object_name` | File name within the run (e.g. `orders.csv`, `products.json`) |
 
-### Examples (planned sources)
+### Examples
 
 | Source | Example key |
 | --- | --- |
@@ -43,7 +43,7 @@ raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_na
 | DummyJSON products | `raw/dummyjson_products/products/dt=2026-10-18/execution_id=run-001/products-skip-000000.json` |
 | PostgreSQL extract | `raw/postgres_oltp/orders/dt=2026-10-18/execution_id=run-001/orders_2026-10-17_2026-10-18.json` |
 | IBGE Localidades | `raw/ibge_localidades/municipios/dt=2026-10-18/execution_id=run-001/municipios.json` |
-| Synthetic events | `raw/synthetic_events/clickstream/dt=2026-10-18/execution_id=run-001/events.jsonl` |
+| Demo storefront clickstream | `raw/demo_storefront/clickstream/dt=2026-10-18/execution_id=run-001/events.jsonl` |
 
 `source_id` / `dataset` values above are the writer conventions. Field lists, null rules, and classification live in [`config/contracts/`](../../config/contracts/) ([data contracts](data-contracts.md)).
 
@@ -83,12 +83,13 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 | `open_data_platform.ingestion.olist` | Fetch the Olist snapshots and write each CSV through the raw writer |
 | `open_data_platform.ingestion.dummyjson_products` | Fetch DummyJSON `/products` pages and write each page through the raw writer |
 | `open_data_platform.ingestion.postgres_oltp` | Extract a half-open `updated_at` window from schema `oltp` and write one JSON array per dataset |
+| `open_data_platform.ingestion.demo_storefront` | Generate a fictional storefront clickstream and write one JSONL object |
 
-Olist historical ingestion, the DummyJSON products client, and the PostgreSQL windowed extract call these helpers. Later source writers do the same.
+Olist historical ingestion, the DummyJSON products client, the PostgreSQL windowed extract, and the demo storefront generator call these helpers. Later source writers do the same.
 
 ## Out of scope (this document)
 
 - Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
-- Other Phase 1 source clients (IBGE, synthetic events)
+- Other Phase 1 source clients (IBGE)
 - Bronze/Iceberg tables — P2-03
 - Quarantine layout — P1-10 / P3-07

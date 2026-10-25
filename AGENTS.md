@@ -5,7 +5,7 @@
 Build a reproducible open-source data platform that supports local development on Windows 11 through WSL2 and Docker Compose, with an AWS deployment path expressed as Terraform Infrastructure as Code.
 
 The platform demonstrates:
-- Multiple source ingestion: historical datasets, APIs, PostgreSQL and synthetic events.
+- Multiple source ingestion: historical datasets, APIs, PostgreSQL, and a fictional storefront clickstream.
 - Batch processing and CDC/streaming.
 - A lakehouse with Bronze, Silver and Gold layers.
 - Apache Airflow orchestration and dbt analytics.

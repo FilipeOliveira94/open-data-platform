@@ -33,7 +33,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Phase | Scope | Window | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
-| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, synthetic) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06 verified) |
+| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07 verified) |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
@@ -124,7 +124,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P1-04 | Historical e-commerce dataset ingestion | P1-01, P1-02, P1-03 | Verified | Repeatable ingest of Olist e-commerce (+ marketing funnel join on `seller_id`) to raw layout; idempotent re-run; unit/integration coverage without private/vendored Olist data |
 | P1-05 | Paginated public API client (DummyJSON products) | P1-02, P1-03 | Verified | DummyJSON `/products` (`limit`/`skip`); timeouts, retries, rate-limit handling; fixtures; no live API in unit tests; lands in Gold `product_analysis` (D-019, D-012) |
 | P1-06 | PostgreSQL incremental batch extract | P0-10, P1-02, P1-03 | Verified | Parameterized extract by watermark/window (`start`/`end` or high-water mark); grain/keys documented; same code path supports daily and weekly windows; idempotent re-run without corrupting raw; OLTP seed per `docs/sources/postgres-oltp.md` |
-| P1-07 | Synthetic event generator | P1-02 | Not started | Deterministic or seedable generator for later streaming scenarios; schema documented |
+| P1-07 | Demo storefront clickstream | P1-02 | Verified | Seedable JSONL clickstream for a fictional retail website (`demo_storefront` / `clickstream`); schema documented; event time on the record. Bronze, Silver, and Gold placement is noted for P2-03, P2-04, and P2-05 and is not built here. CDC remains the PostgreSQL path |
 | P1-08 | IBGE Localidades ingest | P1-02, P1-03 | Not started | Ingest IBGE localities into raw; contracts; geo reference for `olist_analysis` (D-019) |
 | P1-09 | BrasilAPI CEP enrichment (optional) | P1-02, P1-04 | Not started | Optional: small cached CEP lookups only; no CEP crawl; enrich Olist zip prefixes when scheduled |
 | P1-10 | Failure and invalid-record behavior | P1-04–P1-08 | Not started | Explicit handling for nulls, duplicates, invalid schemas; tests for failure paths |

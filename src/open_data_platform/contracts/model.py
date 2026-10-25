@@ -13,14 +13,14 @@ FIELD_TYPES: frozenset[str] = frozenset(
 )
 CLASSIFICATIONS: frozenset[str] = frozenset({"public", "internal", "pii"})
 CLASSIFICATION_RANK: dict[str, int] = {"public": 0, "internal": 1, "pii": 2}
-PAYLOAD_FORMATS: frozenset[str] = frozenset({"csv", "json"})
+PAYLOAD_FORMATS: frozenset[str] = frozenset({"csv", "json", "jsonl"})
 ON_INVALID_POLICIES: frozenset[str] = frozenset({"quarantine", "fail_batch"})
 UPDATE_PATTERNS: frozenset[str] = frozenset(
     {"snapshot", "full_refresh", "incremental_window"}
 )
 GOLD_DOMAINS: frozenset[str] = frozenset({"olist_analysis", "product_analysis"})
 PROVENANCE_SYSTEMS: frozenset[str] = frozenset(
-    {"kaggle", "dummyjson", "postgres", "ibge"}
+    {"kaggle", "dummyjson", "postgres", "ibge", "generator"}
 )
 
 

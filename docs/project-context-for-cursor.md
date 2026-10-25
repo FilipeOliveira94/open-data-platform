@@ -88,9 +88,9 @@ Cursor Chat: https://docs.cursor.com/chat/overview
 ### Fontes de dados
 
 -   Olist (e-commerce + marketing funnel); DummyJSON products; IBGE
-    Localidades; Postgres OLTP (seed); eventos sintéticos; CEP BrasilAPI
-    opcional. Detalhe: `docs/sources/`, ADR-0018/0019. Gold:
-    `olist_analysis` e `product_analysis` (ADR-0012).
+    Localidades; Postgres OLTP (seed); clickstream de loja fictícia
+    (`demo_storefront`); CEP BrasilAPI opcional. Detalhe: `docs/sources/`,
+    ADR-0018/0019. Gold: `olist_analysis` e `product_analysis` (ADR-0012).
 
 ### Plataforma e processamento
 
@@ -166,7 +166,7 @@ caminho Terraform AWS (Fase 7).
 
 Objetivos: - Ingerir dataset histórico. - Criar cliente reutilizável
 para API pública paginada, com fixtures locais. - Ingerir dados do
-PostgreSQL. - Gerar eventos sintéticos. - Definir contratos, metadados e
+PostgreSQL. - Gerar o clickstream de uma loja fictícia (`demo_storefront`). - Definir contratos, metadados e
 convenções de partição/caminhos. - Tratar timeouts, retries, limites de
 requisição e falhas parciais.
 
@@ -639,7 +639,7 @@ Implement small, testable ingestion components for:
 1. Historical Olist datasets, DummyJSON products, IBGE Localidades, Postgres OLTP seed; optional BrasilAPI CEP (`docs/sources/`, ADR-0018/0019). Gold domains: `olist_analysis`, `product_analysis`.
 2. A paginated public API with timeouts, retries, rate-limit handling, and local fixtures.
 3. PostgreSQL source extraction.
-4. Synthetic event generation.
+4. Fictional storefront clickstream (`demo_storefront` / `clickstream`), as a seedable JSONL batch. CDC stays on PostgreSQL.
 
 Define data contracts, ingestion metadata, raw storage layout, and failure behavior.
 Keep unit tests independent of live public APIs.

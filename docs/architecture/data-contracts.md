@@ -13,13 +13,13 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | Block | Fields | Meaning |
 | --- | --- | --- |
 | Identity | `contract_version`, `source_id`, `dataset`, `description`, `grain`, `primary_key` | What one record is, and which fields identify it |
-| Payload | `payload_format` (`csv` or `json`), optional `record_locator` + `envelope_fields` | How the raw object is shaped |
+| Payload | `payload_format` (`csv`, `json`, or `jsonl`), optional `record_locator` + `envelope_fields` | How the raw object is shaped |
 | Schema | `fields[]` with `name`, `type`, `nullable`, `classification`, `description` | Expected columns or object keys |
 | Invalid rows | `on_invalid` (`quarantine` or `fail_batch`) | Declared row-level policy |
 | Structural errors | `on_structural_error` | Always `fail_batch` (missing column, unreadable payload) |
 | Change pattern | `update_pattern` | `snapshot`, `full_refresh`, or `incremental_window` |
 | Governance | `governance.domain`, `governance.owner` | Gold domain and owning role |
-| Provenance | `provenance.system` | External system that produces the bytes |
+| Provenance | `provenance.system` | Producer of the bytes |
 | Evolution | `changelog[]` | Note for each `contract_version` |
 
 Logical types are `string`, `integer`, `number`, `boolean`, `timestamp`, `date`, and `json`. They are not Iceberg or Spark types. That mapping waits for the Phase 2 compatibility proof.
@@ -28,7 +28,7 @@ Field classification is `public`, `internal`, or `pii`. The dataset classificati
 
 `governance.owner` is a role. Version 1 uses `platform`. `governance.domain` is `olist_analysis` or `product_analysis`.
 
-`provenance.system` is the static upstream name: `kaggle`, `dummyjson`, `postgres`, or `ibge`. Execution lineage stays on the raw object (`source_id`, `execution_id`, `_ingestion_ts` from P1-02). Job and column lineage is emitted later from real runs (OpenLineage and dbt, D-010). Contracts do not list downstream models.
+`provenance.system` is the static producer name: `kaggle`, `dummyjson`, `postgres`, `ibge`, or `generator`. `generator` is the in-repo demo storefront clickstream generator. Execution lineage stays on the raw object (`source_id`, `execution_id`, `_ingestion_ts` from P1-02). Job and column lineage is emitted later from real runs (OpenLineage and dbt, D-010). Contracts do not list downstream models.
 
 ## Invalid records
 
@@ -49,6 +49,7 @@ Raise `contract_version` and append a `changelog` note in the same change as any
 | `dummyjson_products` | `products` (page envelope + item) | `full_refresh` | `dummyjson` |
 | `postgres_oltp` | `sellers`, `customers`, `orders`, `order_items` | `incremental_window` | `postgres` |
 | `ibge_localidades` | `municipios` (`view=nivelado`) | `full_refresh` | `ibge` |
+| `demo_storefront` | `clickstream` (one user action per JSONL line) | `snapshot` | `generator` |
 
 Olist column `product_name_lenght` and `product_description_lenght` keep the published spelling.
 
@@ -58,7 +59,9 @@ PostgreSQL v1 adds `updated_at` (`timestamp`, not null) on each table. It is the
 
 IBGE `municipios` is a JSON array. UF and macro-region attributes are columns on that row (`UF-*`, `regiao-*`). Micro and meso region id and name are nullable. Separate region and UF endpoint contracts are not part of version 1.
 
-Out of this set: synthetic events (P1-07 owns that schema) and BrasilAPI CEP (optional P1-09).
+Demo storefront `clickstream` is JSONL: one user action per line, with no envelope. `event_time` is UTC with millisecond precision and a `Z` suffix. Actions are spaced at 500 per second of event time. `product_id` is null on some `page_view` rows. Identifiers are generated tokens and do not join Olist or DummyJSON. Daily batch, weekly batch, and CDC stay on PostgreSQL.
+
+Out of this set: BrasilAPI CEP (optional P1-09).
 
 ## Package
 

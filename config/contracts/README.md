@@ -11,7 +11,8 @@ Path: `config/contracts/{source_id}/{dataset}.yaml`.
 | `dummyjson_products` | `products` |
 | `postgres_oltp` | `sellers`, `customers`, `orders`, `order_items` |
 | `ibge_localidades` | `municipios` |
+| `demo_storefront` | `clickstream` |
 
-Not contracted here: `synthetic_events` (P1-07), BrasilAPI CEP (P1-09).
+Not contracted here: BrasilAPI CEP (P1-09).
 
 No Olist rows and no API payloads are stored in this directory.

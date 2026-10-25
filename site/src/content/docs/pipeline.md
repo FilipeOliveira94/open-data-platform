@@ -7,7 +7,7 @@ Ingestion and lakehouse layers are **not verified yet**. This page will expand a
 
 ## Planned scope
 
-Phase 1 targets multi-source ingestion: historical dataset (after license check), public API, PostgreSQL incremental extract (daily/weekly windows), and synthetic events.
+Phase 1 targets multi-source ingestion: historical dataset (after license check), public API, PostgreSQL incremental extract (daily/weekly windows), and a fictional storefront clickstream (`demo_storefront`).
 
 Later phases cover Bronze / Silver / Gold, Airflow batch schedules, and streaming CDC. None of those pipelines are delivered in the repository today.
 

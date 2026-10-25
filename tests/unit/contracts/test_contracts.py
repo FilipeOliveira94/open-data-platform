@@ -28,6 +28,7 @@ EXPECTED_DATASETS = {
     ("postgres_oltp", "orders"),
     ("postgres_oltp", "order_items"),
     ("ibge_localidades", "municipios"),
+    ("demo_storefront", "clickstream"),
 }
 
 
@@ -92,6 +93,27 @@ def test_postgres_v1_is_windowed_and_has_updated_at() -> None:
         )
         assert updated_at.nullable is False
         assert updated_at.field_type == "timestamp"
+
+
+def test_demo_storefront_clickstream_is_jsonl_without_a_join_key() -> None:
+    clickstream = _by_identity()[("demo_storefront", "clickstream")]
+    assert clickstream.payload_format == "jsonl"
+    assert clickstream.provenance_system == "generator"
+    assert clickstream.domain == "product_analysis"
+    assert clickstream.update_pattern == "snapshot"
+    assert clickstream.primary_key == ("event_id",)
+    names = [field.name for field in clickstream.fields]
+    assert names == [
+        "event_id",
+        "event_time",
+        "event_type",
+        "session_id",
+        "user_id",
+        "product_id",
+    ]
+    product_id = clickstream.fields[-1]
+    assert product_id.nullable is True
+    assert clickstream.classification == "public"
 
 
 def test_ibge_municipios_include_region_attributes() -> None:

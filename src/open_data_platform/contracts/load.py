@@ -215,7 +215,7 @@ def contract_from_mapping(data: dict[str, Any], *, origin: str) -> DataContract:
 
 
 def _assert_raw_path_segments(contract: DataContract, origin: str) -> None:
-    suffix = "csv" if contract.payload_format == "csv" else "json"
+    suffix = {"csv": "csv", "jsonl": "jsonl"}.get(contract.payload_format, "json")
     try:
         build_raw_object_key(
             source_id=contract.source_id,

@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-25 (P1-06 verified — PostgreSQL incremental extract) |
+| Last updated | 2026-10-25 (P1-07 verified — demo storefront clickstream) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06 verified) |
+| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07 verified) |
 
 **Status values:** not started · in progress · delivered · verified · blocked
 
@@ -22,14 +22,14 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P1-07** — Synthetic event generator.
+**P1-08** — IBGE Localidades ingest.
 
 Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms, AWS Terraform apply, Phase 8 hosting polish.
 
 ## Next work
 
-1. **P1-07** — Synthetic event generator.
-2. **P1-08** — IBGE Localidades ingest. Unblocked; can proceed in parallel with P1-07.
+1. **P1-08** — IBGE Localidades ingest.
+2. **P1-09** — BrasilAPI CEP enrichment. Optional; unblocked after P1-04.
 
 ---
 
@@ -43,7 +43,7 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-04 | Historical e-commerce (+ marketing funnel) ingestion | Verified | `ingestion/olist/`, `ingestion/kaggle_download.py`; unit tests 76 passed; MinIO round-trip 1 passed (2026-10-22). Category translation CSV may start with a UTF-8 BOM |
 | P1-05 | Paginated public API client (DummyJSON) | Verified | `ingestion/dummyjson_products/`; unit tests 105 passed; MinIO fixture round-trip 1 passed; live run wrote 7 pages / 194 products (2026-10-24). Contract v2: `brand` nullable |
 | P1-06 | PostgreSQL incremental batch extract | Verified | `ingestion/postgres_oltp/`; unit tests 135 passed; Postgres + MinIO round-trip 1 passed (2026-10-25). Half-open `updated_at` window on UTC midnights; synthetic seed replaces schema `oltp` |
-| P1-07 | Synthetic event generator | Not started | — |
+| P1-07 | Demo storefront clickstream | Verified | `ingestion/demo_storefront/`; unit tests 152 passed; MinIO round-trip 1 passed (2026-10-25). One `events.jsonl` per execution, 500 actions per second of event time, no batch-size cap. Live rerun wrote 30_000 lines in one key |
 | P1-08 | IBGE Localidades ingest | Not started | Planned (D-019) |
 | P1-09 | BrasilAPI CEP enrichment | Not started | Optional (D-019) |
 | P1-10 | Failure and invalid-record behavior | Not started | — |
@@ -67,9 +67,9 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 | | |
 | --- | --- |
 | Date | 2026-10-25 |
-| Environment | WSL2 / Ubuntu; local Compose PostgreSQL 16 and MinIO healthy |
-| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 135 passed; `uv run pytest tests/unit tests/integration/ingestion/test_postgres_oltp_ingest.py` → 136 passed |
-| Result | P1-06 extract: half-open `updated_at` window, same function for a 1-day and a 7-day window, synthetic seed in schema `oltp`. The integration test re-seeded, overwrote one raw key, and wrote a second key for a new `execution_id`. |
+| Environment | WSL2 / Ubuntu; local Compose MinIO healthy |
+| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 152 passed; `uv run pytest tests/integration/ingestion/test_demo_storefront_ingest.py` → 1 passed |
+| Result | P1-07 clickstream: fictional storefront actions in one `events.jsonl`, 2 ms apart (500 per second of event time), with no batch-size cap. The same `execution_id` and ingestion timestamp overwrite the object. A second `execution_id` keeps the previous key. Silver and Gold are documented for P2-03, P2-04, and P2-05 and were not built. |
 
 ---
 
@@ -121,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06 verified) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07 verified) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -160,6 +160,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-25 — P1-07 verified
+
+Demo storefront clickstream: one JSONL object of user actions from a fictional retail website (`demo_storefront` / `clickstream`). Event time is on the record, spaced at 500 actions per second. The same execution overwrites `events.jsonl`; a new `execution_id` keeps the previous object. Identifiers do not join Olist or DummyJSON. `uv run pytest tests/unit` → 152 passed; MinIO integration → 1 passed. Bronze, Silver, and Gold placement is noted for P2-03, P2-04, and P2-05 and was not built. CDC stays on PostgreSQL. Quarantine stays in P1-10.
 
 ### 2026-10-25 — P1-06 verified
 
