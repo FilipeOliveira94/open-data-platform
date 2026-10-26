@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 source_id: olist_brazilian_ecommerce
 dataset: customers
 description: "Order-scoped Olist customers. customer_id changes per order; customer_unique_id is the stable person identifier."
@@ -26,10 +26,10 @@ fields:
     classification: pii
     description: "Stable identifier of the person across orders."
   - name: customer_zip_code_prefix
-    type: integer
+    type: string
     nullable: false
     classification: pii
-    description: "Five-digit ZIP prefix as published. The source file is numeric, so leading zeros are not preserved."
+    description: "Five-digit ZIP prefix as published. Leading zeros are part of the value."
   - name: customer_city
     type: string
     nullable: false
@@ -43,3 +43,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
+  - version: 2
+    note: "customer_zip_code_prefix is text. The published file keeps leading zeros."

@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: olist_brazilian_ecommerce
 dataset: sellers
 description: "Olist sellers. Location describes the business, not a customer. seller_id matches closed_deals.seller_id in the marketing funnel."
@@ -21,10 +21,10 @@ fields:
     classification: internal
     description: "Seller identifier. Equals olist_marketing_funnel closed_deals.seller_id."
   - name: seller_zip_code_prefix
-    type: integer
+    type: string
     nullable: false
     classification: internal
-    description: "Seller ZIP prefix as published (numeric)."
+    description: "Seller ZIP prefix as published, including a leading zero."
   - name: seller_city
     type: string
     nullable: false
@@ -40,3 +40,5 @@ changelog:
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
   - version: 2
     note: "Document the published seller_id join: closed_deals.seller_id matches sellers.seller_id or order_items.seller_id."
+  - version: 3
+    note: "seller_zip_code_prefix is text. The published file keeps leading zeros."

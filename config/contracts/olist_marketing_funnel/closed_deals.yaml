@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: olist_marketing_funnel
 dataset: closed_deals
 description: "Closed seller deals. File olist_closed_deals_dataset.csv. seller_id equals olist_brazilian_ecommerce sellers.seller_id or order_items.seller_id. Self-declared commercial attributes are often null."
@@ -59,12 +59,12 @@ fields:
     type: boolean
     nullable: true
     classification: internal
-    description: "Whether the lead declared a formal company."
+    description: "Whether the lead declared a formal company. The published cells are True and False."
   - name: has_gtin
     type: boolean
     nullable: true
     classification: internal
-    description: "Whether the lead declared a GTIN for its products."
+    description: "Whether the lead declared a GTIN for its products. The published cells are True and False."
   - name: average_stock
     type: string
     nullable: true
@@ -76,10 +76,10 @@ fields:
     classification: internal
     description: "Declared business type."
   - name: declared_product_catalog_size
-    type: integer
+    type: number
     nullable: true
     classification: internal
-    description: "Published column declared_product_catalog_size."
+    description: "Published catalog size. The file stores whole values with a decimal, such as 100.0."
   - name: declared_monthly_revenue
     type: number
     nullable: true
@@ -90,3 +90,5 @@ changelog:
     note: "Initial contract. Columns follow the published Marketing Funnel by Olist (Kaggle olistbr/marketing-funnel-olist). No sample rows are stored."
   - version: 2
     note: "Document the published seller_id join: closed_deals.seller_id matches sellers.seller_id or order_items.seller_id."
+  - version: 3
+    note: "declared_product_catalog_size is a number. Published booleans use True and False."
