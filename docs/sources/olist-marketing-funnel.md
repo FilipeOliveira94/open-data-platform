@@ -24,4 +24,4 @@ From the repository root, with raw-bucket and MinIO settings in the environment:
 uv run python -m open_data_platform.ingestion.olist --execution-id run-001
 ```
 
-The command finishes the e-commerce slug before this one. Each CSV is read and written on its own. A second run with the same `--execution-id` and `--ingestion-ts` overwrites the same raw keys. `--force` downloads the zips again when the staged CSVs are already present.
+The command finishes the e-commerce slug before this one. Each CSV is read and written on its own. Invalid rows stay in the CSV and are copied to `quarantine/olist_marketing_funnel/…/{object_name}.jsonl`, the same rules as the [e-commerce ingest](olist-brazilian-ecommerce.md). A second run with the same `--execution-id` and `--ingestion-ts` overwrites the same raw keys. `--force` downloads the zips again when the staged CSVs are already present.

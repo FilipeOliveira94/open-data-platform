@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-25 (P1-09 withdrawn — BrasilAPI CEP obsolete) |
+| Last updated | 2026-10-26 (P1-10 review: unit suite 216 passed; staged Olist findings are duplicate reviews only) |
 | Current phase | Phase 1 — Multi-source ingestion |
-| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified; P1-09 withdrawn) |
+| Phase status | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08, P1-10 verified; P1-09 withdrawn) |
 
 **Status values:** not started · in progress · delivered · verified · blocked · withdrawn
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P1-10** — Failure and invalid-record behavior.
+**P1-11** — Phase 1 documentation and status.
 
 Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse transforms, AWS Terraform apply, Phase 8 hosting polish.
 
 ## Next work
 
-1. **P1-10** — Failure and invalid-record behavior.
+1. **P1-11** — Phase 1 documentation and status.
 
 ---
 
@@ -43,9 +43,9 @@ Phase 1 out of scope: streaming/CDC, Iceberg, Airflow schedules, lakehouse trans
 | P1-05 | Paginated public API client (DummyJSON) | Verified | `ingestion/dummyjson_products/`; unit tests 105 passed; MinIO fixture round-trip 1 passed; live run wrote 7 pages / 194 products (2026-10-24). Contract v2: `brand` nullable |
 | P1-06 | PostgreSQL incremental batch extract | Verified | `ingestion/postgres_oltp/`; unit tests 135 passed; Postgres + MinIO round-trip 1 passed (2026-10-25). Half-open `updated_at` window on UTC midnights; synthetic seed replaces schema `oltp` |
 | P1-07 | Demo storefront clickstream | Verified | `ingestion/demo_storefront/`; unit tests 152 passed; MinIO round-trip 1 passed (2026-10-25). One `events.jsonl` per execution, 500 actions per second of event time, no batch-size cap. Live rerun wrote 30_000 lines in one key |
-| P1-08 | IBGE Localidades ingest | Verified | `ingestion/ibge_localidades/`; unit tests 194 passed; MinIO fixture round-trip 1 passed; live run `p108-live-20261025` wrote 5_571 municipalities (2026-10-25). Gzip is decoded before the contract check. Quarantine stays in P1-10 |
+| P1-08 | IBGE Localidades ingest | Verified | `ingestion/ibge_localidades/`; unit tests 194 passed; MinIO fixture round-trip 1 passed; live run `p108-live-20261025` wrote 5_571 municipalities (2026-10-25). Gzip is decoded before the contract check. Invalid rows are copied to the P1-10 quarantine sidecar |
 | P1-09 | BrasilAPI CEP enrichment | Withdrawn | ADR-0021 / D-021. An 8-digit CEP lookup does not join to the Olist zip prefix. IBGE and Olist geolocation cover that geography |
-| P1-10 | Failure and invalid-record behavior | Not started | — |
+| P1-10 | Failure and invalid-record behavior | Verified | `contracts/records.py`, `ingestion/quarantine.py`; unit tests 216 passed; live matrix 40 passed (2026-10-26). Raw bytes stay in place. Findings go to `quarantine/…/{object_name}.jsonl` in `ODP_RAW_BUCKET`. A clean rerun deletes that sidecar. Reprocess stays P3-07. D-013 approved 2026-10-26 |
 | P1-11 | Phase 1 documentation and status | Not started | — |
 
 Acceptance detail: `ROADMAP.md` → Phase 1.
@@ -56,7 +56,7 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 - [x] Unit tests do not require the public API to be online.
 - [ ] Raw data is traceable by source and execution.
 - [x] Contracts and expected fields are documented.
-- [ ] Invalid records and errors have explicit, documented behavior.
+- [x] Invalid records and errors have explicit, documented behavior.
 - [x] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
 
 ---
@@ -65,10 +65,10 @@ Acceptance detail: `ROADMAP.md` → Phase 1.
 
 | | |
 | --- | --- |
-| Date | 2026-10-25 |
-| Environment | WSL2 / Ubuntu |
-| Checks | `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 194 passed |
-| Result | `uv run pytest tests/unit` → 194 passed. BrasilAPI CEP is not a dataset (ADR-0021). |
+| Date | 2026-10-26 |
+| Environment | WSL2 / Ubuntu, local MinIO and PostgreSQL |
+| Checks | Live matrix for the five Phase 1 sources: success, overwrite, a new execution, null, type mismatch, duplicate primary key, structural failure, clean rerun, and synthetic `fail_batch` |
+| Result | Live matrix: 40 passed, 0 failed. IBGE: 5_571 municipalities, no sidecar. DummyJSON: 7 pages, no sidecar. PostgreSQL fixture window and an empty window wrote raw JSON and no sidecar. Olist used the staged CSVs. That run, before the contract fix, quarantined leading-zero ZIP prefixes, closed-deal `True`/`False` and `100.0` values, and 1_603 duplicate `review_id` rows. After `819829d`, classifying the same staged files leaves findings only on `order_reviews` (1_603 `duplicate_primary_key`). Test prefixes were deleted. OLTP was restored to the synthetic fixture (sellers 5, customers 2, orders 2, order_items 2). Unit check in this review: `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 216 passed. |
 
 ---
 
@@ -98,7 +98,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | D-019 | DummyJSON (P1-05); IBGE (P1-08). CEP clause superseded | Approved |
 | D-021 | BrasilAPI CEP withdrawn; no raw dataset | Approved |
 | D-012 | Gold domains `olist_analysis` / `product_analysis` | Proposed (domain split recorded) |
-| D-013 | Data contracts / no silent drops — gates P1-03+ | Proposed (P1-03 evidence landed; not approved) |
+| D-013 | Data contracts / no silent drops — gates P1-03+ | Approved (2026-10-26) |
 | D-015 | Package owns logic; thin DAGs/IaC — gates ingestion layout | Proposed |
 | D-001 / D-002 | Compose + MinIO baseline (unchanged) | Approved |
 
@@ -121,7 +121,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
-| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08 verified; P1-09 withdrawn) |
+| 1 | Multi-source ingestion | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08, P1-10 verified; P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Not started |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
@@ -135,6 +135,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 ## Risks and limitations
 
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
+- Published Olist ZIP prefixes, closed-deal booleans, and catalog sizes match the contracts (customers v2, geolocation v2, sellers v3, closed_deals v3). The staged snapshot still quarantines 1_603 `order_reviews` rows with a repeated `review_id`. Those rows stay in the CSV.
 - Spark / Iceberg / catalog / query-engine compatibility is unproven until P2-01.
 - Exactly-once end-to-end will not be claimed without a written proof.
 - `terraform apply` / `destroy` and destructive volume ops need explicit approval.
@@ -160,6 +161,18 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-26 — P1-10 live matrix
+
+Ran each Phase 1 source against local MinIO. IBGE and DummyJSON used the public APIs. PostgreSQL used the synthetic fixture, then temporary rows for the error cases, then `DROP SCHEMA oltp` and a reseed. Olist used the gitignored staged CSVs. Injected payloads covered nulls, type mismatches, duplicate keys, structural failures, a clean rerun, and synthetic `fail_batch`. 40 cases passed. No product change. Before the contract fix, that Olist snapshot also quarantined leading-zero ZIP prefixes and closed-deal `True`/`False` and `100.0` cells. `819829d` matches those tokens. A later classification of the same files leaves only the 1_603 duplicate `review_id` rows.
+
+### 2026-10-26 — D-013 approved; sidecar uses the object writer
+
+D-013 is `approved`. Each ingestor calls `prepare_quarantine` and then `write_raw_object` for the raw payload. The quarantine sidecar is a second call to `write_raw_object` with prefix `quarantine`. A clean rerun still deletes that key. `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 216 passed.
+
+### 2026-10-26 — P1-10 verified
+
+Invalid rows stay in the raw object. A nullable null is not quarantined. A null in a required field, a wrong type, and every row in a repeated primary-key group are written to `quarantine/{source_id}/{dataset}/dt=…/execution_id=…/{object_name}.jsonl` in `ODP_RAW_BUCKET`. The same execution overwrites that sidecar. A clean rerun deletes it. Structural errors still fail before the write and leave earlier objects in place. `on_invalid: fail_batch` writes neither object. No shipped contract uses that policy. Geolocation has no primary key. `timestamp` and `date` are non-empty text, with no calendar check. CSV booleans are `true` and `false`. The PostgreSQL extract quarantines a null primary key instead of aborting. A naive timestamp or a non-finite number still fails before the write. `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 214 passed. No live API, Kaggle, or MinIO. D-013 stays `proposed`. Reprocess stays P3-07.
 
 ### 2026-10-25 — P1-09 withdrawn
 

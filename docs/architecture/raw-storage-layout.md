@@ -70,15 +70,18 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 - Same `(source_id, dataset, dt, execution_id, object_name)` → same object key.
 - A re-run with the same execution identity **overwrites** the object (last write wins).
 - Changing `execution_id` creates a new key (new run), which is intentional for audit of distinct executions.
-- Record-level deduplication and quarantine are **not** raw-writer responsibilities (P1-10 / Silver).
+- The raw object keeps every row. A repeated primary key is reported, not reduced to one survivor (Silver, P2-04).
+- Invalid rows are copied to a sidecar in the same bucket. The key is `quarantine/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_name}.jsonl`. A clean rerun of that identity deletes the sidecar. Reprocessing it is P3-07.
 
 ## Package API
 
 | Module | Responsibility |
 | --- | --- |
-| `open_data_platform.ingestion.paths` | Build and validate raw object keys |
+| `open_data_platform.ingestion.paths` | Build and validate raw and quarantine object keys |
 | `open_data_platform.ingestion.metadata` | Typed metadata → object user-metadata map |
-| `open_data_platform.ingestion.writer` | Put bytes to `ODP_RAW_BUCKET` with key + metadata |
+| `open_data_platform.ingestion.writer` | Put bytes to `ODP_RAW_BUCKET` under `raw/` or `quarantine/`, with key + metadata |
+| `open_data_platform.ingestion.quarantine` | Classify before any put. The sidecar put calls `write_raw_object`. A clean rerun deletes the sidecar |
+| `open_data_platform.contracts.records` | Classify nulls, types, and duplicate primary keys. No storage I/O |
 | `open_data_platform.ingestion.http` | GET with the caller's retry, redirect, and response-size policy |
 | `open_data_platform.ingestion.kaggle_download` | Download one Kaggle dataset zip and extract an expected file set |
 | `open_data_platform.ingestion.olist` | Fetch the Olist snapshots and write each CSV through the raw writer |
@@ -93,4 +96,4 @@ Olist historical ingestion, the DummyJSON products client, the PostgreSQL window
 
 - Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
 - Bronze/Iceberg tables — P2-03
-- Quarantine layout — P1-10 / P3-07
+- Quarantine reprocess path — P3-07

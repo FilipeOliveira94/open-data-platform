@@ -24,7 +24,7 @@ Requests send `User-Agent: open-data-platform/<version> (dummyjson-products)`. C
 
 The client retries timeouts, HTTP 429, and HTTP 5xx, with at most 3 attempts. The pause is 1s, then 2s, then 4s when another attempt is configured. A numeric `Retry-After` on HTTP 429 sets that pause and is capped at 30 seconds. An HTTP-date `Retry-After` leaves the 1s/2s/4s backoff in place. Other 4xx responses and redirects fail on the first response. Error text omits the response body. A response larger than 5 MiB fails. A reported `total` that needs more than 1000 pages fails before the first write.
 
-A page whose envelope or product keys differ from `config/contracts/dummyjson_products/products.yaml` fails the batch before the next write. Pages already written for that execution stay in place. Nulls and duplicate ids stay in the stored page. Quarantine of those rows is P1-10.
+A page whose envelope or product keys differ from `config/contracts/dummyjson_products/products.yaml` fails the batch before the next write. Pages already written for that execution stay in place. The failing page gets no quarantine sidecar. Nulls and duplicate ids stay in the stored page. A null `id` is `null_violation`. Every product in a repeated-id group is `duplicate_primary_key`. Those findings are written beside the page as `products-skip-{skip:06d}.json.jsonl` under `quarantine/dummyjson_products/products/`.
 
 The same `--execution-id` and `--ingestion-ts` overwrite the page keys from that run. A shorter catalog on that same execution leaves any later page keys that this run does not rewrite. A new `execution_id` is the audit path for a new snapshot.
 

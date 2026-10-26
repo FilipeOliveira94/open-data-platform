@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from open_data_platform.contracts.load import load_contracts
+from open_data_platform.contracts.records import parsed_csv_record
 from open_data_platform.ingestion.kaggle_download import (
     KaggleCredentials,
     KaggleDownloadError,
@@ -27,6 +28,11 @@ from open_data_platform.ingestion.kaggle_download import (
     credentials_from_env,
     download_dataset_zip,
     extract_expected_members,
+)
+from open_data_platform.ingestion.quarantine import (
+    InvalidRecordsError,
+    prepare_quarantine,
+    write_quarantine_object,
 )
 from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
 from open_data_platform.object_storage import client_from_env
@@ -190,9 +196,10 @@ def ingest_olist_historical(
     """Read, validate, and write one staged CSV at a time.
 
     The file body is released after its put. A structural failure stops the
-    remaining files. Objects already written for this execution stay in place
-    and are overwritten when the same ``execution_id`` and ``ingestion_ts``
-    run again.
+    remaining files and does not write a quarantine sidecar for that file.
+    Objects already written for this execution stay in place and are
+    overwritten when the same ``execution_id`` and ``ingestion_ts`` run again.
+    Invalid rows stay in the CSV and are copied to the quarantine key.
     """
     loaded = load_contracts() if contracts is None else contracts
     by_identity = {(item.source_id, item.dataset): item for item in loaded}
@@ -217,24 +224,33 @@ def ingest_olist_historical(
                 msg = f"missing staged file: {spec.object_name}"
                 raise OlistIngestError(msg)
             body = path.read_bytes()
-            header = _csv_header(body, spec.object_name)
-            expected = {field.name for field in contract.fields}
-            if len(header) != len(set(header)) or set(header) != expected:
-                msg = f"CSV header does not match contract for {spec.dataset}"
-                raise OlistIngestError(msg)
-            results.append(
-                write_raw_object(
-                    client,
-                    bucket=bucket,
-                    body=body,
-                    source_id=source.source_id,
-                    dataset=spec.dataset,
-                    execution_id=execution_id,
-                    object_name=spec.object_name,
-                    ingestion_ts=ts,
-                    content_type="text/csv",
-                )
+            records = _csv_records(body, contract, spec.object_name)
+            try:
+                sidecar = prepare_quarantine(contract, records)
+            except InvalidRecordsError as exc:
+                raise OlistIngestError(str(exc)) from exc
+            result = write_raw_object(
+                client,
+                bucket=bucket,
+                body=body,
+                source_id=source.source_id,
+                dataset=spec.dataset,
+                execution_id=execution_id,
+                object_name=spec.object_name,
+                ingestion_ts=ts,
+                content_type="text/csv",
             )
+            write_quarantine_object(
+                client,
+                bucket=bucket,
+                source_id=source.source_id,
+                dataset=spec.dataset,
+                execution_id=execution_id,
+                object_name=spec.object_name,
+                ingestion_ts=result.metadata.ingestion_ts,
+                body=sidecar,
+            )
+            results.append(result)
     return tuple(results)
 
 
@@ -395,3 +411,26 @@ def _csv_header(body: bytes, object_name: str) -> list[str]:
         msg = f"staged file has an invalid header: {object_name}"
         raise OlistIngestError(msg)
     return header
+
+
+def _csv_records(
+    body: bytes,
+    contract: DataContract,
+    object_name: str,
+) -> tuple[dict[str, object], ...]:
+    header = _csv_header(body, object_name)
+    expected = {field.name for field in contract.fields}
+    if len(header) != len(set(header)) or set(header) != expected:
+        msg = f"CSV header does not match contract for {contract.dataset}"
+        raise OlistIngestError(msg)
+    text = body.decode("utf-8-sig")
+    reader = csv.reader(io.StringIO(text, newline=""))
+    next(reader)
+    records: list[dict[str, object]] = []
+    for index, row in enumerate(reader):
+        if len(row) != len(header):
+            msg = f"CSV row {index} does not match contract for {contract.dataset}"
+            raise OlistIngestError(msg)
+        cells = dict(zip(header, row, strict=True))
+        records.append(parsed_csv_record(contract, cells))
+    return tuple(records)

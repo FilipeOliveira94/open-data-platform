@@ -7,8 +7,11 @@ fall on UTC midnight, so the raw object name stays unique:
 ``{dataset}_{start_date}_{end_date}.json``
 
 The predicate is ``updated_at >= start AND updated_at < end``. An empty
-window is stored as a JSON array. Scheduling, catchup, and quarantine stay
-outside this module. The synthetic seed replaces the four ``oltp`` tables.
+window is stored as a JSON array. A null or a value of the wrong type stays
+in that array and is copied to the quarantine key. A value that cannot be
+encoded, including a naive timestamp or a non-finite number, fails the batch
+before the write. Scheduling and catchup stay outside this module. The
+synthetic seed replaces the four ``oltp`` tables.
 """
 
 from __future__ import annotations
@@ -28,6 +31,10 @@ import psycopg
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.ingestion.paths import build_raw_object_key
+from open_data_platform.ingestion.quarantine import (
+    prepare_quarantine,
+    write_quarantine_object,
+)
 from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
 from open_data_platform.object_storage import client_from_env
 
@@ -205,23 +212,34 @@ def extract_postgres_oltp(
         contract = by_dataset[dataset]
         _require_extract_contract(contract)
         columns, rows = _fetch_window(connection, contract, start, end)
-        body = _encode_rows(dataset, contract, columns, rows)
+        body, records = _encode_rows(dataset, contract, columns, rows)
+        object_name = window_object_name(dataset, start, end)
         try:
-            results.append(
-                write_raw_object(
-                    client,
-                    bucket=bucket,
-                    body=body,
-                    source_id=SOURCE_ID,
-                    dataset=dataset,
-                    execution_id=execution_id,
-                    object_name=window_object_name(dataset, start, end),
-                    ingestion_ts=written_at,
-                    content_type="application/json",
-                )
+            sidecar = prepare_quarantine(contract, records)
+            result = write_raw_object(
+                client,
+                bucket=bucket,
+                body=body,
+                source_id=SOURCE_ID,
+                dataset=dataset,
+                execution_id=execution_id,
+                object_name=object_name,
+                ingestion_ts=written_at,
+                content_type="application/json",
+            )
+            write_quarantine_object(
+                client,
+                bucket=bucket,
+                source_id=SOURCE_ID,
+                dataset=dataset,
+                execution_id=execution_id,
+                object_name=object_name,
+                ingestion_ts=result.metadata.ingestion_ts,
+                body=sidecar,
             )
         except ValueError as exc:
             raise PostgresOltpError(str(exc)) from exc
+        results.append(result)
     return tuple(results)
 
 
@@ -444,7 +462,7 @@ def _encode_rows(
     contract: DataContract,
     columns: Sequence[str],
     rows: Sequence[Sequence[object]],
-) -> bytes:
+) -> tuple[bytes, tuple[dict[str, object], ...]]:
     expected = [field.name for field in contract.fields]
     if list(columns) != expected:
         msg = f"{dataset}: result columns do not match the contract"
@@ -460,7 +478,7 @@ def _encode_rows(
     except (TypeError, ValueError) as exc:
         msg = f"{dataset}: row could not be encoded as JSON"
         raise PostgresOltpError(msg) from exc
-    return encoded.encode("utf-8") + b"\n"
+    return encoded.encode("utf-8") + b"\n", tuple(payload)
 
 
 def _encode_row(
@@ -479,33 +497,23 @@ def _encode_row(
 
 def _json_value(dataset: str, field: ContractField, value: object) -> object:
     if value is None:
-        if field.nullable:
-            return None
-        msg = f"{dataset}: field {field.name} is null"
-        raise PostgresOltpError(msg)
-    if isinstance(value, bool) or not _matches_type(field, value):
-        msg = f"{dataset}: field {field.name} has an unexpected type"
-        raise PostgresOltpError(msg)
-    if field.field_type == "timestamp":
-        if not isinstance(value, datetime):
+        return None
+    if isinstance(value, datetime):
+        return _format_timestamp(dataset, field.name, value)
+    if isinstance(value, Decimal):
+        if field.field_type != "number":
             msg = f"{dataset}: field {field.name} has an unexpected type"
             raise PostgresOltpError(msg)
-        return _format_timestamp(dataset, field.name, value)
-    if field.field_type == "number":
         return _json_number(dataset, field.name, value)
-    return value
-
-
-def _matches_type(field: ContractField, value: object) -> bool:
-    if field.field_type == "string":
-        return isinstance(value, str)
-    if field.field_type == "integer":
-        return isinstance(value, int)
-    if field.field_type == "number":
-        return isinstance(value, int | float | Decimal)
-    if field.field_type == "timestamp":
-        return isinstance(value, datetime)
-    return False
+    if isinstance(value, float):
+        if not _finite_float(value):
+            msg = f"{dataset}: field {field.name} must be a finite number"
+            raise PostgresOltpError(msg)
+        return value
+    if isinstance(value, bool | int | str | list | dict):
+        return value
+    msg = f"{dataset}: field {field.name} has an unexpected type"
+    raise PostgresOltpError(msg)
 
 
 def _format_timestamp(dataset: str, field_name: str, value: datetime) -> str:

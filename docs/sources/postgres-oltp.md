@@ -26,7 +26,7 @@ updated_at >= start AND updated_at < end
 
 `start` and `end` are timezone-aware instants normalized to UTC, and both must fall on UTC midnight. A daily call passes a one-day window. A weekly call passes a seven-day window. Both calls use `extract_postgres_oltp`. Any other pair of UTC midnights uses that same function. The caller supplies both bounds. This module does not store a high-water mark.
 
-Each dataset becomes one JSON array. The object name is `{dataset}_{start_date}_{end_date}.json`, using the UTC dates of the bounds. Example: `orders_2026-10-17_2026-10-18.json`. The `dt=` partition stays the ingestion date ([raw storage layout](../architecture/raw-storage-layout.md)). A window with no rows is stored as `[]`. The same `execution_id`, ingestion timestamp, and window overwrite that object. A structural mismatch fails the batch and leaves objects already written for that execution in place.
+Each dataset becomes one JSON array. The object name is `{dataset}_{start_date}_{end_date}.json`, using the UTC dates of the bounds. Example: `orders_2026-10-17_2026-10-18.json`. The `dt=` partition stays the ingestion date ([raw storage layout](../architecture/raw-storage-layout.md)). A window with no rows is stored as `[]`. The same `execution_id`, ingestion timestamp, and window overwrite that object. A structural mismatch fails the batch and leaves objects already written for that execution in place. A null or a value of the wrong JSON type stays in the array and is copied to the quarantine sidecar. A naive timestamp or a non-finite number fails before the write. The synthetic seed still rejects a duplicated fixture key before it loads.
 
 Grain and keys stay on the v1 contracts.
 

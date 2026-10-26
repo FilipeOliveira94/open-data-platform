@@ -6,7 +6,10 @@ from datetime import date
 
 import pytest
 
-from open_data_platform.ingestion.paths import build_raw_object_key
+from open_data_platform.ingestion.paths import (
+    build_quarantine_object_key,
+    build_raw_object_key,
+)
 
 
 def test_build_raw_object_key_deterministic() -> None:
@@ -23,6 +26,20 @@ def test_build_raw_object_key_deterministic() -> None:
     assert key_a == (
         "raw/dummyjson_products/products/dt=2026-10-18/"
         "execution_id=run-001/products.json"
+    )
+
+
+def test_build_quarantine_object_key_appends_jsonl_to_the_raw_name() -> None:
+    key = build_quarantine_object_key(
+        source_id="ibge_localidades",
+        dataset="municipios",
+        execution_id="run-001",
+        object_name="municipios.json",
+        ingestion_date=date(2026, 10, 26),
+    )
+    assert key == (
+        "quarantine/ibge_localidades/municipios/dt=2026-10-26/"
+        "execution_id=run-001/municipios.json.jsonl"
     )
 
 

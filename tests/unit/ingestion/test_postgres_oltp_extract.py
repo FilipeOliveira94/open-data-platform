@@ -399,16 +399,22 @@ def test_datasets_run_in_canonical_order() -> None:
     assert '"order_items"' in connection.queries[1][0]
 
 
-def test_null_primary_key_stops_before_the_write() -> None:
+def test_null_primary_key_stays_in_raw_and_is_quarantined() -> None:
     contract = _contracts()["sellers"]
     connection = _ScriptedConnection([_table(contract, _row(contract, seller_id=None))])
     client = _client()
 
-    with pytest.raises(PostgresOltpError, match="seller_id is null"):
-        _extract(connection, client, datasets=DATASETS)
+    _extract(connection, client, datasets=("sellers",))
 
     assert len(connection.queries) == 1
-    assert client.put_object.call_count == 0
+    stored = json.loads(_puts(client)[0].kwargs["Body"])
+    assert stored[0]["seller_id"] is None
+    sidecar = _puts(client)[1].kwargs
+    assert sidecar["Key"].startswith("quarantine/postgres_oltp/sellers/")
+    finding = json.loads(sidecar["Body"].splitlines()[0])
+    assert finding["reason"] == "null_violation"
+    assert finding["field"] == "seller_id"
+    assert client.delete_object.call_count == 0
 
 
 def test_column_mismatch_keeps_the_dataset_already_written() -> None:
@@ -461,20 +467,29 @@ def test_naive_timestamp_value_fails_the_batch() -> None:
     assert client.put_object.call_count == 0
 
 
-def test_boolean_and_non_finite_numbers_are_rejected() -> None:
+def test_boolean_in_an_integer_field_is_quarantined() -> None:
     contract = _contracts()["sellers"]
     client = _client()
-    boolean_row = _ScriptedConnection(
+    connection = _ScriptedConnection(
         [_table(contract, _row(contract, seller_zip_code_prefix=True))]
     )
 
-    with pytest.raises(PostgresOltpError, match="unexpected type"):
-        _extract(boolean_row, client)
+    _extract(connection, client)
 
+    stored = json.loads(_puts(client)[0].kwargs["Body"])
+    assert stored[0]["seller_zip_code_prefix"] is True
+    finding = json.loads(_puts(client)[1].kwargs["Body"].splitlines()[0])
+    assert finding["reason"] == "type_mismatch"
+    assert finding["field"] == "seller_zip_code_prefix"
+
+
+def test_non_finite_numbers_fail_before_the_write() -> None:
     items = _contracts()["order_items"]
     infinite = _ScriptedConnection([_table(items, _row(items, price=float("nan")))])
+    client = _client()
+
     with pytest.raises(PostgresOltpError, match="finite number"):
-        _extract(infinite, _client(), datasets=("order_items",))
+        _extract(infinite, client, datasets=("order_items",))
 
     assert client.put_object.call_count == 0
 

@@ -20,7 +20,7 @@ Each run writes one object:
 
 `raw/demo_storefront/clickstream/dt={YYYY-MM-DD}/execution_id={execution_id}/events.jsonl`
 
-The same `--execution-id` and `--ingestion-ts` overwrite that object. A new `execution_id` keeps the previous object. Quarantine of invalid rows is P1-10. This generator emits only records that match the contract.
+The same `--execution-id` and `--ingestion-ts` overwrite that object. A new `execution_id` keeps the previous object. This generator emits only records that match the contract, so a normal run deletes any stale quarantine object for that identity and does not write a new one. A line that is not a JSON object, or whose keys differ from the contract, fails before the write. The sidecar key for this dataset ends in `events.jsonl.jsonl` under `quarantine/demo_storefront/clickstream/`.
 
 ## Later layers
 

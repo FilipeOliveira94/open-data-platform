@@ -29,6 +29,11 @@ from open_data_platform.ingestion.http import (
     Transport,
     get_with_retries,
 )
+from open_data_platform.ingestion.quarantine import (
+    InvalidRecordsError,
+    prepare_quarantine,
+    write_quarantine_object,
+)
 from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
 from open_data_platform.object_storage import client_from_env
 
@@ -117,7 +122,8 @@ def ingest_ibge_localidades(
     """Fetch the municipality list and write it to the raw layout.
 
     The same ``execution_id`` and ``ingestion_ts`` overwrite ``municipios.json``.
-    A structural failure writes nothing.
+    A structural failure writes nothing. Invalid rows stay in the array and
+    are copied to the quarantine key.
     """
     _require_token("bucket", bucket)
     _require_token("execution_id", execution_id)
@@ -134,8 +140,12 @@ def ingest_ibge_localidades(
         transport=transport,
         sleep=sleep,
     )
-    _require_municipios(body, contract)
-    return write_raw_object(
+    records = _require_municipios(body, contract)
+    try:
+        sidecar = prepare_quarantine(contract, records)
+    except InvalidRecordsError as exc:
+        raise IbgeLocalidadesError(str(exc)) from exc
+    result = write_raw_object(
         client,
         bucket=bucket,
         body=body,
@@ -146,6 +156,17 @@ def ingest_ibge_localidades(
         ingestion_ts=ts,
         content_type="application/json",
     )
+    write_quarantine_object(
+        client,
+        bucket=bucket,
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        object_name=OBJECT_NAME,
+        ingestion_ts=result.metadata.ingestion_ts,
+        body=sidecar,
+    )
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -234,7 +255,10 @@ def _municipios_contract(
     return contract
 
 
-def _require_municipios(body: bytes, contract: DataContract) -> None:
+def _require_municipios(
+    body: bytes,
+    contract: DataContract,
+) -> list[dict[str, object]]:
     try:
         payload = json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -248,6 +272,7 @@ def _require_municipios(body: bytes, contract: DataContract) -> None:
         raise IbgeLocalidadesError(msg)
     required_keys = {field.name for field in contract.fields if not field.nullable}
     allowed_keys = {field.name for field in contract.fields}
+    records: list[dict[str, object]] = []
     for index, item in enumerate(payload):
         if not isinstance(item, dict):
             msg = (
@@ -260,6 +285,8 @@ def _require_municipios(body: bytes, contract: DataContract) -> None:
                 f"IBGE localidades municipios item {index} does not match the contract"
             )
             raise IbgeLocalidadesError(msg)
+        records.append(item)
+    return records
 
 
 def _origin(base_url: str) -> str:

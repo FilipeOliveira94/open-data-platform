@@ -37,7 +37,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-010 | Lineage | OpenLineage where verified; dbt lineage | — | `proposed` | [ADR-0010](docs/decisions/0010-lineage.md) |
 | D-011 | IaC / CI | Terraform (`fmt`/`validate` in CI; apply gated); GitHub Actions; OIDC | — | `proposed` | [ADR-0011](docs/decisions/0011-iac-and-ci-credentials.md) |
 | D-012 | Medallion layers | Bronze / Silver / Gold; Gold domains `olist_analysis` + `product_analysis` | — | `proposed` | [ADR-0012](docs/decisions/0012-medallion-layers.md) |
-| D-013 | Data contracts | Contracts under `config/contracts/`; explicit quarantine/fail (no silent drops) | YAML contracts + structural loader (P1-03). Decision not yet approved | `proposed` | [ADR-0013](docs/decisions/0013-data-contracts.md) |
+| D-013 | Data contracts | Contracts under `config/contracts/`; explicit quarantine/fail (no silent drops) | YAML contracts, structural loader (P1-03), and quarantine sidecar through the shared object writer (P1-10) | `approved` | [ADR-0013](docs/decisions/0013-data-contracts.md) |
 | D-014 | Batch vs streaming | Daily batch, weekly batch, and CDC coexist; CDC does not replace batch | — | `proposed` | [ADR-0014](docs/decisions/0014-batch-vs-streaming-coexistence.md) |
 | D-015 | Monorepo boundaries | Package owns business logic; thin DAGs and IaC | — | `proposed` | [ADR-0015](docs/decisions/0015-monorepo-package-boundaries.md) |
 | D-016 | Discovery / metadata | Deferred; evaluate DataHub / Amundsen / OpenMetadata later | — | `proposed` | [ADR-0016](docs/decisions/0016-data-discovery.md) |
@@ -61,6 +61,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-10-26 | D-013 approved. Invalid-record classification and the `quarantine/` sidecar are in the repository. The sidecar put goes through `write_raw_object` |
 | 2026-10-25 | D-021 approved: BrasilAPI CEP withdrawn as obsolete. D-019 CEP clause superseded; DummyJSON and IBGE stay |
 | 2026-10-18 | D-013: P1-03 landed YAML contracts and a structural loader; state stays `proposed` until approval |
 | 2026-10-18 | D-020 approved: raw object-store layout + ingestion metadata conventions (P1-02) |

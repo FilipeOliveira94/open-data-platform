@@ -111,7 +111,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [x] Unit tests do not require the public API to be online.
 - [ ] Raw data is traceable by source and execution.
 - [x] Contracts and expected fields are documented.
-- [ ] Invalid records and errors have explicit, documented behavior.
+- [x] Invalid records and errors have explicit, documented behavior.
 - [x] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
 
 ### Issues
@@ -125,9 +125,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P1-05 | Paginated public API client (DummyJSON products) | P1-02, P1-03 | Verified | DummyJSON `/products` (`limit`/`skip`); timeouts, retries, rate-limit handling; fixtures; no live API in unit tests; lands in Gold `product_analysis` (D-019, D-012) |
 | P1-06 | PostgreSQL incremental batch extract | P0-10, P1-02, P1-03 | Verified | Parameterized extract by watermark/window (`start`/`end` or high-water mark); grain/keys documented; same code path supports daily and weekly windows; idempotent re-run without corrupting raw; OLTP seed per `docs/sources/postgres-oltp.md` |
 | P1-07 | Demo storefront clickstream | P1-02 | Verified | Seedable JSONL clickstream for a fictional retail website (`demo_storefront` / `clickstream`); schema documented; event time on the record. Bronze, Silver, and Gold placement is noted for P2-03, P2-04, and P2-05 and is not built here. CDC remains the PostgreSQL path |
-| P1-08 | IBGE Localidades ingest | P1-02, P1-03 | Verified | IBGE `municipios` (`view=nivelado`, `orderBy=nome`) into one raw `municipios.json`; contract v1; geo reference for `olist_analysis` (D-019). Quarantine stays in P1-10 |
+| P1-08 | IBGE Localidades ingest | P1-02, P1-03 | Verified | IBGE `municipios` (`view=nivelado`, `orderBy=nome`) into one raw `municipios.json`; contract v1; geo reference for `olist_analysis` (D-019). Invalid rows are copied to the P1-10 quarantine sidecar |
 | P1-09 | BrasilAPI CEP enrichment (optional) | P1-02, P1-04 | Withdrawn | Withdrawn (ADR-0021 / D-021). An 8-digit CEP lookup does not join to the Olist zip prefix. IBGE and Olist geolocation cover that geography |
-| P1-10 | Failure and invalid-record behavior | P1-04–P1-08 | Not started | Explicit handling for nulls, duplicates, invalid schemas; tests for failure paths |
+| P1-10 | Failure and invalid-record behavior | P1-04–P1-08 | Verified | Nulls, duplicate keys, and wrong types are explicit. Raw bytes stay in place. Findings land in `quarantine/…/{object_name}.jsonl` in the same bucket. Structural errors still fail the batch. Unit tests cover the failure paths |
 | P1-11 | Phase 1 documentation and status | P1-10 | Not started | README/docs updated; three update patterns (daily batch, weekly batch, streaming) referenced; `PROJECT_STATUS.md` records verification evidence |
 
 **Suggested order:** P1-01 ∥ P1-02 → P1-03 → P1-04 ∥ P1-05 ∥ P1-06 ∥ P1-07 ∥ P1-08 → P1-10 → P1-11. P1-09 is withdrawn (ADR-0021).
@@ -396,7 +396,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-10-25 |
+| Last updated | 2026-10-26 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

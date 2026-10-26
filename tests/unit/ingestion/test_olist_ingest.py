@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import zipfile
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -300,8 +301,9 @@ def test_ingest_same_identity_overwrites_the_same_key(tmp_path: Path) -> None:
     first = ingest_olist_historical(client, **kwargs)
     orders = next(spec for spec in ECOMMERCE.files if spec.dataset == "orders")
     contract = contracts[(ECOMMERCE.source_id, orders.dataset)]
+    marker = ["t"] * len(contract.fields)
     (ecommerce / orders.object_name).write_bytes(
-        _csv_bytes([field.name for field in contract.fields], row=["x"])
+        _csv_bytes([field.name for field in contract.fields], row=marker)
     )
     second = ingest_olist_historical(client, **kwargs)
 
@@ -312,7 +314,7 @@ def test_ingest_same_identity_overwrites_the_same_key(tmp_path: Path) -> None:
         if call.kwargs["Key"].endswith("/olist_orders_dataset.csv")
     ]
     assert bodies[0] != bodies[1]
-    assert bodies[1].splitlines()[-1] == b"x"
+    assert bodies[1].splitlines()[-1] == b",".join([b"t"] * len(contract.fields))
 
 
 def test_different_execution_id_uses_a_different_key(tmp_path: Path) -> None:
@@ -364,6 +366,175 @@ def test_header_mismatch_stops_at_that_file(tmp_path: Path) -> None:
     assert len(keys) == 5
     assert all(not key.endswith("/olist_orders_dataset.csv") for key in keys)
     assert keys[-1].endswith("/olist_order_reviews_dataset.csv")
+
+
+def _sample_cell(field_type: str) -> str:
+    if field_type == "integer":
+        return "7"
+    if field_type == "number":
+        return "1.5"
+    if field_type == "boolean":
+        return "true"
+    return "value"
+
+
+def _valid_row(contract: DataContract, **overrides: str) -> list[str]:
+    return [
+        overrides.get(field.name, _sample_cell(field.field_type))
+        for field in contract.fields
+    ]
+
+
+def _ingest_one(
+    tmp_path: Path,
+    *,
+    dataset: str,
+    object_name: str,
+    body: bytes,
+) -> MagicMock:
+    source = OlistSource(
+        slug=ECOMMERCE.slug,
+        source_id=ECOMMERCE.source_id,
+        files=(OlistFile(object_name, dataset),),
+    )
+    ecommerce = tmp_path / "ecom"
+    ecommerce.mkdir()
+    (ecommerce / object_name).write_bytes(body)
+    client = _client()
+    ingest_olist_historical(
+        client,
+        bucket="odp-raw",
+        execution_id="run-001",
+        ingestion_ts=_TS,
+        ecommerce_dir=ecommerce,
+        funnel_dir=tmp_path / "funnel",
+        sources=(source,),
+    )
+    return client
+
+
+def test_short_csv_row_writes_nothing(tmp_path: Path) -> None:
+    contract = _contracts()[("olist_brazilian_ecommerce", "orders")]
+    body = _csv_bytes([field.name for field in contract.fields], row=["x"])
+    client = _client()
+    source = OlistSource(
+        slug=ECOMMERCE.slug,
+        source_id=ECOMMERCE.source_id,
+        files=(OlistFile("olist_orders_dataset.csv", "orders"),),
+    )
+    ecommerce = tmp_path / "ecom"
+    ecommerce.mkdir()
+    (ecommerce / "olist_orders_dataset.csv").write_bytes(body)
+
+    with pytest.raises(OlistIngestError, match="CSV row 0 does not match"):
+        ingest_olist_historical(
+            client,
+            bucket="odp-raw",
+            execution_id="run-001",
+            ingestion_ts=_TS,
+            ecommerce_dir=ecommerce,
+            funnel_dir=tmp_path / "funnel",
+            sources=(source,),
+        )
+
+    assert client.put_object.call_count == 0
+    assert client.delete_object.call_count == 0
+
+
+def test_duplicate_review_ids_stay_in_raw_and_are_quarantined(tmp_path: Path) -> None:
+    contract = _contracts()[("olist_brazilian_ecommerce", "order_reviews")]
+    header = [field.name for field in contract.fields]
+    first = _valid_row(contract, review_id="same")
+    second = _valid_row(contract, review_id="same", order_id="other")
+    extra = io.StringIO()
+    writer = csv.writer(extra)
+    writer.writerow(header)
+    writer.writerow(first)
+    writer.writerow(second)
+    body = extra.getvalue().encode("utf-8")
+
+    client = _ingest_one(
+        tmp_path,
+        dataset="order_reviews",
+        object_name="olist_order_reviews_dataset.csv",
+        body=body,
+    )
+
+    raw = next(
+        call.kwargs["Body"]
+        for call in client.put_object.call_args_list
+        if call.kwargs["Key"].endswith("/olist_order_reviews_dataset.csv")
+    )
+    assert raw == body
+    sidecar = next(
+        call.kwargs["Body"]
+        for call in client.put_object.call_args_list
+        if call.kwargs["Key"].startswith("quarantine/")
+    )
+    findings = [json.loads(line) for line in sidecar.splitlines()]
+    assert [item["reason"] for item in findings] == [
+        "duplicate_primary_key",
+        "duplicate_primary_key",
+    ]
+    assert [item["record_index"] for item in findings] == [0, 1]
+
+
+def test_repeated_zip_prefix_is_not_quarantined(tmp_path: Path) -> None:
+    contract = _contracts()[("olist_brazilian_ecommerce", "geolocation")]
+    header = [field.name for field in contract.fields]
+    row = _valid_row(contract)
+    extra = io.StringIO()
+    writer = csv.writer(extra)
+    writer.writerow(header)
+    writer.writerow(row)
+    writer.writerow(row)
+    body = extra.getvalue().encode("utf-8")
+
+    client = _ingest_one(
+        tmp_path,
+        dataset="geolocation",
+        object_name="olist_geolocation_dataset.csv",
+        body=body,
+    )
+
+    assert client.put_object.call_count == 1
+    assert client.put_object.call_args.kwargs["Body"] == body
+    deleted = client.delete_object.call_args.kwargs["Key"]
+    assert deleted.endswith("/olist_geolocation_dataset.csv.jsonl")
+
+
+def test_empty_required_csv_field_is_quarantined(tmp_path: Path) -> None:
+    contract = _contracts()[("olist_brazilian_ecommerce", "order_reviews")]
+    header = [field.name for field in contract.fields]
+    row = _valid_row(contract, review_id="")
+    extra = io.StringIO()
+    writer = csv.writer(extra)
+    writer.writerow(header)
+    writer.writerow(row)
+    body = extra.getvalue().encode("utf-8")
+
+    client = _ingest_one(
+        tmp_path,
+        dataset="order_reviews",
+        object_name="olist_order_reviews_dataset.csv",
+        body=body,
+    )
+
+    raw = next(
+        call.kwargs["Body"]
+        for call in client.put_object.call_args_list
+        if not call.kwargs["Key"].startswith("quarantine/")
+    )
+    assert raw == body
+    sidecar = next(
+        call.kwargs["Body"]
+        for call in client.put_object.call_args_list
+        if call.kwargs["Key"].startswith("quarantine/")
+    )
+    finding = json.loads(sidecar.splitlines()[0])
+    assert finding["reason"] == "null_violation"
+    assert finding["field"] == "review_id"
+    assert finding["record"]["review_id"] is None
 
 
 def test_missing_file_stops_at_that_file(tmp_path: Path) -> None:

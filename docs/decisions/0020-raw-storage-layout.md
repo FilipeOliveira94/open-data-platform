@@ -50,6 +50,8 @@ Package helpers under `src/open_data_platform/ingestion/` own path building, met
 - Package: `src/open_data_platform/ingestion/`
 - Unit tests: `tests/unit/ingestion/` (no live MinIO required)
 
+P1-10 (2026-10-26) filled the quarantine path named above: same bucket, prefix `quarantine/`, raw bytes not rewritten to drop rows. Reprocess stays P3-07. This decision stays `approved`.
+
 ## Revisit when
 
 A source cannot fit `{source_id}/{dataset}` naming; multi-bucket raw is required for IAM; or Bronze PoC forces a different partition scheme (document and migrate deliberately).

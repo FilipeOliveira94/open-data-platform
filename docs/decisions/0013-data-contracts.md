@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` |
 | Date opened | 2026-10-15 |
-| Date decided | — |
+| Date decided | 2026-10-26 |
 | Owner | Platform architect |
 | Index ID | D-013 |
 | Related issues | Phase 1 (`P1-02`, `P1-03`, `P1-10`), Phase 3 quarantine (`P3-07`) |
@@ -35,14 +35,25 @@ Define **explicit data contracts** (expected fields, types, null rules) under `c
 
 ## Evidence / validation
 
-P1-03 (2026-10-18), status of this ADR unchanged (`proposed`):
+P1-03 (2026-10-18):
 
 - Vocabulary: [`docs/architecture/data-contracts.md`](../architecture/data-contracts.md)
 - Files: `config/contracts/{source_id}/{dataset}.yaml`
-- Loader: `src/open_data_platform/contracts/` (structure only; no payload checks)
+- Loader: `src/open_data_platform/contracts/load.py` (structure only; payload checks are P1-10)
 - Unit tests: `tests/unit/contracts/test_contracts.py` (no live API, no Olist rows)
 
-Row quarantine and `fail_batch` are declared on each contract. Runtime enforcement remains P1-10 / P3-07.
+Row quarantine and `fail_batch` are declared on each contract.
+
+P1-10 (2026-10-26):
+
+- Classifier: `src/open_data_platform/contracts/records.py` (no storage I/O)
+- Each ingestor calls `prepare_quarantine`, then `write_raw_object` for the raw payload
+- The sidecar put uses the same `write_raw_object` with prefix `quarantine`
+- Key: `quarantine/{source_id}/{dataset}/dt=…/execution_id=…/{object_name}.jsonl` in `ODP_RAW_BUCKET`
+- Raw bytes stay intact. A clean rerun deletes that execution's sidecar
+- Reprocess path remains P3-07
+
+Approved 2026-10-26 by the platform architect. The contract vocabulary, the loader, and the Phase 1 invalid-record behavior are in the repository.
 
 ## Revisit when
 

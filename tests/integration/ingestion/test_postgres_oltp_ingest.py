@@ -92,11 +92,12 @@ def _stored_rows(
 
 def _delete_execution(client: Any, bucket: str, execution_id: str) -> None:
     paginator = client.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=bucket, Prefix="raw/postgres_oltp/"):
-        for item in page.get("Contents", []):
-            key = item["Key"]
-            if f"/execution_id={execution_id}/" in key:
-                client.delete_object(Bucket=bucket, Key=key)
+    for prefix in ("raw/postgres_oltp/", "quarantine/postgres_oltp/"):
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for item in page.get("Contents", []):
+                key = item["Key"]
+                if f"/execution_id={execution_id}/" in key:
+                    client.delete_object(Bucket=bucket, Key=key)
 
 
 def test_windowed_extract_round_trip_overwrites_the_same_object() -> None:

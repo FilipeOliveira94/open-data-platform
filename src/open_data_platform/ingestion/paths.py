@@ -69,3 +69,28 @@ def build_raw_object_key(
     name = _validate_object_name(object_name)
     dt = ingestion_date.isoformat()
     return f"raw/{source}/{ds}/dt={dt}/execution_id={exec_id}/{name}"
+
+
+def build_quarantine_object_key(
+    *,
+    source_id: str,
+    dataset: str,
+    execution_id: str,
+    object_name: str,
+    ingestion_date: date,
+) -> str:
+    """Build the quarantine key that belongs to one raw object.
+
+    Layout::
+
+        quarantine/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_name}.jsonl
+
+    The same arguments always produce the same key. ``object_name`` is the
+    raw object name; the ``.jsonl`` suffix marks the sidecar.
+    """
+    source = _validate_source_segment("source_id", source_id)
+    ds = _validate_source_segment("dataset", dataset)
+    exec_id = _validate_execution_id(execution_id)
+    name = _validate_object_name(object_name)
+    dt = ingestion_date.isoformat()
+    return f"quarantine/{source}/{ds}/dt={dt}/execution_id={exec_id}/{name}.jsonl"

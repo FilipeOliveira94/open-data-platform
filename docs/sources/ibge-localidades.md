@@ -24,7 +24,7 @@ Requests send `User-Agent: open-data-platform/<version> (ibge-localidades)`.
 
 The client retries timeouts, HTTP 429, and HTTP 5xx, with at most 3 attempts. The pause is 1s, then 2s, then 4s when another attempt is configured. A numeric `Retry-After` on HTTP 429 sets that pause and is capped at 30 seconds. An HTTP-date `Retry-After` leaves the 1s/2s/4s backoff in place. Other 4xx responses and redirects fail on the first response. Error text omits the response body. A response larger than 64 MiB fails. Redirects are not followed.
 
-An array whose items are not objects, or whose keys differ from `config/contracts/ibge_localidades/municipios.yaml`, fails before the write. An empty array fails before the write. Null micro and meso region values stay in the object. A null or duplicate `municipio-id` stays in the object. Quarantine of those rows is P1-10.
+An array whose items are not objects, or whose keys differ from `config/contracts/ibge_localidades/municipios.yaml`, fails before the write. An empty array fails before the write. Null micro and meso region values stay in the object and are not quarantined. A null `municipio-id` stays in the object and is copied to the quarantine sidecar as `null_violation`. A repeated `municipio-id` stays in the object, and every row in that group is `duplicate_primary_key`. The sidecar key ends in `municipios.json.jsonl` under `quarantine/ibge_localidades/municipios/`.
 
 The same `--execution-id` and `--ingestion-ts` overwrite `municipios.json`. A new `execution_id` keeps the previous object.
 

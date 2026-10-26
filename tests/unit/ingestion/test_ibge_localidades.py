@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -200,8 +201,39 @@ def test_null_and_duplicate_ids_stay_in_the_array() -> None:
 
     _ingest(client, _Body(body))
 
-    stored = json.loads(client.put_object.call_args.kwargs["Body"])
+    raw = next(
+        call.kwargs
+        for call in client.put_object.call_args_list
+        if call.kwargs["Key"].endswith("/municipios.json")
+    )
+    stored = json.loads(raw["Body"])
     assert [item["municipio-id"] for item in stored] == [None, 1, 1]
+    sidecar = next(
+        call.kwargs
+        for call in client.put_object.call_args_list
+        if call.kwargs["Key"].endswith("/municipios.json.jsonl")
+    )
+    findings = [json.loads(line) for line in sidecar["Body"].splitlines()]
+    assert [item["reason"] for item in findings] == [
+        "null_violation",
+        "duplicate_primary_key",
+        "duplicate_primary_key",
+    ]
+    assert findings[0]["field"] == "municipio-id"
+    assert findings[0]["record_index"] == 0
+    assert [item["record_index"] for item in findings[1:]] == [1, 2]
+
+
+def test_fail_batch_on_invalid_writes_nothing() -> None:
+    contract = replace(_contract(), on_invalid="fail_batch")
+    client = _client()
+    body = _array(_municipality(contract, **{"municipio-id": None}))
+
+    with pytest.raises(IbgeLocalidadesError, match="invalid records fail the batch"):
+        _ingest(client, _Body(body), contracts=(contract,))
+
+    assert client.put_object.call_count == 0
+    assert client.delete_object.call_count == 0
 
 
 def test_omitted_nullable_region_keys_stay_omitted() -> None:

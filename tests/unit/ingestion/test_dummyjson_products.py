@@ -252,17 +252,36 @@ def test_null_and_duplicate_ids_stay_in_the_page() -> None:
         contract,
         skip=0,
         limit=30,
-        total=2,
+        total=3,
         products=[
             _product(contract, id=None, title="blank"),
             _product(contract, id=1, title="copy"),
+            _product(contract, id=1, title="again"),
         ],
     )
 
     _ingest(client, _Pages({0: body}), limit=30)
 
-    stored = json.loads(client.put_object.call_args.kwargs["Body"])
-    assert [item["id"] for item in stored["products"]] == [None, 1]
+    raw = next(
+        call.kwargs
+        for call in client.put_object.call_args_list
+        if call.kwargs["Key"].endswith("/products-skip-000000.json")
+    )
+    stored = json.loads(raw["Body"])
+    assert [item["id"] for item in stored["products"]] == [None, 1, 1]
+    assert raw["Body"] == body
+    sidecar = next(
+        call.kwargs
+        for call in client.put_object.call_args_list
+        if call.kwargs["Key"].startswith("quarantine/")
+    )
+    findings = [json.loads(line) for line in sidecar["Body"].splitlines()]
+    assert [(item["record_index"], item["reason"]) for item in findings] == [
+        (0, "null_violation"),
+        (1, "duplicate_primary_key"),
+        (2, "duplicate_primary_key"),
+    ]
+    assert findings[0]["field"] == "id"
 
 
 def test_limit_below_one_makes_no_request() -> None:

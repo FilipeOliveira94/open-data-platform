@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 from botocore.exceptions import ClientError
 
 from open_data_platform.ingestion.writer import write_raw_object
@@ -81,3 +82,45 @@ def test_write_raw_object_same_identity_same_key() -> None:
     assert client.put_object.call_count == 2
     assert client.put_object.call_args_list[0].kwargs["Body"] == b"v1"
     assert client.put_object.call_args_list[1].kwargs["Body"] == b"v2"
+
+
+def test_write_raw_object_quarantine_prefix_uses_the_sidecar_key() -> None:
+    client = MagicMock()
+    client.head_bucket.return_value = {}
+    ts = datetime(2026, 10, 26, 12, tzinfo=UTC)
+
+    result = write_raw_object(
+        client,
+        bucket="odp-raw",
+        body=b"{}\n",
+        source_id="ibge_localidades",
+        dataset="municipios",
+        execution_id="run-001",
+        object_name="municipios.json",
+        ingestion_ts=ts,
+        content_type="application/x-ndjson",
+        prefix="quarantine",
+    )
+
+    assert result.key == (
+        "quarantine/ibge_localidades/municipios/dt=2026-10-26/"
+        "execution_id=run-001/municipios.json.jsonl"
+    )
+    assert client.put_object.call_args.kwargs["Key"] == result.key
+    assert client.put_object.call_args.kwargs["Metadata"]["source_id"] == (
+        "ibge_localidades"
+    )
+
+
+def test_write_raw_object_rejects_an_unknown_prefix() -> None:
+    with pytest.raises(ValueError, match="prefix must be raw or quarantine"):
+        write_raw_object(
+            MagicMock(),
+            bucket="odp-raw",
+            body=b"x",
+            source_id="demo_storefront",
+            dataset="clickstream",
+            execution_id="run-001",
+            object_name="events.jsonl",
+            prefix="bronze",
+        )

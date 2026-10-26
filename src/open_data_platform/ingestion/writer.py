@@ -7,8 +7,13 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from open_data_platform.ingestion.metadata import IngestionMetadata
-from open_data_platform.ingestion.paths import build_raw_object_key
+from open_data_platform.ingestion.paths import (
+    build_quarantine_object_key,
+    build_raw_object_key,
+)
 from open_data_platform.object_storage import ensure_bucket
+
+_PREFIXES = frozenset({"raw", "quarantine"})
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
@@ -34,11 +39,16 @@ def write_raw_object(
     object_name: str,
     ingestion_ts: datetime | None = None,
     content_type: str | None = None,
+    prefix: str = "raw",
 ) -> RawWriteResult:
-    """Write ``body`` to the raw layout with required ingestion metadata.
+    """Write ``body`` with required ingestion metadata.
 
-    Re-running with the same identity fields overwrites the same object key.
+    ``prefix`` is ``raw`` or ``quarantine``. The quarantine prefix appends
+    ``.jsonl`` to ``object_name``. The same identity overwrites the same key.
     """
+    if prefix not in _PREFIXES:
+        msg = "prefix must be raw or quarantine"
+        raise ValueError(msg)
     meta = IngestionMetadata.create(
         source_id=source_id,
         execution_id=execution_id,
@@ -49,14 +59,17 @@ def write_raw_object(
         ts_utc = ts.replace(tzinfo=UTC)
     else:
         ts_utc = ts.astimezone(UTC)
-
-    key = build_raw_object_key(
-        source_id=source_id,
-        dataset=dataset,
-        execution_id=execution_id,
-        object_name=object_name,
-        ingestion_date=ts_utc.date(),
-    )
+    key_args = {
+        "source_id": source_id,
+        "dataset": dataset,
+        "execution_id": execution_id,
+        "object_name": object_name,
+        "ingestion_date": ts_utc.date(),
+    }
+    if prefix == "raw":
+        key = build_raw_object_key(**key_args)
+    else:
+        key = build_quarantine_object_key(**key_args)
 
     ensure_bucket(client, bucket)
     put_kwargs: dict[str, object] = {

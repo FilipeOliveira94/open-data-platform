@@ -29,6 +29,11 @@ from open_data_platform.ingestion.http import (
     Transport,
     get_with_retries,
 )
+from open_data_platform.ingestion.quarantine import (
+    InvalidRecordsError,
+    prepare_quarantine,
+    write_quarantine_object,
+)
 from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
 from open_data_platform.object_storage import client_from_env
 
@@ -60,6 +65,7 @@ class _Page:
 
     total: int
     count: int
+    records: tuple[dict[str, object], ...]
 
 
 def page_object_name(skip: int) -> str:
@@ -181,19 +187,33 @@ def ingest_dummyjson_products(
             msg = "DummyJSON products total changed between pages"
             raise DummyJsonProductsError(msg)
         _require_page_count(page, skip=skip, limit=page_limit)
-        results.append(
-            write_raw_object(
-                client,
-                bucket=bucket,
-                body=body,
-                source_id=SOURCE_ID,
-                dataset=DATASET,
-                execution_id=execution_id,
-                object_name=page_object_name(skip),
-                ingestion_ts=ts,
-                content_type="application/json",
-            )
+        object_name = page_object_name(skip)
+        try:
+            sidecar = prepare_quarantine(contract, page.records)
+        except InvalidRecordsError as exc:
+            raise DummyJsonProductsError(str(exc)) from exc
+        result = write_raw_object(
+            client,
+            bucket=bucket,
+            body=body,
+            source_id=SOURCE_ID,
+            dataset=DATASET,
+            execution_id=execution_id,
+            object_name=object_name,
+            ingestion_ts=ts,
+            content_type="application/json",
         )
+        write_quarantine_object(
+            client,
+            bucket=bucket,
+            source_id=SOURCE_ID,
+            dataset=DATASET,
+            execution_id=execution_id,
+            object_name=object_name,
+            ingestion_ts=result.metadata.ingestion_ts,
+            body=sidecar,
+        )
+        results.append(result)
         next_skip = skip + page_limit
         if next_skip >= seen_total:
             break
@@ -329,6 +349,7 @@ def _parse_page(
         raise DummyJsonProductsError(msg)
     required_keys = {field.name for field in contract.fields if not field.nullable}
     allowed_keys = {field.name for field in contract.fields}
+    records: list[dict[str, object]] = []
     for index, item in enumerate(products):
         if not isinstance(item, dict):
             msg = f"DummyJSON products item {index} does not match the contract"
@@ -337,7 +358,8 @@ def _parse_page(
         if not required_keys <= keys or not keys <= allowed_keys:
             msg = f"DummyJSON products item {index} does not match the contract"
             raise DummyJsonProductsError(msg)
-    return _Page(total=total, count=len(products))
+        records.append(item)
+    return _Page(total=total, count=len(products), records=tuple(records))
 
 
 def _require_page_count(page: _Page, *, skip: int, limit: int) -> None:

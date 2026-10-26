@@ -15,6 +15,15 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from open_data_platform.contracts.load import load_contracts
+from open_data_platform.contracts.records import (
+    PayloadStructureError,
+    load_jsonl_records,
+)
+from open_data_platform.ingestion.quarantine import (
+    InvalidRecordsError,
+    prepare_quarantine,
+    write_quarantine_object,
+)
 from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
 from open_data_platform.object_storage import client_from_env
 
@@ -93,9 +102,14 @@ def ingest_demo_storefront(
         count=count,
         event_time_start=event_time_start,
     )
-    _require_contract(contracts)
+    contract = _require_contract(contracts)
+    records = _clickstream_records(body, contract)
     ts = datetime.now(UTC) if ingestion_ts is None else ingestion_ts
-    return write_raw_object(
+    try:
+        sidecar = prepare_quarantine(contract, records)
+    except InvalidRecordsError as exc:
+        raise DemoStorefrontError(str(exc)) from exc
+    result = write_raw_object(
         client,
         bucket=bucket,
         body=body,
@@ -106,6 +120,17 @@ def ingest_demo_storefront(
         ingestion_ts=ts,
         content_type=CONTENT_TYPE,
     )
+    write_quarantine_object(
+        client,
+        bucket=bucket,
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        object_name=OBJECT_NAME,
+        ingestion_ts=result.metadata.ingestion_ts,
+        body=sidecar,
+    )
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -218,6 +243,24 @@ def _require_contract(contracts: tuple[DataContract, ...] | None) -> DataContrac
         msg = "demo_storefront.clickstream contract fields do not match the generator"
         raise DemoStorefrontError(msg)
     return contract
+
+
+def _clickstream_records(
+    body: bytes,
+    contract: DataContract,
+) -> tuple[dict[str, object], ...]:
+    try:
+        loaded = load_jsonl_records(body)
+    except PayloadStructureError as exc:
+        raise DemoStorefrontError(str(exc)) from exc
+    required = {field.name for field in contract.fields if not field.nullable}
+    allowed = {field.name for field in contract.fields}
+    for index, item in enumerate(loaded):
+        keys = set(item)
+        if not required <= keys or not keys <= allowed:
+            msg = f"clickstream line {index} does not match the contract"
+            raise DemoStorefrontError(msg)
+    return loaded
 
 
 def _parse_timestamp(name: str, value: str) -> datetime:

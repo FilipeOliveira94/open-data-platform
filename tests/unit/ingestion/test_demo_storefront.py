@@ -10,6 +10,8 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
+from open_data_platform.contracts.load import load_contracts
+from open_data_platform.contracts.records import classify_records, load_jsonl_records
 from open_data_platform.ingestion.demo_storefront import (
     EVENTS_PER_SECOND,
     DemoStorefrontError,
@@ -117,6 +119,88 @@ def test_naive_event_time_is_rejected() -> None:
             count=1,
             event_time_start=datetime(2026, 10, 18),
         )
+
+
+def test_generator_output_has_no_invalid_records() -> None:
+    contract = next(
+        item
+        for item in load_contracts()
+        if item.source_id == "demo_storefront" and item.dataset == "clickstream"
+    )
+    body = generate_clickstream_jsonl(seed=4, count=20, event_time_start=_START)
+
+    assert classify_records(contract, load_jsonl_records(body)) == ()
+
+
+def test_valid_clickstream_deletes_a_stale_quarantine_object() -> None:
+    client = MagicMock()
+    client.head_bucket.return_value = {}
+
+    ingest_demo_storefront(
+        client,
+        bucket="odp-raw",
+        execution_id="run-001",
+        seed=4,
+        count=2,
+        event_time_start=_START,
+        ingestion_ts=_INGESTION_TS,
+    )
+
+    keys = [call.kwargs["Key"] for call in client.put_object.call_args_list]
+    assert keys == [
+        "raw/demo_storefront/clickstream/dt=2026-10-25/execution_id=run-001/events.jsonl"
+    ]
+    deleted = client.delete_object.call_args.kwargs["Key"]
+    assert deleted == (
+        "quarantine/demo_storefront/clickstream/dt=2026-10-25/"
+        "execution_id=run-001/events.jsonl.jsonl"
+    )
+
+
+def test_malformed_clickstream_writes_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "open_data_platform.ingestion.demo_storefront.generate_clickstream_jsonl",
+        lambda **_kwargs: b"[\n",
+    )
+    client = MagicMock()
+
+    with pytest.raises(DemoStorefrontError, match="not JSON"):
+        ingest_demo_storefront(
+            client,
+            bucket="odp-raw",
+            execution_id="run-001",
+            seed=1,
+            count=1,
+            event_time_start=_START,
+            ingestion_ts=_INGESTION_TS,
+        )
+
+    assert client.put_object.call_count == 0
+    assert client.delete_object.call_count == 0
+
+
+def test_clickstream_key_mismatch_writes_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "open_data_platform.ingestion.demo_storefront.generate_clickstream_jsonl",
+        lambda **_kwargs: b"{}\n",
+    )
+    client = MagicMock()
+
+    with pytest.raises(DemoStorefrontError, match="does not match the contract"):
+        ingest_demo_storefront(
+            client,
+            bucket="odp-raw",
+            execution_id="run-001",
+            seed=1,
+            count=1,
+            event_time_start=_START,
+            ingestion_ts=_INGESTION_TS,
+        )
+
+    assert client.put_object.call_count == 0
+    assert client.delete_object.call_count == 0
 
 
 def test_write_uses_the_ingestion_date_and_metadata() -> None:
