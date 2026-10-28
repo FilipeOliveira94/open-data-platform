@@ -33,7 +33,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | Phase | Scope | Window | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
-| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | In progress (P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07 verified) |
+| 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
@@ -107,9 +107,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Phase acceptance (all required):**
 
-- [ ] Ingestions can be repeated without undue duplication or corruption.
+- [x] Ingestions can be repeated without undue duplication or corruption.
 - [x] Unit tests do not require the public API to be online.
-- [ ] Raw data is traceable by source and execution.
+- [x] Raw data is traceable by source and execution.
 - [x] Contracts and expected fields are documented.
 - [x] Invalid records and errors have explicit, documented behavior.
 - [x] PostgreSQL extract accepts an explicit time/watermark window suitable for daily and weekly batch runs.
@@ -128,7 +128,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P1-08 | IBGE Localidades ingest | P1-02, P1-03 | Verified | IBGE `municipios` (`view=nivelado`, `orderBy=nome`) into one raw `municipios.json`; contract v1; geo reference for `olist_analysis` (D-019). Invalid rows are copied to the P1-10 quarantine sidecar |
 | P1-09 | BrasilAPI CEP enrichment (optional) | P1-02, P1-04 | Withdrawn | Withdrawn (ADR-0021 / D-021). An 8-digit CEP lookup does not join to the Olist zip prefix. IBGE and Olist geolocation cover that geography |
 | P1-10 | Failure and invalid-record behavior | P1-04–P1-08 | Verified | Nulls, duplicate keys, and wrong types are explicit. Raw bytes stay in place. Findings land in `quarantine/…/{object_name}.jsonl` in the same bucket. Structural errors still fail the batch. Unit tests cover the failure paths |
-| P1-11 | Phase 1 documentation and status | P1-10 | Not started | README/docs updated; three update patterns (daily batch, weekly batch, streaming) referenced; `PROJECT_STATUS.md` records verification evidence |
+| P1-11 | Phase 1 documentation and status | P1-10 | Verified | README/docs updated; three update patterns (daily batch, weekly batch, streaming) referenced; `PROJECT_STATUS.md` records verification evidence |
 
 **Suggested order:** P1-01 ∥ P1-02 → P1-03 → P1-04 ∥ P1-05 ∥ P1-06 ∥ P1-07 ∥ P1-08 → P1-10 → P1-11. P1-09 is withdrawn (ADR-0021).
 
@@ -396,7 +396,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-10-26 |
+| Last updated | 2026-10-28 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-10-28: P1-11 verified; Phase 1 verified (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

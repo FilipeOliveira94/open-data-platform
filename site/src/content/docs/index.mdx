@@ -1,6 +1,6 @@
 ---
 title: Open Data Platform
-description: Reproducible open-source data platform with a verified local Compose baseline and a planned AWS Terraform path.
+description: Reproducible open-source data platform with verified local ingestion and a planned AWS Terraform path.
 ---
 
 A reproducible open-source data platform for local development on Windows 11 + WSL2 + Docker Compose, with an AWS deployment path expressed later as Terraform Infrastructure as Code.
@@ -10,22 +10,26 @@ A reproducible open-source data platform for local development on Windows 11 + W
 | Status | Scope |
 | --- | --- |
 | **Verified** | Phase 0 — repository, Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, CI |
-| **Planned** | Phases 1–7 — ingestion, lakehouse, orchestration, CDC, observability, CI expansion, AWS IaC |
-| **Planned** | Phase 8 — report polish and public hosting |
+| **Verified** | Phase 1 — raw ingestion from Olist, DummyJSON, PostgreSQL, the demo storefront clickstream, and IBGE |
+| **Not started** | Phases 2–7 — lakehouse, orchestration, CDC, observability, CI expansion, AWS IaC |
+| **Not started** | Phase 8 — report polish and public hosting |
 
 ## Baseline sketch
 
 ```text
-Phase 0 (verified)              Later (planned)
-─────────────────               ────────────────
+Phase 0–1 (verified)            Later (not started)
+────────────────────            ───────────────────
 Python + uv + Ruff + pytest
         │
         ├── PostgreSQL 16  (Compose)
         └── MinIO          (Compose)
+                ▲
+                │ raw objects
+        ingestion writers
         │
 GitHub Actions: lint + unit tests
 
-                                Ingestion → Lakehouse → AWS Terraform
+                                Lakehouse → AWS Terraform
 ```
 
 Source of truth for delivered work: [`PROJECT_STATUS.md`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/PROJECT_STATUS.md) in the [repository](https://github.com/FilipeOliveira94/open-data-platform).

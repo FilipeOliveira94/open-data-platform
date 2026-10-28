@@ -15,7 +15,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 
 When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. Phase 1 is in progress: raw object-store layout and ingestion metadata are documented in [`docs/architecture/raw-storage-layout.md`](docs/architecture/raw-storage-layout.md) (ADR-0020).
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). Lakehouse tables, Airflow schedules, and streaming CDC are later phases.
 
 ## Prerequisites
 
@@ -91,8 +91,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | [`docs/status-log.md`](docs/status-log.md) | Chronological status archive |
 | [`DECISIONS.md`](DECISIONS.md) | Architecture decision index |
 | [`docs/decisions/`](docs/decisions/) | ADR detail |
-| [`docs/sources/`](docs/sources/) | Historical dataset license and redistribution notes |
+| [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md) | Phase 1 source index, raw keys, repeatable runs, update patterns |
+| [`docs/sources/`](docs/sources/) | Per-source license, access, and commands |
+| [`docs/architecture/`](docs/architecture/) | Raw layout and data contracts |
 
-## Out of scope for Phase 0
+## Not in the verified platform yet
 
-Airflow, Kafka, Spark, Trino, Iceberg, Kubernetes, the AWS Terraform path (Phase 7), and the platform report site (Phase 8).
+Spark, Iceberg, Trino, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). The `site/` scaffold previews verified facts locally.
