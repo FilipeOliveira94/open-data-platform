@@ -7,7 +7,7 @@
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-009 |
-| Related issues | Phase 5 (`P5-01`–`P5-03`, `P5-05`–`P5-06`) |
+| Related issues | Phase 5 (`P5-01`–`P5-03`, `P5-05`–`P5-08`) |
 | Supersedes | — |
 | Superseded by | — |
 

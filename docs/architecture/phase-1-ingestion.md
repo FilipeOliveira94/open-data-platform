@@ -52,7 +52,7 @@ The clickstream, Olist snapshots, DummyJSON, and IBGE are batch landings. They a
 
 ## Evidence
 
-Recorded on the Phase 1 issues. This page does not add a new live run.
+Recorded on the Phase 1 issues. This page does not add a new live run. Live counts already sit in `docs/status-log.md`: DummyJSON 194 products, IBGE 5_571 municipalities, and the P1-10 MinIO matrix (40 passed).
 
 | Check | Result |
 | --- | --- |

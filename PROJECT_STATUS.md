@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-28 (P1-11: Phase 1 verified; unit suite 216 passed) |
+| Last updated | 2026-10-28 (Phases 0–1 stay verified; close pair starts at Phase 2) |
 | Current phase | Phase 2 — Lakehouse and analytics |
 | Phase status | Not started |
 
@@ -24,7 +24,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 **P2-01** — Minimal Spark + Iceberg + catalog + query proof of concept.
 
-Phase 2 out of scope until that proof succeeds: Airflow, CDC/streaming, AWS lakehouse modules. Do not scale transforms before P2-01 is verified.
+Phase 2 out of scope until that proof succeeds: Airflow, CDC/streaming, AWS lakehouse modules. Do not scale transforms before P2-01 is verified. The phase closes on P2-08, then P2-09.
 
 ## Next work
 
@@ -43,7 +43,8 @@ Phase 2 out of scope until that proof succeeds: Airflow, CDC/streaming, AWS lake
 | P2-05 | Analytical model design (grain, keys, SCD) | Not started | — |
 | P2-06 | dbt project and initial Gold models | Not started | — |
 | P2-07 | Data quality and reconciliation tests | Not started | — |
-| P2-08 | Phase 2 docs (versions, partitions, limitations) | Not started | — |
+| P2-08 | Live run, result, and consistency check | Not started | — |
+| P2-09 | Phase 2 documentation and status | Not started | — |
 
 Acceptance detail: `ROADMAP.md` → Phase 2.
 
@@ -53,6 +54,8 @@ Acceptance detail: `ROADMAP.md` → Phase 2.
 - [ ] Queries and transforms are reproducible via documented commands.
 - [ ] Quality and reconciliation rules have tests.
 - [ ] Documentation lists component versions and known limitations.
+- [ ] A live run result is recorded and compared to the Phase 2 contracts (P2-08).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P2-09).
 
 ---
 
@@ -62,14 +65,14 @@ Acceptance detail: `ROADMAP.md` → Phase 2.
 | --- | --- |
 | Date | 2026-10-28 |
 | Environment | WSL2 / Ubuntu. No Compose services, no public API, no Kaggle |
-| Checks | P1-11 documentation close. Ruff, unit tests, and the site production build. No Phase 2 code |
-| Result | `uv run ruff check src tests` PASS. `uv run ruff format --check src tests` PASS. `uv run pytest tests/unit` → 216 passed in 10.56s. `cd site && npm ci && npm run build` completed: 6 pages. Node v22.14.0 is below the engine range some transitive packages declare; the build still finished. |
+| Checks | Roadmap correction: Phases 0 and 1 stay verified on logged results. Site production build after restoring that copy. Unit tests were not re-run |
+| Result | `cd site && npm run build` completed: 6 pages in 1.76s. Home and Pipeline HTML state Phases 0 and 1 as verified. Prior unit suite, still the last run: 216 passed on the P1-11 pass |
 
 ---
 
 ## Phase 1 baseline
 
-Phase 1 is **verified** (P1-09 withdrawn). Index: [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md).
+Phase 1 is **verified** (P1-09 withdrawn). Index: [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). Live results already logged: DummyJSON 194 products, IBGE 5_571 municipalities, and the P1-10 MinIO matrix (40 passed).
 
 Five sources land raw objects: Olist e-commerce and marketing funnel, DummyJSON products, PostgreSQL windowed extract, demo storefront clickstream, and IBGE `municipios`. The same execution identity overwrites an object. A new `execution_id` keeps the previous one. Keys and user metadata carry `source_id`, `execution_id`, and `_ingestion_ts`. Invalid rows stay in the raw object; findings go to `quarantine/…/{object_name}.jsonl`.
 
@@ -170,6 +173,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
 
-### 2026-10-28 — P1-11 verified; Phase 1 closed
+### 2026-10-28 — Phases 0 and 1 stay verified
+
+Logged results already cover those closes. Phase 0: Compose healthy, PostgreSQL reachable, MinIO put/get, CI green (2026-10-16). Phase 1: DummyJSON 194 products, IBGE 5_571 municipalities, P1-10 matrix 40 passed, P1-11 documentation. P0-14, P0-15, P1-12, and P1-13 are removed. The live-run and documentation pair starts at Phase 2 (P2-08, P2-09). Next work is P2-01. `cd site && npm run build` completed: 6 pages in 1.76s. Unit tests were not re-run.
+
+### 2026-10-28 — P1-11 verified; documentation pass
 
 README and [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md) index the five sources, raw keys, repeatable overwrite, and the three update patterns. Daily and weekly batch stay on the P1-06 window. Streaming stays in Phase 4. `uv run ruff check src tests` PASS. `uv run ruff format --check src tests` PASS. `uv run pytest tests/unit` → 216 passed in 10.56s. `cd site && npm ci && npm run build` completed: 6 pages in 1.85s. No live API, Kaggle, or MinIO. No Phase 2 code.

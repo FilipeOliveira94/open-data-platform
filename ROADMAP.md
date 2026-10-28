@@ -10,7 +10,12 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 - Mark an issue **verified** only when its acceptance checks have been run and the result is recorded in `PROJECT_STATUS.md`.
 - Do not start a phase until its listed dependencies are satisfied (or an explicit waiver is recorded in `DECISIONS.md`).
 - Do not create empty directories for later phases until that phase starts.
-- Within a phase, keep **feature / source issues before phase-closing** validation and docs issues (failure tests, regression checks, “Phase N documentation”). New work must not be appended after those closing IDs.
+- From **Phase 2** on, keep **feature / source issues before the phase close**. The last two issues are always, in this order:
+  1. **Live run, result, and consistency check** — run the phase path on the real local stack, and on an external source only when that phase's contract requires it. Record the result. Compare it to the phase contracts and to the last verified baseline. Record mismatches. Unit tests alone do not close this issue.
+  2. **Phase N documentation and status** — depends on that live-run issue. Docs and `PROJECT_STATUS.md` cite the recorded result.
+- New work must not be appended after those two closing IDs.
+- From Phase 2 on, a phase is not verified, and the next phase does not start, until both closing issues are verified.
+- Phases 0 and 1 stay verified on the results already recorded in `docs/status-log.md`. Do not reopen them for this close pattern.
 
 ---
 
@@ -56,7 +61,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Incremental rule (Phases 1–7):** a scaffold under `site/` may exist early (Astro Starlight + Catppuccin theme). Content updates must use only facts already **verified** in `PROJECT_STATUS.md`. Do **not** complete public hosting or final copy polish until Phase 8.
 
-**Phase 7 vs Phase 8:** P7-07 delivers the **in-repo case study** (markdown, diagrams, reproduction steps). Phase 8 turns that material into the **deployed multi-page report** and sets the GitHub repository Website URL.
+**Phase 7 vs Phase 8:** P7-07 delivers the **in-repo case study** (markdown, diagrams, reproduction steps). P7-08 checks that case study against a recorded IaC result, and P7-09 records status. Phase 8 turns that material into the **deployed multi-page report** and sets the GitHub repository Website URL.
 
 ---
 
@@ -93,7 +98,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P0-12 | GitHub Actions: lint and tests | P0-09 | Verified | Workflow runs lint + tests; no cloud deploy |
 | P0-13 | Initial decision note (Compose vs AWS; Phase 0 services) | P0-07 | Delivered | Approve/update D-001 (and D-002 as applicable) in `DECISIONS.md`/ADRs: Compose for local verification; AWS as Terraform IaC in Phase 7 |
 
-**Suggested order:** P0-06 → P0-07 → P0-08 → P0-09 → P0-10 → P0-11 → P0-12 → P0-13 (P0-08 and P0-10 may proceed in parallel after P0-07).
+**Suggested order:** P0-06 → P0-07 → P0-08 → P0-09 → P0-10 → P0-11 → P0-12 → P0-13 (P0-08 and P0-10 may proceed in parallel after P0-07). Live Compose, MinIO put/get, lint/tests, and CI are recorded in `docs/status-log.md` (2026-10-16). README and the status ledger are the phase documentation. The Phase 2 close pattern is not applied here.
 
 ---
 
@@ -130,7 +135,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P1-10 | Failure and invalid-record behavior | P1-04–P1-08 | Verified | Nulls, duplicate keys, and wrong types are explicit. Raw bytes stay in place. Findings land in `quarantine/…/{object_name}.jsonl` in the same bucket. Structural errors still fail the batch. Unit tests cover the failure paths |
 | P1-11 | Phase 1 documentation and status | P1-10 | Verified | README/docs updated; three update patterns (daily batch, weekly batch, streaming) referenced; `PROJECT_STATUS.md` records verification evidence |
 
-**Suggested order:** P1-01 ∥ P1-02 → P1-03 → P1-04 ∥ P1-05 ∥ P1-06 ∥ P1-07 ∥ P1-08 → P1-10 → P1-11. P1-09 is withdrawn (ADR-0021).
+**Suggested order:** P1-01 ∥ P1-02 → P1-03 → P1-04 ∥ P1-05 ∥ P1-06 ∥ P1-07 ∥ P1-08 → P1-10 → P1-11. P1-09 is withdrawn (ADR-0021). Live results already logged: DummyJSON `p105-live-20261024` (7 pages / 194 products), IBGE `p108-live-20261025` (5_571 municipalities), P1-10 MinIO matrix (40 passed, including the 1_603 duplicate `review_id` rows). P1-11 is the documentation close. The Phase 2 close pattern is not applied here.
 
 ---
 
@@ -148,6 +153,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Queries and transforms are reproducible via documented commands.
 - [ ] Quality and reconciliation rules have tests.
 - [ ] Documentation lists component versions and known limitations.
+- [ ] A live run result is recorded and compared to the Phase 2 contracts (P2-08).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P2-09).
 
 ### Issues
 
@@ -160,9 +167,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P2-05 | Analytical model design (grain, keys, SCD) | P2-04 | Not started | Document grain/keys/update rules for facts, dims and marts before implementing models |
 | P2-06 | dbt project and initial Gold models | P2-05 | Not started | dbt project builds; placeholders replaced only for models with documented contracts (`fct_*`, `dim_*`, `mart_*` as approved) |
 | P2-07 | Data quality and reconciliation tests | P2-06 | Not started | dbt/Python tests cover key metrics vs source; failures are visible |
-| P2-08 | Phase 2 docs (versions, partitions, limitations) | P2-01, P2-07 | Not started | Partitioning, file sizing, incremental strategy and stack limitations documented |
+| P2-08 | Live run, result, and consistency check | P2-01, P2-06, P2-07 | Not started | On the local stack, run the documented create/write/query path and the Bronze → Silver → Gold/dbt path for the approved models. Record component versions, row counts, and the quality-test result. Compare Gold metrics to the source or Silver counts named in the contracts. Record mismatches. Unit tests alone do not close this issue |
+| P2-09 | Phase 2 documentation and status | P2-08 | Not started | Document component versions, partitioning, file sizing, incremental strategy, known limitations, and the P2-08 result. `PROJECT_STATUS.md` cites that evidence |
 
-**Suggested order:** P2-01 → P2-02 → P2-03 → P2-04 → P2-05 → P2-06 → P2-07 → P2-08.
+**Suggested order:** P2-01 → P2-02 → P2-03 → P2-04 → P2-05 → P2-06 → P2-07 → P2-08 → P2-09.
 
 **Analytical models (placeholders until P2-05), by Gold domain:**
 
@@ -187,6 +195,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Backfills do not corrupt data or create undue duplication.
 - [ ] Invalid records are identified and handled per documented rules.
 - [ ] Success and failure scenarios have tests or reproducible evidence.
+- [ ] A live run result is recorded and compared to the source windows (P3-10).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-11).
 
 ### Issues
 
@@ -201,8 +211,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P3-07 | Quality checks and quarantine | P3-03, P2-07 | Not started | Invalid records routed per contract; quarantine location and reprocess path documented |
 | P3-08 | Execution metadata and failure logging | P3-02–P3-07 | Not started | Execution IDs, failure reasons and run metadata are inspectable |
 | P3-09 | Orchestration success/failure tests | P3-04, P3-05, P3-06, P3-07 | Not started | Automated or scripted evidence for happy path, retry and failed-run handling for daily and weekly DAGs |
+| P3-10 | Live run, result, and consistency check | P3-08, P3-09 | Not started | On local Airflow, trigger one daily-shaped run and one weekly-shaped run, then rerun one of those windows. Record watermarks, task states, landing counts, and quarantine counts. Compare the counts to the source window and to the previous landing for that window. Record mismatches. Unit tests alone do not close this issue |
+| P3-11 | Phase 3 documentation and status | P3-10 | Not started | Document schedules, catchup, backfill, quarantine, and the P3-10 result. `PROJECT_STATUS.md` cites that evidence |
 
-**Suggested order:** P3-01 → P3-02 ∥ P3-03 → P3-04 ∥ P3-05 → P3-06 → P3-07 → P3-08 → P3-09.
+**Suggested order:** P3-01 → P3-02 ∥ P3-03 → P3-04 ∥ P3-05 → P3-06 → P3-07 → P3-08 → P3-09 → P3-10 → P3-11.
 
 ---
 
@@ -221,6 +233,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Restart and replay do not corrupt sinking state.
 - [ ] Docs contrast streaming CDC vs daily/weekly batch and do not claim “exactly once” without proof.
 - [ ] Validated daily and weekly batch paths still work after CDC is introduced.
+- [ ] A live run result is recorded and compared to the PostgreSQL source and the batch baseline (P4-08).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P4-09).
 
 ### Issues
 
@@ -233,8 +247,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P4-05 | Semantics documentation (batch vs stream) | P4-03, P4-04, P3-04, P3-05 | Not started | Snapshots, duplicates, ordering, late events, deletes, checkpoints, replay and recovery documented; explicit comparison of daily batch, weekly batch and streaming CDC |
 | P4-06 | Streaming resilience scenarios | P4-04, P4-05 | Not started | Tests or runbooks for duplicates, out-of-order, restart/replay and deletes |
 | P4-07 | Batch path regression check | P3-04, P3-05, P4-04 | Not started | Evidence that daily and weekly batch extracts still succeed alongside the streaming path |
+| P4-08 | Live run, result, and consistency check | P4-04, P4-06, P4-07 | Not started | Run inserts, updates, and deletes through the local CDC path into the sink. Restart the consumer once and replay. Record event counts and the sink row set before and after replay. Compare the sink to the PostgreSQL source for those keys. Run the daily and weekly batch paths and compare them to their pre-CDC baseline. Record mismatches. Do not claim exactly-once. Unit tests alone do not close this issue |
+| P4-09 | Phase 4 documentation and status | P4-08 | Not started | Document batch vs streaming from the P4-08 result. P4-05 remains the semantics write-up. `PROJECT_STATUS.md` cites the live-run evidence |
 
-**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07.
+**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07 → P4-08 → P4-09.
 
 ---
 
@@ -252,6 +268,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Demonstrated lineage matches actual executions.
 - [ ] Metrics are measured, not invented.
 - [ ] Cost model documents assumptions, unit drivers and estimated monthly ranges for the AWS target design.
+- [ ] A live run result is recorded and compared to that run's logs, metrics, and lineage (P5-07).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P5-08).
 
 ### Issues
 
@@ -263,8 +281,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P5-04 | OpenLineage where supported | Phase 3 (and 4 if streaming) | Not started | Lineage emitted only for components with verified support; demo from a real run |
 | P5-05 | Cost model for AWS target architecture | — | Not started | Documented cost model with assumptions, drivers and estimated ranges aligned to the Phase 7 AWS design |
 | P5-06 | Alerts and runbooks | P5-03 | Not started | Alert thresholds and at least one failure runbook under `docs/runbooks/` |
+| P5-07 | Live run, result, and consistency check | P5-03, P5-04, P5-05, P5-06 | Not started | Run one real local pipeline execution that emits logs, metrics, and lineage. Record the dashboard values and the lineage edges. Compare them to that run's execution id, counts, and failure state. Check the cost model against its own drivers and assumptions. It is not a measured cloud bill. Record mismatches. Do not invent metrics or spend figures |
+| P5-08 | Phase 5 documentation and status | P5-07 | Not started | Document the dashboards, lineage demo, cost-model assumptions, and the P5-07 result. `PROJECT_STATUS.md` cites that evidence |
 
-**Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06.
+**Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06 → P5-07 → P5-08.
 
 ---
 
@@ -282,6 +302,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Integration tests are reproducible and isolated.
 - [ ] Recovery scenarios have recorded evidence.
 - [ ] Secrets and credentials are not exposed in logs or artifacts.
+- [ ] A live run result is recorded and compared to the local checks (P6-07).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P6-08).
 
 ### Issues
 
@@ -293,8 +315,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P6-04 | Isolated integration test job | P0-10, Phase 1+ | Not started | Integration tests run in CI or documented Compose profile; deterministic fixtures |
 | P6-05 | Resilience test evidence | P3-09; P4-06 if present | Not started | Failure/retry/recovery scenarios executed and linked from `PROJECT_STATUS.md` |
 | P6-06 | Security checks | P6-01 | Not started | Appropriate secret scanning / dependency audit; no credential leakage in CI logs |
+| P6-07 | Live run, result, and consistency check | P6-01, P6-02, P6-04, P6-05, P6-06 | Not started | Run the documented CI workflow and one recovery scenario. Record pass/fail. Compare CI results to the local results for the same checks. Confirm logs and artifacts from that run do not contain credentials. Record mismatches. Include P6-03 when that issue is verified; do not block this issue on Terraform that does not exist yet |
+| P6-08 | Phase 6 documentation and status | P6-07 | Not started | Document the CI and recovery evidence, including any check still waiting on P6-03, and cite the P6-07 result in `PROJECT_STATUS.md` |
 
-**Suggested order:** P6-01 → P6-02 ∥ P6-04 → P6-03 (when Terraform exists) → P6-05 → P6-06.
+**Suggested order:** P6-01 → P6-02 ∥ P6-04 → P6-03 (when Terraform exists) → P6-05 → P6-06 → P6-07 → P6-08.
 
 ---
 
@@ -315,6 +339,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] CI runs `terraform fmt -check` and `validate`.
 - [ ] Cost model states assumptions and estimated ranges for the AWS design.
 - [ ] Case study presents the local platform and the AWS IaC path with diagrams and reproduction steps.
+- [ ] A live IaC check result is recorded and compared to the mapping and the cost model (P7-08).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P7-09).
 
 ### Issues
 
@@ -327,8 +353,10 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P7-05 | CI: Terraform fmt and validate | P7-02, P6-03 | Not started | Workflow runs `terraform fmt -check` and `validate` on the IaC tree |
 | P7-06 | AWS cost model | P7-01 | Not started | Cost model with assumptions, drivers and monthly estimate ranges for the documented AWS design |
 | P7-07 | Case study: README, diagrams, demo path | P7-03, P7-04, P7-05, P7-06 | Not started | In-repo case study: local platform + AWS IaC path, architecture diagrams, setup and provisioning guidance; content ready for Phase 8 site consumption |
+| P7-08 | Live run, result, and consistency check | P7-03, P7-04, P7-05, P7-06, P7-07 | Not started | Run `terraform fmt -check` and `terraform validate` on the IaC tree. Record the result. Compare module resources to the local→AWS mapping and to the cost-model drivers. `terraform plan` only with explicit approval. `apply` and `destroy` are outside this issue. Record mismatches. Do not invent spend figures |
+| P7-09 | Phase 7 documentation and status | P7-08 | Not started | README, the case study, and `PROJECT_STATUS.md` cite the P7-08 result. P7-07 remains the case-study content issue |
 
-**Suggested order:** P7-01 → P7-02 → P7-03 → P7-04 ∥ P7-05 ∥ P7-06 → P7-07.
+**Suggested order:** P7-01 → P7-02 → P7-03 → P7-04 ∥ P7-05 ∥ P7-06 → P7-07 → P7-08 → P7-09.
 
 ---
 
@@ -347,6 +375,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Site builds locally via a documented command; CI builds (and optionally deploys) the static output.
 - [ ] Public URL is set on the GitHub repository Website field and linked from the README Platform report block.
 - [ ] Navigation and page roles match the growth scheme above; reference page links back to repo docs/ADRs.
+- [ ] A live site result is recorded and compared to `PROJECT_STATUS.md` (P8-06).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P8-07).
 
 ### Issues
 
@@ -357,10 +387,11 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P8-03 | Pipeline and Operations pages | P8-01, P7-07 | Not started | Pipeline covers ingestion through Gold, orchestration and CDC; Operations covers quality, observability, lineage, CI and local→AWS IaC path |
 | P8-04 | Reference page and repo cross-links | P8-02, P8-03 | Not started | Reference links to GitHub, ADRs, roadmap, setup; README Platform report block points to the live URL (or staging URL if deploy is gated) |
 | P8-05 | Static hosting and GitHub Website field | P8-04 | Not started | Hosting documented (e.g. GitHub Pages or equivalent); CI build green; repository About → Website set to the report URL |
-| P8-06 | Final copy and consistency pass | P8-05 | Not started | Tone is factual platform documentation; status/claims aligned with `PROJECT_STATUS.md`; no unverified metrics or cost figures |
+| P8-06 | Live run, result, and consistency check | P8-04, P8-05 | Not started | Build the site and open the published URL, or the production build when the URL is not up yet. Walk Home, Architecture, Pipeline, Operations, and Reference. Compare status, counts, and any metric or cost claim to `PROJECT_STATUS.md` and the phase docs. Record broken links and mismatches. Do not treat a single screenshot as this check |
+| P8-07 | Phase 8 documentation and status | P8-06 | Not started | Site copy, README, and `PROJECT_STATUS.md` match the P8-06 findings. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
 
 
-**Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-06.
+**Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-06 → P8-07.
 
 ---
 
@@ -375,6 +406,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | Kubernetes | Out of scope unless an explicit approved requirement |
 | Secrets | Never commit credentials, tokens, live `.env`, or private datasets |
 | Cloud / AWS IaC | Phase 7 delivers the AWS path as Terraform IaC and local→AWS mapping. CI validates with `fmt`/`validate`. Cost models must state assumptions. Never invent metrics or spend figures. Do not run `terraform apply`/`destroy` without explicit user approval |
+| Phase close | From Phase 2 on, every phase ends with a live run, result, and consistency check, then a phase documentation and status issue. The next phase waits until both are verified. Phases 0 and 1 stay verified on results already in `docs/status-log.md` |
 | Platform report site | Scaffold may land early; full content, design and hosting finalized in Phase 8. Earlier phases may add verified facts only. Site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
 | Empty dirs | Do not scaffold later-phase trees until that phase starts |
 | Language | Code/docs in English; agent↔user communication in Brazilian Portuguese |
@@ -399,4 +431,4 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | Last updated | 2026-10-28 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-28: P1-11 verified; Phase 1 verified (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09, P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07). Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

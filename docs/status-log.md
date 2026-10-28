@@ -4,6 +4,14 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-10-28 — Phases 0 and 1 stay verified
+
+The close pair (live run, then documentation and status) applies from Phase 2 on. Phases 0 and 1 stay verified on results already in this log, so P0-14, P0-15, P1-12, and P1-13 are removed. Phase 0 evidence is the 2026-10-16 Compose health check, PostgreSQL reachability, MinIO put/get, and green CI. Phase 1 evidence is the DummyJSON live run (7 pages / 194 products), the IBGE live run (5_571 municipalities), the P1-10 MinIO matrix (40 passed, including 1_603 duplicate `review_id` rows), and P1-11. The full Olist Kaggle rerun after the category-file BOM fix remains unrepeated; the staged-file matrix is the recorded Olist result. Next work is P2-01.
+
+### 2026-10-28 — Phase close pattern
+
+`ROADMAP.md` now ends every phase with a live run, result, and consistency check, then a phase documentation and status issue: P0-14/P0-15, P1-12/P1-13, P2-08/P2-09, P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07. P1-11 stays the earlier documentation pass. Phase 0 and Phase 1 feature issues keep their recorded status. Those phases are in progress until the new close is verified, so Phase 2 waits. `cd site && npm run build` completed: 6 pages in 1.75s. Unit tests were not re-run. The IDE browser could not open the local preview.
+
 ### 2026-10-28 — P1-11 Phase 1 documentation and status
 
 README and `docs/architecture/phase-1-ingestion.md` index the five raw sources, object keys, repeatable overwrite, quarantine, and the three update patterns. Daily and weekly batch remain the P1-06 window (Airflow schedules stay P3-04 and P3-05). Streaming stays Phase 4. Phase 1 acceptance is checked in `ROADMAP.md`. The operational ledger moves to Phase 2, not started, at P2-01. Validation: `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 216 passed in 10.56s. `cd site && npm ci && npm run build` completed: 6 pages. Node v22.14.0 is below the engine range some transitive packages declare (`@astrojs/prism` >=22.22.0, `undici` >=22.19.0); the build still finished. No live API, Kaggle, or MinIO. No ingestion code change.

@@ -7,7 +7,7 @@
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-008 |
-| Related issues | Phase 4 (`P4-01`–`P4-07`) |
+| Related issues | Phase 4 (`P4-01`–`P4-09`) |
 | Supersedes | — |
 | Superseded by | — |
 

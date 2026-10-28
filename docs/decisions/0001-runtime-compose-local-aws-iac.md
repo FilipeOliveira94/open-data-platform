@@ -7,7 +7,7 @@
 | Date decided | 2026-10-16 |
 | Owner | Platform architect |
 | Index ID | D-001 |
-| Related issues | P0-13, Phase 7 (`P7-01`–`P7-07`) |
+| Related issues | P0-13, Phase 7 (`P7-01`–`P7-09`) |
 | Supersedes | — |
 | Superseded by | — |
 

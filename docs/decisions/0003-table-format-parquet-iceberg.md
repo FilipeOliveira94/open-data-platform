@@ -7,7 +7,7 @@
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-003 |
-| Related issues | P2-01, P2-03–P2-08 |
+| Related issues | P2-01, P2-03–P2-09 |
 | Supersedes | — |
 | Superseded by | — |
 
