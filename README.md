@@ -15,7 +15,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 
 When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). Lakehouse tables, Airflow schedules, and streaming CDC are later phases.
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified single-table Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)). Bronze, Silver, and Gold tables, Airflow schedules, and streaming CDC are later issues.
 
 ## Prerequisites
 
@@ -63,8 +63,9 @@ docker compose down
 | `make setup` / `make sync` | Install package and locked deps via `uv` |
 | `make lint` | Ruff check |
 | `make test` | Unit tests only |
-| `make up` / `make down` | Start/stop Compose stack |
+| `make up` / `make down` | Start/stop Compose stack (PostgreSQL and MinIO only) |
 | `make test-minio` | Live MinIO put/get smoke |
+| `make test-iceberg-poc` | P2-01 Iceberg probe (MinIO must be healthy; profile `lakehouse`) |
 
 ## Local services (Phase 0)
 
@@ -76,6 +77,17 @@ docker compose down
 **MinIO image note:** MinIO Inc. removed official public container images in favor of commercial **AIStor**. The community MinIO server remains **AGPLv3**, so community-built images are acceptable for local use. Phase 0 pins [`coollabsio/minio`](https://hub.docker.com/r/coollabsio/minio) at upstream release `RELEASE.2025-10-15T17-29-55Z` (see ADR-0002).
 
 Default credentials are placeholders in `.env.example` for local use only.
+
+## Lakehouse probe (P2-01)
+
+Spark is not part of `docker compose up`. The `lakehouse` profile runs one Spark SQL probe: create `poc.probe`, overwrite two rows, and query the count. Versions, the Hadoop-catalog limitation, and the 2026-10-28 result are in [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md).
+
+```bash
+docker compose up -d minio
+make test-iceberg-poc
+```
+
+The catalog in this probe is the Iceberg Hadoop catalog on MinIO. It is not the catalog P2-02 will choose.
 
 ## CI
 
@@ -92,9 +104,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | [`DECISIONS.md`](DECISIONS.md) | Architecture decision index |
 | [`docs/decisions/`](docs/decisions/) | ADR detail |
 | [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md) | Phase 1 source index, raw keys, repeatable runs, update patterns |
+| [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) | P2-01 Spark + Iceberg probe: pins, command, result, limitations |
 | [`docs/sources/`](docs/sources/) | Per-source license, access, and commands |
 | [`docs/architecture/`](docs/architecture/) | Raw layout and data contracts |
 
 ## Not in the verified platform yet
 
-Spark, Iceberg, Trino, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). The `site/` scaffold previews verified facts locally.
+A durable catalog and a second SQL engine (P2-02), Trino, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). The P2-01 probe covers one Iceberg table on Spark with the Hadoop catalog. The `site/` scaffold previews verified facts locally.

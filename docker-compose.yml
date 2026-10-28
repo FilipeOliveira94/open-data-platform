@@ -4,6 +4,9 @@
 # MinIO note: official public images were withdrawn in favor of commercial
 # AIStor. Community MinIO remains AGPLv3; this stack uses coollabsio/minio
 # at an upstream RELEASE tag (community rebuild of that lineage).
+#
+# The Spark service is opt-in via the "lakehouse" profile (P2-01 probe).
+# `docker compose up -d` does not start it.
 
 services:
   postgres:
@@ -46,6 +49,25 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  # One-shot Iceberg probe. Start with:
+  #   docker compose --profile lakehouse run --rm -T spark
+  spark:
+    image: spark:3.5.8-java17
+    profiles: [lakehouse]
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      ODP_WAREHOUSE_BUCKET: ${ODP_WAREHOUSE_BUCKET:-odp-warehouse}
+      HOME: /tmp
+    volumes:
+      - ./docker/spark/poc_probe.sql:/opt/odp/poc_probe.sql:ro
+      - ./docker/spark/run_poc.sh:/opt/odp/run_poc.sh:ro
+    entrypoint: ["/bin/bash", "/opt/odp/run_poc.sh"]
 
 volumes:
   odp_postgres_data:

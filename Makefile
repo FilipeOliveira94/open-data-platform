@@ -6,10 +6,10 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc up down ps logs clean
 
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  %-14s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  %-18s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 setup: sync ## Install Python 3.12 toolchain and package (via uv)
 	@echo "Setup complete. Copy .env.example to .env if you need local overrides."
@@ -35,6 +35,14 @@ test-minio: ## MinIO write/read smoke (Compose MinIO must be healthy)
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	$(PYTEST) tests/integration/infrastructure/test_minio_smoke.py
+
+test-iceberg-poc: ## Create the warehouse bucket and run the Iceberg probe
+	@set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
+	$(COMPOSE) --profile lakehouse run --rm -T spark
 
 up: ## Start PostgreSQL and MinIO
 	$(COMPOSE) up -d

@@ -38,7 +38,21 @@ Target **Parquet** files managed with **Apache Iceberg**, but only **after** a m
 
 ## Evidence / validation
 
-None yet — hard gate at P2-01.
+P2-01 (2026-10-28) created, overwrote, and queried one Iceberg table. Detail: [`docs/architecture/phase-2-spark-iceberg-poc.md`](../architecture/phase-2-spark-iceberg-poc.md).
+
+| Piece | Pin |
+| --- | --- |
+| Spark | `spark:3.5.8-java17` (Scala 2.12.18, OpenJDK 17.0.20) |
+| Iceberg | `iceberg-spark-runtime-3.5_2.12:1.12.0` |
+| Catalog | Spark `SparkCatalog`, `type=hadoop` |
+| Warehouse | MinIO bucket `odp-warehouse`, `s3a://odp-warehouse/poc` |
+| S3A jars | `hadoop-aws:3.3.4`, `aws-java-sdk-bundle:1.12.262` |
+
+Both runs returned `row_count` 2. The official image's Hadoop 3.3.4 client jars omit `S3AFileSystem`; the first attempt failed with that `ClassNotFoundException` and was rerun only after those two jars were pinned. `wildfly-openssl:1.0.7.Final` came in as a transitive dependency of `hadoop-aws`.
+
+Rejected without a live run: tag `spark:3.5.8` (Java 11) with Iceberg 1.12. Iceberg 1.11 dropped Java 11.
+
+This does not approve the table format. The Hadoop catalog is not the durable catalog, and no second engine was queried. D-004 is unchanged. Status stays `proposed`.
 
 ## Revisit when
 

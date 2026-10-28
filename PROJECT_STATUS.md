@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-28 (Phases 0–1 stay verified; close pair starts at Phase 2) |
+| Last updated | 2026-10-28 (P2-01 probe verified) |
 | Current phase | Phase 2 — Lakehouse and analytics |
-| Phase status | Not started |
+| Phase status | In progress |
 
 **Status values:** not started · in progress · delivered · verified · blocked · withdrawn
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P2-01** — Minimal Spark + Iceberg + catalog + query proof of concept.
+**P2-02** — Local catalog and query-engine choice.
 
-Phase 2 out of scope until that proof succeeds: Airflow, CDC/streaming, AWS lakehouse modules. Do not scale transforms before P2-01 is verified. The phase closes on P2-08, then P2-09.
+P2-01 verified one Iceberg table on Spark 3.5.8, Iceberg 1.12.0, the Hadoop catalog, and MinIO. That catalog is not the durable choice. Airflow, CDC/streaming, and AWS lakehouse modules stay out of scope. The phase closes on P2-08, then P2-09.
 
 ## Next work
 
-1. **P2-01** — Minimal Spark + Iceberg + catalog + query proof of concept.
+1. **P2-02** — Local catalog and query-engine choice.
 
 ---
 
@@ -36,7 +36,7 @@ Phase 2 out of scope until that proof succeeds: Airflow, CDC/streaming, AWS lake
 
 | ID | Title | Status | Evidence |
 | --- | --- | --- | --- |
-| P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Not started | — |
+| P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Verified | Two runs returned count 2. [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) |
 | P2-02 | Local catalog and query-engine choice | Not started | — |
 | P2-03 | Bronze layer from raw ingestion | Not started | — |
 | P2-04 | Silver normalization and deduplication | Not started | — |
@@ -64,9 +64,9 @@ Acceptance detail: `ROADMAP.md` → Phase 2.
 | | |
 | --- | --- |
 | Date | 2026-10-28 |
-| Environment | WSL2 / Ubuntu. No Compose services, no public API, no Kaggle |
-| Checks | Roadmap correction: Phases 0 and 1 stay verified on logged results. Site production build after restoring that copy. Unit tests were not re-run |
-| Result | `cd site && npm run build` completed: 6 pages in 1.76s. Home and Pipeline HTML state Phases 0 and 1 as verified. Prior unit suite, still the last run: 216 passed on the P1-11 pass |
+| Environment | WSL2 / Ubuntu. MinIO already healthy. `make` is not installed in this shell |
+| Checks | P2-01 probe recipe twice; `docker compose config --services`; Ruff; unit tests |
+| Result | Both Spark SQL runs printed `2` (1 row fetched). Warehouse prefix `poc/` had 13 objects after the second run, including `v3.metadata.json`. `docker compose config --services` lists `minio` and `postgres` only. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` → 219 passed in 11.07s |
 
 ---
 
@@ -105,7 +105,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 
 | ID | Relevance | State |
 | --- | --- | --- |
-| D-003 | Table format for the P2-01 proof | Proposed |
+| D-003 | Table format. P2-01 probe passed; status stays proposed | Proposed |
 | D-004 | Catalog and SQL engine; chosen after P2-01 | Proposed |
 | D-005 | Spark and dbt | Proposed |
 | D-012 | Bronze / Silver / Gold; Gold domains already named | Proposed |
@@ -133,7 +133,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, medallion, dbt | Not started |
+| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01 verified) |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
@@ -145,7 +145,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 ## Risks and limitations
 
-- Spark / Iceberg / catalog / query-engine compatibility is unproven until P2-01.
+- P2-01 proved one table on Spark 3.5.8, Iceberg 1.12.0, the Hadoop catalog, and MinIO S3A. A durable catalog and a second query engine are still unproven (P2-02). The Hadoop catalog is not a concurrent-writer catalog.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Published Olist ZIP prefixes, closed-deal booleans, and catalog sizes match the contracts. The staged snapshot still quarantines 1_603 `order_reviews` rows with a repeated `review_id`.
 - Exactly-once end-to-end will not be claimed without a written proof.
@@ -172,6 +172,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-10-28 — P2-01 verified
+
+Spark `3.5.8-java17`, Iceberg `1.12.0`, Hadoop catalog, warehouse `s3a://odp-warehouse/poc`, table `poc.probe`. Two runs of `docker compose --profile lakehouse run --rm -T spark` each printed count `2`. The image has no S3A class; `hadoop-aws` 3.3.4 and `aws-java-sdk-bundle` 1.12.262 were added after `ClassNotFoundException`. Java 11 plus Iceberg 1.12 was rejected from the Iceberg 1.11 release note and was not run. `make` was not installed here; the Make recipe was run directly. `uv run pytest tests/unit` → 219 passed in 11.07s. D-003 and D-004 stay `proposed`.
 
 ### 2026-10-28 — Phases 0 and 1 stay verified
 

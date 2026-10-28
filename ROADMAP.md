@@ -39,7 +39,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
 | 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Not started |
+| 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | In progress (P2-01 verified) |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
@@ -160,7 +160,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
-| P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Phase 1 | Not started | Create / write / catalog / query one table; versions pinned; result recorded; incompatible combos rejected with a decision note |
+| P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Phase 1 | Verified | Create / write / catalog / query one table; versions pinned; result recorded; incompatible combos rejected with a decision note |
 | P2-02 | Local catalog and query-engine choice | P2-01 | Not started | Local table catalog (and Trino or alternative) chosen after PoC; recorded in D-004 / `DECISIONS.md` |
 | P2-03 | Bronze layer from raw ingestion | P2-01, P1-02 | Not started | Bronze preserves source payload + ingestion metadata; grain and PK documented |
 | P2-04 | Silver normalization and deduplication | P2-03 | Not started | Typed, deduplicated Silver tables; null/duplicate/invalid handling intentional |
