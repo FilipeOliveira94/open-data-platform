@@ -5,8 +5,8 @@
 # AIStor. Community MinIO remains AGPLv3; this stack uses coollabsio/minio
 # at an upstream RELEASE tag (community rebuild of that lineage).
 #
-# The Spark service is opt-in via the "lakehouse" profile (P2-01 probe).
-# `docker compose up -d` does not start it.
+# Spark and Trino are opt-in via the "lakehouse" profile (P2-01 and P2-02).
+# `docker compose up -d` does not start them.
 
 services:
   postgres:
@@ -68,6 +68,58 @@ services:
       - ./docker/spark/poc_probe.sql:/opt/odp/poc_probe.sql:ro
       - ./docker/spark/run_poc.sh:/opt/odp/run_poc.sh:ro
     entrypoint: ["/bin/bash", "/opt/odp/run_poc.sh"]
+
+  # JDBC catalog probe. The Compose database "iceberg" must already exist.
+  #   docker compose --profile lakehouse run --rm -T spark-catalog
+  spark-catalog:
+    image: spark:3.5.8-java17
+    profiles: [lakehouse]
+    depends_on:
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      ODP_WAREHOUSE_BUCKET: ${ODP_WAREHOUSE_BUCKET:-odp-warehouse}
+      POSTGRES_USER: ${POSTGRES_USER:-odp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
+      ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
+      HOME: /tmp
+    volumes:
+      - ./docker/spark/catalog_probe.sql:/opt/odp/catalog_probe.sql:ro
+      - ./docker/spark/run_catalog_probe.sh:/opt/odp/run_catalog_probe.sh:ro
+    entrypoint: ["/bin/bash", "/opt/odp/run_catalog_probe.sh"]
+
+  # Read-only query side of the P2-02 probe. Start after spark-catalog
+  # has created the JDBC tables. The image sizes the JVM from the memory
+  # Docker gives the container.
+  trino:
+    image: trinodb/trino:484
+    profiles: [lakehouse]
+    depends_on:
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      ODP_WAREHOUSE_BUCKET: ${ODP_WAREHOUSE_BUCKET:-odp-warehouse}
+      POSTGRES_USER: ${POSTGRES_USER:-odp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
+      ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
+    volumes:
+      - ./docker/trino/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+    healthcheck:
+      test: ["CMD", "/usr/lib/trino/bin/health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
 
 volumes:
   odp_postgres_data:

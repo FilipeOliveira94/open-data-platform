@@ -15,7 +15,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 
 When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified single-table Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)). Bronze, Silver, and Gold tables, Airflow schedules, and streaming CDC are later issues.
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified single-table Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)) and a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)). Bronze, Silver, and Gold tables, Airflow schedules, and streaming CDC are later issues.
 
 ## Prerequisites
 
@@ -66,6 +66,7 @@ docker compose down
 | `make up` / `make down` | Start/stop Compose stack (PostgreSQL and MinIO only) |
 | `make test-minio` | Live MinIO put/get smoke |
 | `make test-iceberg-poc` | P2-01 Iceberg probe (MinIO must be healthy; profile `lakehouse`) |
+| `make test-catalog-probe` | P2-02 JDBC catalog probe: Spark write, Trino read (PostgreSQL and MinIO must be healthy) |
 
 ## Local services (Phase 0)
 
@@ -87,7 +88,15 @@ docker compose up -d minio
 make test-iceberg-poc
 ```
 
-The catalog in this probe is the Iceberg Hadoop catalog on MinIO. It is not the catalog P2-02 will choose.
+The catalog in this probe is the Iceberg Hadoop catalog on MinIO. The durable local catalog is the JDBC catalog from P2-02.
+
+## Catalog and Trino (P2-02)
+
+Spark writes `catalog_probe.probe` through the Iceberg JDBC catalog on the Compose PostgreSQL database `iceberg`. Trino `484` reads it. Neither service starts with `docker compose up`. Versions, the command, and the 2026-10-29 result are in [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md).
+
+```bash
+make test-catalog-probe
+```
 
 ## CI
 
@@ -105,9 +114,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | [`docs/decisions/`](docs/decisions/) | ADR detail |
 | [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md) | Phase 1 source index, raw keys, repeatable runs, update patterns |
 | [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) | P2-01 Spark + Iceberg probe: pins, command, result, limitations |
+| [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) | P2-02 JDBC catalog and Trino: pins, command, result, limitations |
 | [`docs/sources/`](docs/sources/) | Per-source license, access, and commands |
 | [`docs/architecture/`](docs/architecture/) | Raw layout and data contracts |
 
 ## Not in the verified platform yet
 
-A durable catalog and a second SQL engine (P2-02), Trino, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). The P2-01 probe covers one Iceberg table on Spark with the Hadoop catalog. The `site/` scaffold previews verified facts locally.
+Bronze, Silver, and Gold tables, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. The `site/` scaffold previews verified facts locally.

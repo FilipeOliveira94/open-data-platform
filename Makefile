@@ -6,10 +6,10 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe up down ps logs clean
 
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  %-18s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  %-22s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 setup: sync ## Install Python 3.12 toolchain and package (via uv)
 	@echo "Setup complete. Copy .env.example to .env if you need local overrides."
@@ -43,6 +43,25 @@ test-iceberg-poc: ## Create the warehouse bucket and run the Iceberg probe
 	set +a; \
 	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
 	$(COMPOSE) --profile lakehouse run --rm -T spark
+
+test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehouse)
+	@set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
+	case "$$db" in \
+		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
+	esac; \
+	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
+	$(COMPOSE) up -d --wait postgres minio; \
+	exists=$$($(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'"); \
+	if [ "$$exists" != "1" ]; then \
+		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
+	fi; \
+	$(COMPOSE) --profile lakehouse run --rm -T spark-catalog; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(COMPOSE) --profile lakehouse exec -T trino trino --execute "SELECT COUNT(*) AS row_count FROM iceberg.catalog_probe.probe"
 
 up: ## Start PostgreSQL and MinIO
 	$(COMPOSE) up -d

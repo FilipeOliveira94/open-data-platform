@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` |
 | Date opened | 2026-10-15 |
-| Date decided | — |
+| Date decided | 2026-10-29 |
 | Owner | Platform architect |
 | Index ID | D-003 |
 | Related issues | P2-01, P2-03–P2-09 |
@@ -52,7 +52,7 @@ Both runs returned `row_count` 2. The official image's Hadoop 3.3.4 client jars 
 
 Rejected without a live run: tag `spark:3.5.8` (Java 11) with Iceberg 1.12. Iceberg 1.11 dropped Java 11.
 
-This does not approve the table format. The Hadoop catalog is not the durable catalog, and no second engine was queried. D-004 is unchanged. Status stays `proposed`.
+P2-02 read the same format through Trino and the JDBC catalog ([ADR-0004](0004-table-catalog-and-sql-engines.md)). The metadata file records `format-version` 2. That is the compatible set this decision required: Spark, Iceberg, a catalog, and a second SQL engine. The Hadoop catalog remains the P2-01 probe only.
 
 ## Revisit when
 
