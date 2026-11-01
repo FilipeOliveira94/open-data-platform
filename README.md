@@ -121,7 +121,7 @@ Default credentials are placeholders in `.env.example` for local use only.
 
 ## Lakehouse probe (P2-01)
 
-Spark is not part of `docker compose up`. The `lakehouse` profile runs one Spark SQL probe: create `poc.probe`, overwrite two rows, and query the count. Versions, the Hadoop-catalog limitation, and the 2026-10-28 result are in [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md).
+Spark is not part of `docker compose up`. The `lakehouse` profile provides one Spark runtime and Trino. Profile `up` leaves Spark idle; a probe passes its script to `docker compose run`. Versions, the Hadoop-catalog limitation, and the 2026-10-28 result are in [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md).
 
 ```bash
 docker compose up -d minio

@@ -28,7 +28,7 @@ The catalog file uses Trino's `${ENV:NAME}` substitution. The image's own `confi
 
 ## Command
 
-`docker compose up -d` does not start Spark or Trino. Both services are on the `lakehouse` profile. PostgreSQL and MinIO must be healthy. The catalog database must exist before Spark runs. Trino must start after Spark has created the JDBC tables. With GNU Make:
+`docker compose up -d` does not start Spark or Trino. Both are on the `lakehouse` profile. Spark is one runtime: its default command sleeps, and `run` passes `docker/spark/run_catalog_probe.sh`. PostgreSQL and MinIO must be healthy. The catalog database must exist before Spark runs. Trino must start after Spark has created the JDBC tables. With GNU Make:
 
 ```bash
 make test-catalog-probe

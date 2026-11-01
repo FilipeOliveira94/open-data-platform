@@ -42,7 +42,7 @@ test-iceberg-poc: ## Create the warehouse bucket and run the Iceberg probe
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
-	$(COMPOSE) --profile lakehouse run --rm -T spark
+	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/run_poc.sh
 
 test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehouse)
 	@set -a; \
@@ -59,7 +59,7 @@ test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehous
 	if [ "$$exists" != "1" ]; then \
 		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
 	fi; \
-	$(COMPOSE) --profile lakehouse run --rm -T spark-catalog; \
+	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/run_catalog_probe.sh; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(COMPOSE) --profile lakehouse exec -T trino trino --execute "SELECT COUNT(*) AS row_count FROM iceberg.catalog_probe.probe"
 

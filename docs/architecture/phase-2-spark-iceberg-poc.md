@@ -28,11 +28,13 @@ docker compose up -d minio
 make test-iceberg-poc
 ```
 
-The Make target sources `.env.example` and then `.env` if present, creates `ODP_WAREHOUSE_BUCKET` with the existing S3 helper, and runs:
+The Make target sources `.env.example` and then `.env` if present, creates `ODP_WAREHOUSE_BUCKET` with the existing S3 helper, and runs the probe script on the shared Spark runtime:
 
 ```bash
-docker compose --profile lakehouse run --rm -T spark
+docker compose --profile lakehouse run --rm -T spark /opt/odp/run_poc.sh
 ```
+
+`docker compose --profile lakehouse up` starts that runtime idle (`sleep infinity`). It does not execute this script. The Hadoop probe and the JDBC probe are scripts passed at invocation, not separate Compose services.
 
 SQL: `docker/spark/poc_probe.sql`. Spark settings: `docker/spark/run_poc.sh`. Credentials are the MinIO placeholders from the environment. The container reads MinIO at `http://minio:9000`.
 
