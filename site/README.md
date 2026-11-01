@@ -21,10 +21,10 @@ command -v npm && node -v && npm -v
 
 ## Preview
 
-From this directory:
+From this directory, install the lockfile and start the dev server:
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 

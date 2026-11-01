@@ -9,7 +9,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 | | |
 | --- | --- |
 | Live report | *Not published yet* (Phase 8) |
-| Local preview | `cd site && npm install && npm run dev` — see [`site/README.md`](site/README.md) (Node.js 22.12+) |
+| Local preview | `cd site && npm ci && npm run dev` — see [`site/README.md`](site/README.md) (Node.js 22.22+) |
 | Scheme | See [`ROADMAP.md`](ROADMAP.md) → Platform report site |
 | Status | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) → Platform report site |
 
@@ -19,15 +19,55 @@ When the report is published, the URL will also be set on the GitHub repository 
 
 ## Prerequisites
 
-- WSL2 Ubuntu (or Linux) with Docker Desktop and WSL integration enabled
-- [uv](https://docs.astral.sh/uv/) 0.13.1 (pinned in `pyproject.toml` / CI; install matching version)
-- Docker Compose v2 (`docker compose version`)
-- GNU Make (optional; targets mirror the commands below)
+- Windows 11 with WSL2 and an Ubuntu distro (or another Linux host)
+- Docker Desktop, running, with WSL integration enabled for that distro
+- [uv](https://docs.astral.sh/uv/) **0.13.1** (pinned in `pyproject.toml` and CI)
+- Docker Compose v2, included with Docker Desktop (`docker compose version`)
+- GNU Make (optional; every Make target below has the equivalent command)
+- Node.js 22.22+ only to preview the platform report under `site/`
+
+`uv sync` installs CPython 3.12 for this repository. Ubuntu's `python3` package may be another version. Use `uv run`, not system `python3`.
+
+## Install on a fresh machine
+
+Run these from the Ubuntu terminal as a normal user. They do not require an existing checkout.
+
+### 1. uv 0.13.1
+
+```bash
+curl -LsSf https://astral.sh/uv/0.13.1/install.sh | sh
+source "$HOME/.local/bin/env"
+uv --version
+```
+
+`uv --version` must print `uv 0.13.1`. The installer adds `source "$HOME/.local/bin/env"` to `~/.bashrc`, which puts `~/.local/bin` on `PATH`. Open a new terminal if `uv` is not found.
+
+If `curl` is missing: `sudo apt update && sudo apt install -y curl ca-certificates`.
+
+### 2. GNU Make (optional)
+
+```bash
+sudo apt update
+sudo apt install -y make
+make --version
+```
+
+### 3. Docker Desktop and WSL
+
+1. Install [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+2. Start Docker Desktop and leave it running. The engine is the `docker-desktop` WSL distro; it stops when the app quits.
+3. In Docker Desktop: **Settings → Resources → WSL integration**. Enable the Ubuntu distro, then **Apply & restart**.
+4. In Ubuntu, confirm both the client and the server answer:
+
+```bash
+docker version
+docker compose version
+```
 
 ## Quick start
 
 ```bash
-# 1) Toolchain
+# 1) Toolchain — downloads CPython 3.12 and installs the lockfile into .venv
 uv sync
 
 # 2) Optional local overrides (never commit .env)
