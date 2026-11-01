@@ -47,7 +47,7 @@ Shared platform infrastructure (Spark, Iceberg, catalog) may serve both; **marts
 
 ## Evidence / validation
 
-None yet — Phase 2 implementation.
+P2-03 (2026-10-31) loaded Bronze tables from raw objects. Detail: [`docs/architecture/bronze-layer.md`](../architecture/bronze-layer.md). The layer choice stays `proposed` until Silver and Gold exist and this ADR is accepted.
 
 ## Revisit when
 

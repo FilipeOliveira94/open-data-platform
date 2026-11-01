@@ -24,11 +24,11 @@ The same `--execution-id` and `--ingestion-ts` overwrite that object. A new `exe
 
 ## Later layers
 
-These layers are not built here.
+These layers are not built in P1-07. Bronze promotion is P2-03.
 
 | Layer | Issue | Intended use |
 | --- | --- | --- |
-| Bronze | P2-03 | One row per JSONL action, plus `source_id`, `execution_id`, and `_ingestion_ts`. The raw payload stays auditable. |
+| Bronze | P2-03 | Implemented. One row per JSONL action, plus `source_id`, `execution_id`, `_ingestion_ts`, `raw_object_key`, `record_index`, and `dt`. See [bronze layer](../architecture/bronze-layer.md). The raw payload stays auditable. |
 | Silver | P2-04 | Typed clickstream deduplicated on `event_id`. `event_time` is the event clock. A null `product_id` stays null. The same seed and index repeat `event_id`, which is the key that deduplication will use. |
 | Gold | P2-05 | A `product_analysis` mart for this fictional storefront may be designed then. Mart names stay unlocked until that issue. The mart does not join Olist or DummyJSON. |
 

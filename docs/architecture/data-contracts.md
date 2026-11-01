@@ -22,7 +22,7 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | Provenance | `provenance.system` | Producer of the bytes |
 | Evolution | `changelog[]` | Note for each `contract_version` |
 
-Logical types are `string`, `integer`, `number`, `boolean`, `timestamp`, `date`, and `json`. They are not Iceberg or Spark types. That mapping waits for the Phase 2 compatibility proof.
+Logical types are `string`, `integer`, `number`, `boolean`, `timestamp`, `date`, and `json`. Bronze stores each field as Iceberg `STRING` ([bronze layer](bronze-layer.md)). Casting to the logical type is P2-04.
 
 Field classification is `public`, `internal`, or `pii`. The dataset classification is the strictest of its fields (envelope included). It is computed by the loader and is not stored, so the rollup cannot drift from the fields.
 
@@ -96,4 +96,4 @@ BrasilAPI CEP is not a contracted source ([ADR-0021](../decisions/0021-withdraw-
 - Choosing a surviving duplicate (P2-04)
 - OpenLineage events, discovery catalogs, retention periods, SLAs, and cost tags
 - Masking or tokenization of `pii` fields
-- Iceberg schemas
+- Typed Iceberg schemas (P2-04)

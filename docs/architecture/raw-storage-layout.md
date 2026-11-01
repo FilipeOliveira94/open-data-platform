@@ -8,7 +8,7 @@ Conventions for Phase 1 auditable landing in object storage. Decision record: [A
 | --- | --- | --- |
 | Object store `raw/…` | Auditable lakehouse landing (source of truth for ingested bytes) | Every batch writer (P1-04+) |
 | Local `data/raw/` | Gitignored fetch/staging (e.g. Kaggle unzip) | Before upload; never committed (ADR-0018) |
-| Bronze tables | Near-source **tabular** layer + metadata columns | Phase 2 (P2-03); not defined here |
+| Bronze tables | Near-source **tabular** layer + metadata columns | [Bronze layer](bronze-layer.md) (P2-03) |
 
 ## Bucket and configuration
 
@@ -95,5 +95,5 @@ Olist historical ingestion, the DummyJSON products client, the PostgreSQL window
 ## Out of scope (this document)
 
 - Data contract field lists — [`data-contracts.md`](data-contracts.md) (this document keeps path and object metadata only)
-- Bronze/Iceberg tables — P2-03
+- Bronze tables — [bronze layer](bronze-layer.md) (P2-03)
 - Quarantine reprocess path — P3-07

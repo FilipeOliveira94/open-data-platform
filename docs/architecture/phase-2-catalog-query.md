@@ -54,4 +54,4 @@ The current metadata location after those runs is `s3a://odp-warehouse/catalog/c
 - Each Spark run downloads the pinned jars from Maven Central. The container is removed afterwards, so the Ivy cache is not kept.
 - CI does not start Compose. The unit test checks the probe files only.
 - Trino stays up after the target. It is not part of `docker compose up`. Stop it with `docker compose --profile lakehouse stop trino` when it is no longer needed. That command does not remove volumes.
-- P2-03 and later lakehouse writes use this catalog. The P2-01 Hadoop catalog probe stays as its own evidence.
+- P2-03 writes Bronze tables through this catalog. The Hadoop catalog stays the P2-01 probe. See [`bronze-layer.md`](bronze-layer.md).

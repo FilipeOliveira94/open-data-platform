@@ -15,7 +15,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 
 When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified single-table Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)) and a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)). Bronze, Silver, and Gold tables, Airflow schedules, and streaming CDC are later issues.
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)), a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)), and verified Bronze tables ([P2-03](docs/architecture/bronze-layer.md)). Silver, Gold, Airflow schedules, and streaming CDC are later issues.
 
 ## Prerequisites
 
@@ -107,6 +107,7 @@ docker compose down
 | `make test-minio` | Live MinIO put/get smoke |
 | `make test-iceberg-poc` | P2-01 Iceberg probe (MinIO must be healthy; profile `lakehouse`) |
 | `make test-catalog-probe` | P2-02 JDBC catalog probe: Spark write, Trino read (PostgreSQL and MinIO must be healthy) |
+| `make test-bronze` | P2-03 Bronze load: one raw object per payload format, Spark write, Trino checks |
 
 ## Local services (Phase 0)
 
@@ -121,7 +122,7 @@ Default credentials are placeholders in `.env.example` for local use only.
 
 ## Lakehouse probe (P2-01)
 
-Spark is not part of `docker compose up`. The `lakehouse` profile provides one Spark runtime and Trino. Profile `up` leaves Spark idle; a probe passes its script to `docker compose run`. Versions, the Hadoop-catalog limitation, and the 2026-10-28 result are in [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md).
+Spark is not part of `docker compose up`. The `lakehouse` profile provides one Spark runtime and Trino. Profile `up` leaves Spark idle; a probe or a Bronze load passes its script to `docker compose run`. Versions, the Hadoop-catalog limitation, and the 2026-10-28 result are in [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md).
 
 ```bash
 docker compose up -d minio
@@ -137,6 +138,10 @@ Spark writes `catalog_probe.probe` through the Iceberg JDBC catalog on the Compo
 ```bash
 make test-catalog-probe
 ```
+
+## Bronze (P2-03)
+
+`make test-bronze` writes one synthetic raw object per payload shape into bucket `odp-bronze-live`, loads four Iceberg tables on the JDBC catalog, and checks them with Trino. Grain, columns, and the 2026-10-31 counts are in [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md). The target overwrites those four Bronze tables. It does not read the Phase 1 raw bucket.
 
 ## CI
 
@@ -155,9 +160,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md) | Phase 1 source index, raw keys, repeatable runs, update patterns |
 | [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) | P2-01 Spark + Iceberg probe: pins, command, result, limitations |
 | [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) | P2-02 JDBC catalog and Trino: pins, command, result, limitations |
+| [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md) | P2-03 Bronze tables: grain, columns, command, result |
 | [`docs/sources/`](docs/sources/) | Per-source license, access, and commands |
 | [`docs/architecture/`](docs/architecture/) | Raw layout and data contracts |
 
 ## Not in the verified platform yet
 
-Bronze, Silver, and Gold tables, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. The `site/` scaffold previews verified facts locally.
+Silver and Gold tables, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. P2-03 covers Bronze tables on that catalog. The `site/` scaffold previews verified facts locally.

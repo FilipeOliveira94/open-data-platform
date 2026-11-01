@@ -4,6 +4,14 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-01 — P2-03 rechecked on the shared Spark runtime
+
+Each Bronze dataset is a separate Spark invocation. `make test-bronze` printed `100`, `2`, `2`, and `3`, then Trino matched 18 checks. The synthetic objects are written by `open_data_platform.lakehouse.fixtures`. `uv run pytest tests/unit` passed. The `site/` pages were left unchanged. D-012 stays `proposed`.
+
+### 2026-10-31 — P2-03 Bronze layer
+
+Bronze is one Iceberg table per contract on the JDBC catalog, namespace `bronze`, format version 2, every column `STRING`. Metadata columns are `source_id`, `execution_id`, `_ingestion_ts`, `raw_object_key`, `record_index`, and `dt`. The final `make test-bronze` used bucket `odp-bronze-live` and four synthetic objects. Spark printed `3`, `100`, `2`, `2`. Trino passed 18 checks, including duplicates, nulls, `São Teste`, and compact JSON text. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` → 245 passed in 10.96s. `docker compose config --services` listed `minio` and `postgres`. The `site/` pages were left unchanged. D-012 stays `proposed`. Silver is P2-04.
+
 ### 2026-10-28 — Phases 0 and 1 stay verified
 
 The close pair (live run, then documentation and status) applies from Phase 2 on. Phases 0 and 1 stay verified on results already in this log, so P0-14, P0-15, P1-12, and P1-13 are removed. Phase 0 evidence is the 2026-10-16 Compose health check, PostgreSQL reachability, MinIO put/get, and green CI. Phase 1 evidence is the DummyJSON live run (7 pages / 194 products), the IBGE live run (5_571 municipalities), the P1-10 MinIO matrix (40 passed, including 1_603 duplicate `review_id` rows), and P1-11. The full Olist Kaggle rerun after the category-file BOM fix remains unrepeated; the staged-file matrix is the recorded Olist result. Next work is P2-01.

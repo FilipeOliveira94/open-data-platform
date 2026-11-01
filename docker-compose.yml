@@ -5,7 +5,7 @@
 # AIStor. Community MinIO remains AGPLv3; this stack uses coollabsio/minio
 # at an upstream RELEASE tag (community rebuild of that lineage).
 #
-# Spark and Trino are opt-in via the "lakehouse" profile (P2-01 and P2-02).
+# Spark and Trino are opt-in via the "lakehouse" profile (P2-01, P2-02, and P2-03).
 # `docker compose up -d` does not start them.
 # `docker compose --profile lakehouse up` starts Trino and an idle Spark process.
 # It does not run a SQL script. Pass the script to `docker compose run`.
@@ -56,6 +56,8 @@ services:
   # not execute SQL. Pass a script from ./docker/spark:
   #   docker compose --profile lakehouse run --rm -T spark /opt/odp/run_poc.sh
   #   docker compose --profile lakehouse run --rm -T spark /opt/odp/run_catalog_probe.sh
+  #   docker compose --profile lakehouse run --rm -T \
+  #     -e ODP_SPARK_SQL=/tmp/bronze.sql spark /opt/odp/run_bronze.sh
   spark:
     image: spark:3.5.8-java17
     profiles: [lakehouse]

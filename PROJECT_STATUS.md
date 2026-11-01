@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-10-29 (P2-02 catalog and Trino verified) |
+| Last updated | 2026-11-01 (P2-03 Bronze verified) |
 | Current phase | Phase 2 — Lakehouse and analytics |
 | Phase status | In progress |
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P2-03** — Bronze layer from raw ingestion.
+**P2-04** — Silver normalization and deduplication.
 
-P2-02 approved the Iceberg JDBC catalog on PostgreSQL database `iceberg` and Trino 484. Spark 3.5.8-java17 writes. The Hadoop catalog remains the P2-01 probe only. Airflow, CDC/streaming, and AWS lakehouse modules stay out of scope. The phase closes on P2-08, then P2-09.
+P2-03 promotes every contracted raw dataset into Iceberg `STRING` tables on the JDBC catalog from P2-02. The live check covered one dataset of each payload shape. Typing, deduplication, Airflow, CDC/streaming, and AWS lakehouse modules stay out of scope. The phase closes on P2-08, then P2-09.
 
 ## Next work
 
-1. **P2-03** — Bronze layer from raw ingestion. Use the JDBC catalog from P2-02.
+1. **P2-04** — Silver normalization and deduplication. Bronze stays string-typed and keeps duplicate keys.
 
 ---
 
@@ -38,7 +38,7 @@ P2-02 approved the Iceberg JDBC catalog on PostgreSQL database `iceberg` and Tri
 | --- | --- | --- | --- |
 | P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Verified | Two runs returned count 2. [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) |
 | P2-02 | Local catalog and query-engine choice | Verified | Spark and Trino both returned 2 on two runs. [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) |
-| P2-03 | Bronze layer from raw ingestion | Not started | — |
+| P2-03 | Bronze layer from raw ingestion | Verified | Four payload shapes. Spark counts 3, 100, 2, 2. Trino 18/18. [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md) |
 | P2-04 | Silver normalization and deduplication | Not started | — |
 | P2-05 | Analytical model design (grain, keys, SCD) | Not started | — |
 | P2-06 | dbt project and initial Gold models | Not started | — |
@@ -63,10 +63,10 @@ Acceptance detail: `ROADMAP.md` → Phase 2.
 
 | | |
 | --- | --- |
-| Date | 2026-10-29 |
+| Date | 2026-11-01 |
 | Environment | WSL2 / Ubuntu. PostgreSQL and MinIO already healthy. GNU Make 4.4.1 |
-| Checks | `make test-catalog-probe` twice; `docker compose config --services`; Ruff; unit tests |
-| Result | Both runs: Spark printed `2` (1 row fetched) and Trino printed `"2"`. After the second `make` run, prefix `catalog/` had 24 objects and the current metadata `format-version` is 2. `docker compose config --services` lists `minio` and `postgres` only. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` → 224 passed in 10.47s |
+| Checks | `make test-bronze` with one Spark process per dataset; `make test-iceberg-poc`; `make test-catalog-probe`; `docker compose config --services`; Ruff; unit tests |
+| Result | Bronze Spark printed `100`, `2`, `2`, and `3` for clickstream, products, municipalities, and the category CSV. Trino matched all 18 checks, including a repeated category name, a null English label, 16 null `product_id` values, one null microregion, `São Teste`, a null `brand`, and tags text `["demo"]`. The Hadoop probe and the JDBC probe each printed `2` on the shared Spark runtime; Trino printed `"2"`. `docker compose config --services` lists `minio` and `postgres` only. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` passed (exit 0) |
 
 ---
 
@@ -133,7 +133,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01 and P2-02 verified) |
+| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01, P2-02, and P2-03 verified) |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
@@ -146,6 +146,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 ## Risks and limitations
 
 - P2-02 proved one table on the Iceberg JDBC catalog: Spark writes, Trino 484 reads. An overwrite leaves the previous Parquet files in the bucket. JDBC is not the Glue protocol. The Hadoop catalog remains the P2-01 probe only.
+- P2-03 stores Bronze contract fields as `STRING` on that same catalog. The live check wrote fixtures to bucket `odp-bronze-live` and overwrote four Bronze tables. It did not read the Phase 1 raw bucket.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Published Olist ZIP prefixes, closed-deal booleans, and catalog sizes match the contracts. The staged snapshot still quarantines 1_603 `order_reviews` rows with a repeated `review_id`.
 - Exactly-once end-to-end will not be claimed without a written proof.
@@ -172,6 +173,14 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-01 — P2-03 rechecked on the shared Spark runtime
+
+`make test-bronze` ran one Spark process per dataset. Spark printed `100`, `2`, `2`, and `3` (clickstream, products, municipalities, category CSV). Trino matched 18 checks. `make test-iceberg-poc` and `make test-catalog-probe` each printed `2` through the same runtime; Trino printed `"2"`. Fixture payloads live in `open_data_platform.lakehouse.fixtures`. `uv run pytest tests/unit` passed. The `site/` pages were left unchanged.
+
+### 2026-10-31 — P2-03 verified
+
+Bronze tables are Iceberg format version 2 in namespace `bronze` on the P2-02 JDBC catalog. Each table location is `s3a://odp-warehouse/bronze/{source_id}/{dataset}`. Columns are `STRING`. The final `make test-bronze` wrote four synthetic objects into `odp-bronze-live` and Spark printed `3`, `100`, `2`, `2`. Trino returned those counts and the null, duplicate, metadata, and nested-text checks: 18 of 18. Earlier Spark overwrites the same evening printed the same four counts. `docker compose config --services` lists `minio` and `postgres` only. `uv run pytest tests/unit` → 245 passed in 10.96s. The `site/` pages were left unchanged. D-012 stays `proposed`. Detail: [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md).
 
 ### 2026-10-29 — P2-02 verified
 

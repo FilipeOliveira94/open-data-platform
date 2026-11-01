@@ -73,4 +73,4 @@ Recorded on the Phase 1 issues. This page does not add a new live run. Live coun
 
 ## Out of scope
 
-Bronze, Silver, and Gold (Phase 2). Airflow schedules and backfills (Phase 3). Streaming CDC (Phase 4). AWS Terraform apply (Phase 7).
+Bronze tables are documented in [bronze layer](bronze-layer.md) (P2-03). Silver and Gold remain later Phase 2 work. Airflow schedules and backfills (Phase 3). Streaming CDC (Phase 4). AWS Terraform apply (Phase 7).

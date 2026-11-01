@@ -162,7 +162,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | --- | --- | --- | --- | --- |
 | P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Phase 1 | Verified | Create / write / catalog / query one table; versions pinned; result recorded; incompatible combos rejected with a decision note |
 | P2-02 | Local catalog and query-engine choice | P2-01 | Verified | Local table catalog (and Trino or alternative) chosen after PoC; recorded in D-004 / `DECISIONS.md` |
-| P2-03 | Bronze layer from raw ingestion | P2-01, P1-02 | Not started | Bronze preserves source payload + ingestion metadata; grain and PK documented |
+| P2-03 | Bronze layer from raw ingestion | P2-01, P1-02 | Verified | Bronze preserves source payload + ingestion metadata; grain and PK documented |
 | P2-04 | Silver normalization and deduplication | P2-03 | Not started | Typed, deduplicated Silver tables; null/duplicate/invalid handling intentional |
 | P2-05 | Analytical model design (grain, keys, SCD) | P2-04 | Not started | Document grain/keys/update rules for facts, dims and marts before implementing models |
 | P2-06 | dbt project and initial Gold models | P2-05 | Not started | dbt project builds; placeholders replaced only for models with documented contracts (`fct_*`, `dim_*`, `mart_*` as approved) |

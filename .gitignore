@@ -31,6 +31,9 @@ node_modules/
 site/dist/
 site/.astro/
 
+# Generated Bronze Spark SQL for the local live check
+.local/
+
 # IDE / OS
 .idea/
 .vscode/
