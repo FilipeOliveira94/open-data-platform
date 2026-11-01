@@ -256,7 +256,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 ## Phase 5 — Observability, lineage and FinOps
 
-**Goal:** Diagnose failures/latency with real metrics; show lineage from real runs; document a FinOps cost model for the AWS target architecture with explicit assumptions.
+**Goal:** Diagnose failures/latency with real metrics; show lineage from real runs; document a FinOps cost model for the AWS target architecture with explicit assumptions, including the Iceberg snapshot retention the local warehouse applies.
 
 **Depends on:** Phase 3 verified. Stream-specific metrics may wait for Phase 4.
 
@@ -268,8 +268,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Demonstrated lineage matches actual executions.
 - [ ] Metrics are measured, not invented.
 - [ ] Cost model documents assumptions, unit drivers and estimated monthly ranges for the AWS target design.
-- [ ] A live run result is recorded and compared to that run's logs, metrics, and lineage (P5-07).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P5-08).
+- [ ] Iceberg snapshots past the retention named in that model are expired and orphan Parquet files are removed, with counts recorded (P5-07).
+- [ ] A live run result is recorded and compared to that run's logs, metrics, lineage, and the snapshot-expiration counts (P5-08).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P5-09).
 
 ### Issues
 
@@ -281,10 +282,11 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P5-04 | OpenLineage where supported | Phase 3 (and 4 if streaming) | Not started | Lineage emitted only for components with verified support; demo from a real run |
 | P5-05 | Cost model for AWS target architecture | — | Not started | Documented cost model with assumptions, drivers and estimated ranges aligned to the Phase 7 AWS design |
 | P5-06 | Alerts and runbooks | P5-03 | Not started | Alert thresholds and at least one failure runbook under `docs/runbooks/` |
-| P5-07 | Live run, result, and consistency check | P5-03, P5-04, P5-05, P5-06 | Not started | Run one real local pipeline execution that emits logs, metrics, and lineage. Record the dashboard values and the lineage edges. Compare them to that run's execution id, counts, and failure state. Check the cost model against its own drivers and assumptions. It is not a measured cloud bill. Record mismatches. Do not invent metrics or spend figures |
-| P5-08 | Phase 5 documentation and status | P5-07 | Not started | Document the dashboards, lineage demo, cost-model assumptions, and the P5-07 result. `PROJECT_STATUS.md` cites that evidence |
+| P5-07 | Expire Iceberg snapshots and delete orphan Parquet | P2-03, P5-05 | Not started | A maintenance command expires snapshots older than the retention named in the P5-05 cost model and deletes orphan data files. It keeps the current snapshot. A recorded run for one table lists the snapshots and files removed as counts. It does not run on `docker compose up` and does not invent a spend figure |
+| P5-08 | Live run, result, and consistency check | P5-03, P5-04, P5-05, P5-06, P5-07 | Not started | Run one real local pipeline execution that emits logs, metrics, and lineage. Record the dashboard values and the lineage edges. Compare them to that run's execution id, counts, and failure state. Check the cost model against its own drivers and assumptions. Record the P5-07 before/after object counts. It is not a measured cloud bill. Record mismatches. Do not invent metrics or spend figures |
+| P5-09 | Phase 5 documentation and status | P5-08 | Not started | Document the dashboards, lineage demo, cost-model assumptions, snapshot retention, and the P5-08 result. `PROJECT_STATUS.md` cites that evidence |
 
-**Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06 → P5-07 → P5-08.
+**Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06 → P5-07 → P5-08 → P5-09.
 
 ---
 
@@ -428,7 +430,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-10-28 |
+| Last updated | 2026-11-01 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09, P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07). Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-11-01: Iceberg snapshot expiration is P5-07, before the Phase 5 close. The live run and documentation issues are P5-08 and P5-09. 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09, P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07). Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

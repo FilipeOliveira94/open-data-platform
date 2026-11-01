@@ -174,6 +174,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
 
+### 2026-11-01 — snapshot retention moved to Phase 5
+
+Expiring Iceberg snapshots and deleting orphan Parquet is P5-07, after the cost model (P5-05) and before the Phase 5 live run (P5-08) and documentation (P5-09). It is not a Phase 2 issue. No cleanup command was added.
+
 ### 2026-11-01 — P2-03 rechecked on the shared Spark runtime
 
 `make test-bronze` ran one Spark process per dataset. Spark printed `100`, `2`, `2`, and `3` (clickstream, products, municipalities, category CSV). Trino matched 18 checks. `make test-iceberg-poc` and `make test-catalog-probe` each printed `2` through the same runtime; Trino printed `"2"`. Fixture payloads live in `open_data_platform.lakehouse.fixtures`. `uv run pytest tests/unit` passed. The `site/` pages were left unchanged.

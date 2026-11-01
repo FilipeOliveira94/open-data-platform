@@ -102,7 +102,7 @@ The Spark image, Iceberg runtime, S3A jars, PostgreSQL JDBC driver, JDBC schema 
 
 ## Limitations
 
-- `INSERT OVERWRITE` leaves the previous Parquet files in the bucket.
+- `INSERT OVERWRITE` leaves the previous Parquet files in the bucket. Expiring snapshots and deleting orphan files is P5-07.
 - The first `CREATE TABLE` fixes the table location. A later run does not move it.
 - Logical contract types are not cast. That cast is P2-04.
 - `make test-bronze` overwrites the four Bronze tables named above. It does not delete raw objects in the Phase 1 bucket.

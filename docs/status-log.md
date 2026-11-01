@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-01 — snapshot retention moved to Phase 5
+
+Iceberg `INSERT OVERWRITE` keeps old snapshots and their Parquet files. That maintenance is P5-07 in the FinOps phase: it uses the retention named by the P5-05 cost model and sits before the Phase 5 live run (P5-08) and documentation (P5-09). The Phase 5 close pair numbered P5-07/P5-08 on 2026-10-28 is now P5-08/P5-09. No cleanup job was added.
+
 ### 2026-11-01 — P2-03 rechecked on the shared Spark runtime
 
 Each Bronze dataset is a separate Spark invocation. `make test-bronze` printed `100`, `2`, `2`, and `3`, then Trino matched 18 checks. The synthetic objects are written by `open_data_platform.lakehouse.fixtures`. `uv run pytest tests/unit` passed. The `site/` pages were left unchanged. D-012 stays `proposed`.
