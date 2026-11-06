@@ -34,6 +34,12 @@ site/.astro/
 # Local runtime artifacts (generated SQL, Spark Ivy jar cache under spark-ivy/)
 .local/
 
+# dbt (P2-06)
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/package-lock.yml
+
 # IDE / OS
 .idea/
 .vscode/

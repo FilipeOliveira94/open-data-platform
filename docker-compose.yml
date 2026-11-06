@@ -102,6 +102,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-odp}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
       ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
+    # Host port for dbt-trino (P2-06). Inside Compose the service remains trino:8080.
+    ports:
+      - "${TRINO_PORT:-8080}:8080"
     volumes:
       - ./docker/trino/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
     healthcheck:
