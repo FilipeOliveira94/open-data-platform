@@ -1,4 +1,4 @@
-contract_version: 3
+contract_version: 4
 source_id: olist_marketing_funnel
 dataset: closed_deals
 description: "Closed seller deals. File olist_closed_deals_dataset.csv. seller_id equals olist_brazilian_ecommerce sellers.seller_id or order_items.seller_id. Self-declared commercial attributes are often null."
@@ -10,7 +10,7 @@ update_pattern: snapshot
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
-  domain: olist_analysis
+  source_family: olist_analysis
   owner: platform
 provenance:
   system: kaggle
@@ -92,3 +92,5 @@ changelog:
     note: "Document the published seller_id join: closed_deals.seller_id matches sellers.seller_id or order_items.seller_id."
   - version: 3
     note: "declared_product_catalog_size is a number. Published booleans use True and False."
+  - version: 4
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."

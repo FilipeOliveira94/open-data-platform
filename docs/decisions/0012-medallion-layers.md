@@ -24,7 +24,7 @@ Adopt **Bronze / Silver / Gold**:
 
 **Gold schemas (separate analytical products — do not merge schemas):**
 
-The 2026-10-17 split named two source families, `olist_analysis` and `product_analysis`. Ingestion contracts still store that family on `governance.domain`. P2-05 assigns each business audience its own Gold schema. One family feeds several schemas. DummyJSON still does not join Olist. The storefront still does not join either. PostgreSQL ids still do not join the historical orders.
+The 2026-10-17 split named two source families, `olist_analysis` and `product_analysis`. Ingestion contracts store that family on `governance.source_family`. P2-05 assigns each business audience its own Gold schema. One family feeds several schemas. DummyJSON still does not join Olist. The storefront still does not join either. PostgreSQL ids still do not join the historical orders.
 
 | Schema | Audience | Primary sources |
 | --- | --- | --- |

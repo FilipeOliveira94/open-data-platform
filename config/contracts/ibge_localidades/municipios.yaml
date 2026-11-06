@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 source_id: ibge_localidades
 dataset: municipios
 description: "IBGE Localidades municipalities using view=nivelado. The payload is a JSON array. UF and region attributes are columns on this row. Separate region and UF endpoints are not datasets in contract version 1."
@@ -10,7 +10,7 @@ update_pattern: full_refresh
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
-  domain: olist_analysis
+  source_family: olist_analysis
   owner: platform
 provenance:
   system: ibge
@@ -98,3 +98,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract. Field names from GET /api/v1/localidades/municipios?view=nivelado checked 2026-10-18. Micro and meso region id and name were null on one municipality. No response rows are stored."
+  - version: 2
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."

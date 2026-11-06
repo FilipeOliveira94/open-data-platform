@@ -8,7 +8,7 @@ D-012 stays `proposed` until the tables exist. Silver stays the Spark writer fro
 
 Seven business domains. One shared calendar. A domain is a schema: marts from one domain do not share a product key or a customer key with another domain unless the section "What connects them" says so.
 
-The ingestion contracts still label a source family, `olist_analysis` or `product_analysis`. That label is not the Gold schema. Several Gold schemas can read one family.
+Ingestion contracts label a source family on `governance.source_family`: `olist_analysis` or `product_analysis`. That field is not the Gold schema. Several Gold schemas can read one family.
 
 | Domain | Who uses it | Question | Sources |
 | --- | --- | --- | --- |

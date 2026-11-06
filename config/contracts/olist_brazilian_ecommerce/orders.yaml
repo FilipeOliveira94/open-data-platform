@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 source_id: olist_brazilian_ecommerce
 dataset: orders
 description: "Historical Olist orders. One published CSV row per order. Approval and delivery timestamps are null when that step did not occur."
@@ -10,7 +10,7 @@ update_pattern: snapshot
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
-  domain: olist_analysis
+  source_family: olist_analysis
   owner: platform
 provenance:
   system: kaggle
@@ -58,3 +58,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
+  - version: 2
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."

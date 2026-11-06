@@ -178,7 +178,7 @@ def test_two_pages_land_under_dummyjson_products() -> None:
 
     results = _ingest(client, transport)
 
-    assert contract.domain == "product_analysis"
+    assert contract.source_family == "product_analysis"
     assert [item.metadata.source_id for item in results] == [
         "dummyjson_products",
         "dummyjson_products",
@@ -325,7 +325,7 @@ def test_bad_second_page_stops_before_the_next_put() -> None:
 
 def test_short_final_page_accepts_the_returned_count_as_limit() -> None:
     contract = _contract()
-    assert contract.contract_version == 2
+    assert contract.contract_version == 3
     client = _client()
     body = _page(
         contract,

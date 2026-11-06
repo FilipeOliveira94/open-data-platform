@@ -44,7 +44,7 @@ def test_source_modules_cover_registered_sources() -> None:
 def test_order_reviews_uses_composite_primary_key() -> None:
     contract = _by_identity()[("olist_brazilian_ecommerce", "order_reviews")]
     assert contract.primary_key == ("review_id", "order_id")
-    assert contract.contract_version == 2
+    assert contract.contract_version == 3
     sql = render_silver_sql(
         contract,
         "odp-warehouse",

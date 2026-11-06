@@ -72,14 +72,14 @@ def test_geolocation_has_no_primary_key() -> None:
 def test_order_reviews_primary_key_is_review_and_order() -> None:
     reviews = _by_identity()[("olist_brazilian_ecommerce", "order_reviews")]
     assert reviews.primary_key == ("review_id", "order_id")
-    assert reviews.contract_version == 2
+    assert reviews.contract_version == 3
     assert reviews.grain == "One row per review submission for one order."
 
 
 def test_dummyjson_page_envelope_is_not_an_olist_key() -> None:
     products = _by_identity()[("dummyjson_products", "products")]
     assert products.record_locator == "products"
-    assert products.domain == "product_analysis"
+    assert products.source_family == "product_analysis"
     assert [field.name for field in products.envelope_fields] == [
         "products",
         "total",
@@ -106,7 +106,7 @@ def test_demo_storefront_clickstream_is_jsonl_without_a_join_key() -> None:
     clickstream = _by_identity()[("demo_storefront", "clickstream")]
     assert clickstream.payload_format == "jsonl"
     assert clickstream.provenance_system == "generator"
-    assert clickstream.domain == "product_analysis"
+    assert clickstream.source_family == "product_analysis"
     assert clickstream.update_pattern == "snapshot"
     assert clickstream.primary_key == ("event_id",)
     names = [field.name for field in clickstream.fields]
@@ -145,7 +145,7 @@ def _minimal_mapping() -> dict[str, object]:
         "update_pattern": "full_refresh",
         "on_invalid": "quarantine",
         "on_structural_error": "fail_batch",
-        "governance": {"domain": "product_analysis", "owner": "platform"},
+        "governance": {"source_family": "product_analysis", "owner": "platform"},
         "provenance": {"system": "dummyjson"},
         "fields": [
             {
@@ -176,7 +176,7 @@ def test_contract_from_mapping_accepts_minimal_document() -> None:
         ("duplicate_field", "duplicate field name 'id'"),
         ("structural_error_not_fail", "on_structural_error must be one of"),
         ("envelope_without_locator", "envelope_fields requires record_locator"),
-        ("missing_domain", "missing governance keys: domain"),
+        ("missing_source_family", "missing governance keys: source_family"),
     ],
 )
 def test_contract_from_mapping_rejects_structural_errors(
@@ -198,8 +198,8 @@ def test_contract_from_mapping_rejects_structural_errors(
         data["on_structural_error"] = "quarantine"
     elif mutate == "envelope_without_locator":
         data["envelope_fields"] = data["fields"]
-    elif mutate == "missing_domain":
-        del data["governance"]["domain"]  # type: ignore[index]
+    elif mutate == "missing_source_family":
+        del data["governance"]["source_family"]  # type: ignore[index]
     with pytest.raises(ContractError, match=expected):
         contract_from_mapping(data, origin="test")
 

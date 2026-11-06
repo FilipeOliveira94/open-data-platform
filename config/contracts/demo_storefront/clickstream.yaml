@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 source_id: demo_storefront
 dataset: clickstream
 description: "Seedable clickstream from a fictional retail website. One record is one user action: page_view, add_to_cart, or purchase. event_id identifies the action. event_time is the time of the action. Session, user, and product identifiers are generated tokens. The batch lands as JSONL. Ingestion time stays on the object metadata. This source has no join to Olist or DummyJSON. Daily batch, weekly batch, and CDC remain the PostgreSQL paths."
@@ -10,7 +10,7 @@ update_pattern: snapshot
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
-  domain: product_analysis
+  source_family: product_analysis
   owner: platform
 provenance:
   system: generator
@@ -48,3 +48,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract for the fictional storefront clickstream. JSONL, 500 actions per second of event time, millisecond timestamps. No stored sample rows."
+  - version: 2
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."

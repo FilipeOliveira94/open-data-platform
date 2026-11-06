@@ -150,7 +150,7 @@ def test_fixture_lands_under_ibge_localidades() -> None:
 
     result = _ingest(client, transport)
 
-    assert contract.domain == "olist_analysis"
+    assert contract.source_family == "olist_analysis"
     assert contract.update_pattern == "full_refresh"
     assert result.metadata.source_id == "ibge_localidades"
     assert result.key == _PREFIX + "municipios.json"

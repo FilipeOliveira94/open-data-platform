@@ -124,13 +124,13 @@ def test_seller_join_contracts_record_both_ecommerce_targets() -> None:
     closed = contracts[("olist_marketing_funnel", "closed_deals")]
     sellers = contracts[("olist_brazilian_ecommerce", "sellers")]
     items = contracts[("olist_brazilian_ecommerce", "order_items")]
-    assert closed.contract_version == 3
-    assert sellers.contract_version == 3
-    assert items.contract_version == 2
+    assert closed.contract_version == 4
+    assert sellers.contract_version == 4
+    assert items.contract_version == 3
     closed_seller = next(field for field in closed.fields if field.name == "seller_id")
     assert "sellers.seller_id" in closed_seller.description
     assert "order_items.seller_id" in closed_seller.description
-    assert contracts[("olist_brazilian_ecommerce", "orders")].contract_version == 1
+    assert contracts[("olist_brazilian_ecommerce", "orders")].contract_version == 2
     leads = contracts[("olist_marketing_funnel", "qualified_leads")]
     assert all(field.name != "seller_id" for field in leads.fields)
 

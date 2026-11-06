@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 source_id: postgres_oltp
 dataset: customers
 description: "PostgreSQL OLTP customers. JSON array of rows. Seed may come from local Olist files or synthetic stand-ins."
@@ -10,7 +10,7 @@ update_pattern: incremental_window
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
-  domain: olist_analysis
+  source_family: olist_analysis
   owner: platform
 provenance:
   system: postgres
@@ -48,3 +48,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial v1 contract. Columns align with the Olist dataset of the same grain, plus updated_at for the P1-06 watermark."
+  - version: 2
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."

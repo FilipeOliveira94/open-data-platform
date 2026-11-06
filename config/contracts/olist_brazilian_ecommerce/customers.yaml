@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: olist_brazilian_ecommerce
 dataset: customers
 description: "Order-scoped Olist customers. customer_id changes per order; customer_unique_id is the stable person identifier."
@@ -10,7 +10,7 @@ update_pattern: snapshot
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
-  domain: olist_analysis
+  source_family: olist_analysis
   owner: platform
 provenance:
   system: kaggle
@@ -45,3 +45,5 @@ changelog:
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
   - version: 2
     note: "customer_zip_code_prefix is text. The published file keeps leading zeros."
+  - version: 3
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."

@@ -173,7 +173,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Suggested order:** P2-01 → P2-02 → P2-03 → P2-04 → P2-05 → P2-06 → P2-07 → P2-08 → P2-09 → P2-10. Phase close is P2-09 then P2-10; P2-08 may run earlier after P2-03.
 
-**Analytical models** are specified in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Gold schemas: `marketplace_operations`, `customer_crm`, `seller_acquisition`, `brazil_geography`, `catalog_commerce`, `storefront_behavior`, `oltp_operations`, plus shared `dim_date`. Contract `governance.domain` stays the source family (`olist_analysis` or `product_analysis`). `mart_platform_sales` replaces the earlier `mart_daily_sales` placeholder. On-time rate and `mart_late_orders` are the delay analysis. Each schema has a quality-findings fact.
+**Analytical models** are specified in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Gold schemas: `marketplace_operations`, `customer_crm`, `seller_acquisition`, `brazil_geography`, `catalog_commerce`, `storefront_behavior`, `oltp_operations`, plus shared `dim_date`. Contract `governance.source_family` is the ingest label (`olist_analysis` or `product_analysis`), not the Gold schema. `mart_platform_sales` replaces the earlier `mart_daily_sales` placeholder. On-time rate and `mart_late_orders` are the delay analysis. Each schema has a quality-findings fact.
 
 ---
 

@@ -18,7 +18,8 @@ ON_INVALID_POLICIES: frozenset[str] = frozenset({"quarantine", "fail_batch"})
 UPDATE_PATTERNS: frozenset[str] = frozenset(
     {"snapshot", "full_refresh", "incremental_window"}
 )
-GOLD_DOMAINS: frozenset[str] = frozenset({"olist_analysis", "product_analysis"})
+# Ingest label. Not a Gold schema. See docs/architecture/gold-model-design.md.
+SOURCE_FAMILIES: frozenset[str] = frozenset({"olist_analysis", "product_analysis"})
 PROVENANCE_SYSTEMS: frozenset[str] = frozenset(
     {"kaggle", "dummyjson", "postgres", "ibge", "generator"}
 )
@@ -62,7 +63,7 @@ class DataContract:
     on_invalid: str
     on_structural_error: str
     update_pattern: str
-    domain: str
+    source_family: str
     owner: str
     provenance_system: str
     changelog: tuple[ChangelogEntry, ...]

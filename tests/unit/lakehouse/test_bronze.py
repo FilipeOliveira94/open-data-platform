@@ -71,7 +71,7 @@ def _contract(**overrides: object) -> DataContract:
         "on_invalid": "quarantine",
         "on_structural_error": "fail_batch",
         "update_pattern": "snapshot",
-        "domain": "product_analysis",
+        "source_family": "product_analysis",
         "owner": "platform",
         "provenance_system": "generator",
         "changelog": (),

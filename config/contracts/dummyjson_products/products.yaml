@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: dummyjson_products
 dataset: products
 description: "DummyJSON GET /products page. The raw object is the JSON page. The record grain is one element of products. DummyJSON id is not an Olist product_id."
@@ -10,7 +10,7 @@ update_pattern: full_refresh
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
-  domain: product_analysis
+  source_family: product_analysis
   owner: platform
 provenance:
   system: dummyjson
@@ -152,3 +152,5 @@ changelog:
     note: "Initial contract. Page envelope and product object follow https://dummyjson.com/docs/products checked 2026-10-18. Nested objects stay json. Values are synthetic demo data."
   - version: 2
     note: "brand is nullable. Checked live on 2026-10-24: 92 of 194 products omit brand, and a short final page sets limit to the returned count."
+  - version: 3
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."

@@ -15,10 +15,10 @@ import yaml
 from open_data_platform.contracts.model import (
     CLASSIFICATIONS,
     FIELD_TYPES,
-    GOLD_DOMAINS,
     ON_INVALID_POLICIES,
     PAYLOAD_FORMATS,
     PROVENANCE_SYSTEMS,
+    SOURCE_FAMILIES,
     UPDATE_PATTERNS,
     ChangelogEntry,
     ContractError,
@@ -50,7 +50,7 @@ _TOP_LEVEL_KEYS: frozenset[str] = frozenset(
 _FIELD_KEYS: frozenset[str] = frozenset(
     {"name", "type", "nullable", "classification", "description"}
 )
-_GOVERNANCE_KEYS: frozenset[str] = frozenset({"domain", "owner"})
+_GOVERNANCE_KEYS: frozenset[str] = frozenset({"source_family", "owner"})
 _PROVENANCE_KEYS: frozenset[str] = frozenset({"system"})
 _CHANGELOG_KEYS: frozenset[str] = frozenset({"version", "note"})
 _REQUIRED_TOP_LEVEL: frozenset[str] = _TOP_LEVEL_KEYS - {
@@ -198,7 +198,12 @@ def contract_from_mapping(data: dict[str, Any], *, origin: str) -> DataContract:
         update_pattern=_choice(
             data["update_pattern"], UPDATE_PATTERNS, origin, "update_pattern"
         ),
-        domain=_choice(governance["domain"], GOLD_DOMAINS, origin, "governance.domain"),
+        source_family=_choice(
+            governance["source_family"],
+            SOURCE_FAMILIES,
+            origin,
+            "governance.source_family",
+        ),
         owner=_non_empty_str(governance["owner"], origin, "governance.owner"),
         provenance_system=_choice(
             provenance["system"],

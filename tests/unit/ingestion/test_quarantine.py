@@ -34,7 +34,7 @@ def _contract() -> DataContract:
             "update_pattern": "snapshot",
             "on_invalid": "quarantine",
             "on_structural_error": "fail_batch",
-            "governance": {"domain": "product_analysis", "owner": "platform"},
+            "governance": {"source_family": "product_analysis", "owner": "platform"},
             "provenance": {"system": "generator"},
             "fields": [
                 {
