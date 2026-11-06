@@ -36,7 +36,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-009 | Observability | Prometheus + Grafana locally; CloudWatch (+ optional Datadog/New Relic) on AWS | — | `proposed` | [ADR-0009](docs/decisions/0009-observability.md) |
 | D-010 | Lineage | OpenLineage where verified; dbt lineage | — | `proposed` | [ADR-0010](docs/decisions/0010-lineage.md) |
 | D-011 | IaC / CI | Terraform (`fmt`/`validate` in CI; apply gated); GitHub Actions; OIDC | — | `proposed` | [ADR-0011](docs/decisions/0011-iac-and-ci-credentials.md) |
-| D-012 | Medallion layers | Bronze / Silver / Gold; Gold domains `olist_analysis` + `product_analysis` | — | `proposed` | [ADR-0012](docs/decisions/0012-medallion-layers.md) |
+| D-012 | Medallion layers | Bronze / Silver / Gold. Source families `olist_analysis` and `product_analysis`. Gold schemas: marketplace operations, customer CRM, seller acquisition, Brazil geography, catalog, storefront, OLTP operations | — | `proposed` | [ADR-0012](docs/decisions/0012-medallion-layers.md) |
 | D-013 | Data contracts | Contracts under `config/contracts/`; explicit quarantine/fail (no silent drops) | YAML contracts, structural loader (P1-03), and quarantine sidecar through the shared object writer (P1-10) | `approved` | [ADR-0013](docs/decisions/0013-data-contracts.md) |
 | D-014 | Batch vs streaming | Daily batch, weekly batch, and CDC coexist; CDC does not replace batch | — | `proposed` | [ADR-0014](docs/decisions/0014-batch-vs-streaming-coexistence.md) |
 | D-015 | Monorepo boundaries | Package owns business logic; thin DAGs and IaC | — | `proposed` | [ADR-0015](docs/decisions/0015-monorepo-package-boundaries.md) |
@@ -45,7 +45,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-018 | Historical Olist datasets | CC BY-NC-SA 4.0 e-commerce + marketing funnel; no vendor; fetch-from-source | Provenance under `docs/sources/`; no dataset binaries in git (P1-01) | `approved` | [ADR-0018](docs/decisions/0018-historical-dataset-redistribution.md) |
 | D-019 | HTTP API sources | P1-05 DummyJSON `/products`; IBGE Localidades (P1-08). BrasilAPI CEP withdrawn | DummyJSON products client; IBGE `municipios` client. No CEP dataset | `approved` | [ADR-0019](docs/decisions/0019-public-api-ingestion-source.md) |
 | D-020 | Raw storage layout | Object-store `raw/{source_id}/{dataset}/dt=…/execution_id=…/`; metadata `source_id`, `execution_id`, `_ingestion_ts`; `data/raw/` is local staging only | Package helpers + unit tests (P1-02) | `approved` | [ADR-0020](docs/decisions/0020-raw-storage-layout.md) |
-| D-021 | BrasilAPI CEP | Not a platform source. Geography for `olist_analysis` is Olist geolocation plus IBGE | No CEP dataset (P1-09 withdrawn) | `approved` | [ADR-0021](docs/decisions/0021-withdraw-brasilapi-cep.md) |
+| D-021 | BrasilAPI CEP | Not a platform source. Geography is Olist geolocation plus IBGE, Gold schema `brazil_geography` | No CEP dataset (P1-09 withdrawn) | `approved` | [ADR-0021](docs/decisions/0021-withdraw-brasilapi-cep.md) |
 
 `—` means not yet implemented or not yet verified in the repository.
 

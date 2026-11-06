@@ -164,8 +164,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P2-02 | Local catalog and query-engine choice | P2-01 | Verified | Local table catalog (and Trino or alternative) chosen after PoC; recorded in D-004 / `DECISIONS.md` |
 | P2-03 | Bronze layer from raw ingestion | P2-01, P1-02 | Verified | Bronze preserves source payload + ingestion metadata; grain and PK documented |
 | P2-04 | Silver normalization and deduplication | P2-03 | Verified | Typed, deduplicated Silver tables; null/duplicate/invalid handling intentional |
-| P2-05 | Analytical model design (grain, keys, SCD) | P2-04 | Not started | Document grain/keys/update rules for facts, dims and marts before implementing models |
-| P2-06 | dbt project and initial Gold models | P2-05 | Not started | dbt project builds; placeholders replaced only for models with documented contracts (`fct_*`, `dim_*`, `mart_*` as approved) |
+| P2-05 | Analytical model design (grain, keys, SCD) | P2-04 | Verified | Grain, keys, and update rules for facts, dims, and marts are in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Type 1 for P2-06. Type 2 applications are specified there and implemented only in P4-08 |
+| P2-06 | dbt project and initial Gold models | P2-05 | Not started | dbt project builds; models are the facts, dims, and marts named in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Silver stays the Spark writer. A later dbt port of that SQL is a note in the design, not this issue |
 | P2-07 | Data quality and reconciliation tests | P2-06 | Not started | dbt/Python tests cover key metrics vs source; failures are visible. Replace hardcoded `live_counts` snapshot sizes (current `odp-raw` / `run-001` pin, including DummyJSON 194 and growing `full_refresh` / `incremental_window` sources) with counts derived from Bronze/source for that run |
 | P2-08 | Spark lakehouse jar / Ivy cache | P2-03 | Verified | Persist or bake Iceberg/Hadoop/JDBC jars so each `docker compose run spark` does not re-download Maven artifacts; document the local cache path; keep pins unchanged. May run any time after P2-03; does not block P2-05 |
 | P2-09 | Live run, result, and consistency check | P2-01, P2-06, P2-07 | Not started | On the local stack, run the documented create/write/query path and the Bronze → Silver → Gold/dbt path for the approved models. Record component versions, row counts, and the quality-test result. Compare Gold metrics to the source or Silver counts named in the contracts. Record mismatches. Unit tests alone do not close this issue. Persist evidence in architecture docs / `docs/status-log.md` (not only `PROJECT_STATUS.md`) |
@@ -173,10 +173,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Suggested order:** P2-01 → P2-02 → P2-03 → P2-04 → P2-05 → P2-06 → P2-07 → P2-08 → P2-09 → P2-10. Phase close is P2-09 then P2-10; P2-08 may run earlier after P2-03.
 
-**Analytical models (placeholders until P2-05), by Gold domain:**
-
-- `olist_analysis`: `fct_orders`, `fct_order_items`, `fct_payments`, `dim_customers`, `dim_products`, `dim_date`, `mart_daily_sales`, `mart_customer_retention` (plus funnel/geo as approved).
-- `product_analysis`: DummyJSON product marts (names locked in P2-05); separate schema/folder from Olist.
+**Analytical models** are specified in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Gold schemas: `marketplace_operations`, `customer_crm`, `seller_acquisition`, `brazil_geography`, `catalog_commerce`, `storefront_behavior`, `oltp_operations`, plus shared `dim_date`. Contract `governance.domain` stays the source family (`olist_analysis` or `product_analysis`). `mart_platform_sales` replaces the earlier `mart_daily_sales` placeholder. On-time rate and `mart_late_orders` are the delay analysis. Each schema has a quality-findings fact.
 
 ---
 
@@ -234,8 +231,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Restart and replay do not corrupt sinking state.
 - [ ] Docs contrast streaming CDC vs daily/weekly batch and do not claim “exactly once” without proof.
 - [ ] Validated daily and weekly batch paths still work after CDC is introduced.
-- [ ] A live run result is recorded and compared to the PostgreSQL source and the batch baseline (P4-08).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P4-09).
+- [ ] A live run result is recorded and compared to the PostgreSQL source and the batch baseline (P4-09).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P4-10).
 
 ### Issues
 
@@ -248,10 +245,11 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P4-05 | Semantics documentation (batch vs stream) | P4-03, P4-04, P3-04, P3-05 | Not started | Snapshots, duplicates, ordering, late events, deletes, checkpoints, replay and recovery documented; explicit comparison of daily batch, weekly batch and streaming CDC |
 | P4-06 | Streaming resilience scenarios | P4-04, P4-05 | Not started | Tests or runbooks for duplicates, out-of-order, restart/replay and deletes |
 | P4-07 | Batch path regression check | P3-04, P3-05, P4-04 | Not started | Evidence that daily and weekly batch extracts still succeed alongside the streaming path |
-| P4-08 | Live run, result, and consistency check | P4-04, P4-06, P4-07 | Not started | Run inserts, updates, and deletes through the local CDC path into the sink. Restart the consumer once and replay. Record event counts and the sink row set before and after replay. Compare the sink to the PostgreSQL source for those keys. Run the daily and weekly batch paths and compare them to their pre-CDC baseline. Record mismatches. Do not claim exactly-once. Unit tests alone do not close this issue |
-| P4-09 | Phase 4 documentation and status | P4-08 | Not started | Document batch vs streaming from the P4-08 result. P4-05 remains the semantics write-up. `PROJECT_STATUS.md` cites the live-run evidence |
+| P4-08 | SCD Type 2 history | P4-04, P4-05 | Not started | Implement the type 2 applications in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). First history is PostgreSQL CDC for customers, sellers, orders, and order items: `valid_from`, `valid_to`, and `is_current`, including deletes that close the current row. Purchase-time city, UF, and ZIP stay copied on the order fact. Do not invent history for a single snapshot. Clickstream events and reviews stay immutable. This issue is the only SCD implementation. P4-05 stays the batch-vs-stream semantics note |
+| P4-09 | Live run, result, and consistency check | P4-04, P4-06, P4-07 | Not started | Run inserts, updates, and deletes through the local CDC path into the sink. Restart the consumer once and replay. Record event counts and the sink row set before and after replay. Compare the sink to the PostgreSQL source for those keys. Run the daily and weekly batch paths and compare them to their pre-CDC baseline. Record mismatches. Do not claim exactly-once. Unit tests alone do not close this issue |
+| P4-10 | Phase 4 documentation and status | P4-09 | Not started | Document batch vs streaming from the P4-09 result. P4-05 remains the semantics write-up. `PROJECT_STATUS.md` cites the live-run evidence |
 
-**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07 → P4-08 → P4-09.
+**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07 → P4-08 → P4-09 → P4-10. Phase close is P4-09 then P4-10.
 
 ---
 
@@ -431,7 +429,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-05 |
+| Last updated | 2026-11-06 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-11-05: Phase 2 close pair is P2-09/P2-10; Spark Ivy cache inserted as P2-08 before the close (no new work after the last two issues). 2026-11-01: Iceberg snapshot expiration is P5-07, before the Phase 5 close. The live run and documentation issues are P5-08 and P5-09. 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09 at the time; later P2-09/P2-10), P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07. Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-11-06: P2-05 verified (Gold grain, keys, marts). Phase 4 close pair is P4-09/P4-10. P4-08 is SCD Type 2, before the close, and is not folded into P4-05. 2026-11-05: Phase 2 close pair is P2-09/P2-10; Spark Ivy cache inserted as P2-08 before the close (no new work after the last two issues). 2026-11-01: Iceberg snapshot expiration is P5-07, before the Phase 5 close. The live run and documentation issues are P5-08 and P5-09. 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09 at the time; later P2-09/P2-10), P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07. Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

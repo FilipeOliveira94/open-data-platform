@@ -6,7 +6,7 @@ Typed, deduplicated Iceberg tables built from [Bronze](bronze-layer.md). Decisio
 
 ## Split by source
 
-Bronze uses one generic promotion path. Silver is **one module per `source_id`** under `open_data_platform.lakehouse.silver`. Each module owns cast style, JSON expansion, and survivor rules for its datasets. Gold domains stay separate (`olist_analysis`, `product_analysis`); Silver tables remain keyed by source and dataset so Airflow (P3-03) can schedule sources independently. DAGs must call the package CLI; they must not reimplement transforms.
+Bronze uses one generic promotion path. Silver is **one module per `source_id`** under `open_data_platform.lakehouse.silver`. Each module owns cast style, JSON expansion, and survivor rules for its datasets. Gold schemas stay separate (seven business schemas in [Gold model design](gold-model-design.md)); Silver tables remain keyed by source and dataset so Airflow (P3-03) can schedule sources independently. DAGs must call the package CLI; they must not reimplement transforms.
 
 | Module | `source_id` |
 | --- | --- |
@@ -107,5 +107,5 @@ Same Spark, Iceberg, JDBC, and Trino pins as [catalog and query](phase-2-catalog
 
 - `INSERT OVERWRITE` / table recreate leaves previous Parquet files in the bucket (P5-07).
 - CI does not start Compose. Unit tests cover SQL text, policies, and expansions.
-- D-012 stays `proposed` until Gold exists.
+- D-012 stays `proposed` until Gold tables exist. Grain and mart rules are in [Gold model design](gold-model-design.md). P2-06 reads these Silver tables. A later port of this SQL into dbt is a note in that design, not a change to this writer.
 - Broader quality and reconciliation tests are P2-07; orchestration is Phase 3.

@@ -17,7 +17,7 @@ Phase 1 needs HTTP ingestion distinct from Olist **files**. Olist has no public 
 
 ## Decision
 
-1. **P1-05 (required):** **DummyJSON** `GET https://dummyjson.com/products` with `limit` / `skip` (response includes `total`). Separate product domain in Gold (`product_analysis`). No foreign keys into Olist `product_id`.
+1. **P1-05 (required):** **DummyJSON** `GET https://dummyjson.com/products` with `limit` / `skip` (response includes `total`). Separate from Olist products. No foreign keys into Olist `product_id`. The Gold schema for this catalog is `catalog_commerce` (ADR-0012, revised 2026-11-06; the 2026-10-17 source family name is `product_analysis`).
 2. **IBGE Localidades (P1-08):** `https://servicodados.ibge.gov.br/api/v1/localidades/…` (e.g. municípios) as Brazilian geography reference. Client may chunk large JSON responses; it does **not** replace DummyJSON for P1-05 pagination acceptance.
 3. **BrasilAPI CEP (P1-09, optional):** point lookups for zip enrichment; small cached samples only; respect anti-crawl terms. Not a P1-05 substitute. Superseded by [ADR-0021](0021-withdraw-brasilapi-cep.md).
 
@@ -36,7 +36,7 @@ Final source notes: [`docs/sources/`](../sources/). Gold domain split: [ADR-0012
 
 ## Consequences and trade-offs
 
-- Contracts and dbt projects keep **olist_analysis** and **product_analysis** separate (ADR-0012).
+- Contracts keep the source families **olist_analysis** and **product_analysis**. Gold schemas are the finer list in ADR-0012. DummyJSON still does not join Olist.
 - IBGE has its own contract (P1-08). BrasilAPI CEP is not contracted ([ADR-0021](0021-withdraw-brasilapi-cep.md)). Neither blocked P1-02.
 - Unit tests for HTTP clients use fixtures; no live dependency in unit tests.
 

@@ -4,6 +4,14 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-06 — Gold schemas split by audience
+
+Revised [`docs/architecture/gold-model-design.md`](architecture/gold-model-design.md) and ADR-0012. Source families on contracts stay `olist_analysis` and `product_analysis`. Gold schemas are `marketplace_operations`, `customer_crm`, `seller_acquisition`, `brazil_geography`, `catalog_commerce`, `storefront_behavior`, and `oltp_operations`, plus shared `dim_date`. Delivered orders with both dates are 93.2% on time (89_936 / 96_470) and 6.8% late (6_534). `mart_delivery_performance` publishes the rate. `mart_late_orders` lists each late order. Each schema has `fct_*_quality_findings` for contract violations and business anomalies. Late delivery is not filed as a data error. D-012 stays `proposed`. No dbt model was built.
+
+### 2026-11-06 — P2-05 Gold model design
+
+Documented grain, keys, type 1 refresh, and marts for `olist_analysis`, `product_analysis`, and the PostgreSQL `oltp_` star. Profiled `data/raw` Olist CSVs and Trino `iceberg.silver` (`odp-raw`, `execution_id=run-001`) on this date. Published payments have no refund status: 484 of 625 canceled orders already had `order_approved_at`. Reviewed orders delivered after the estimate average score 2.272 (6_382) against 4.290 on time or early (89_448). IBGE city+UF match after lower, accent strip, and hyphen-to-space: 98_817 / 99_441 customers and 2_986 / 3_095 sellers, with no ambiguous pair. Category supplement for Gold: `pc_gamer` → `gaming_pc`, `portateis_cozinha_e_preparadores_de_alimentos` → `portable_kitchen_appliances_and_food_processors`. Clickstream has no URL and does not join DummyJSON or Olist. SCD Type 2 applications are in that design. Implementation is new roadmap issue P4-08 only. Phase 4 live run and documentation moved to P4-09 and P4-10. D-012 stays `proposed`. No dbt project, no Spark job, no unit-test run.
+
 ### 2026-11-06 — P2-08 Spark Ivy cache
 
 Compose Spark mounts `.local/spark-ivy` at `/tmp/.ivy2`. `make spark-ivy-warm` seeds the pinned Iceberg/Hadoop/AWS/JDBC jars. Second warm and a Bronze clickstream `compose run --rm` both reported `6 already retrieved` with no Maven re-download. Host dirs are world-writable for Spark `uid=185`. Detail: `docs/architecture/phase-2-spark-ivy-cache.md`.

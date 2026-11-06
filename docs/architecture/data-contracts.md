@@ -18,7 +18,7 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | Invalid rows | `on_invalid` (`quarantine` or `fail_batch`) | Declared row-level policy |
 | Structural errors | `on_structural_error` | Always `fail_batch` (missing column, unreadable payload) |
 | Change pattern | `update_pattern` | `snapshot`, `full_refresh`, or `incremental_window` |
-| Governance | `governance.domain`, `governance.owner` | Gold domain and owning role |
+| Governance | `governance.domain`, `governance.owner` | Source family and owning role |
 | Provenance | `provenance.system` | Producer of the bytes |
 | Evolution | `changelog[]` | Note for each `contract_version` |
 
@@ -26,7 +26,7 @@ Logical types are `string`, `integer`, `number`, `boolean`, `timestamp`, `date`,
 
 Field classification is `public`, `internal`, or `pii`. The dataset classification is the strictest of its fields (envelope included). It is computed by the loader and is not stored, so the rollup cannot drift from the fields.
 
-`governance.owner` is a role. Version 1 uses `platform`. `governance.domain` is `olist_analysis` or `product_analysis`.
+`governance.owner` is a role. Version 1 uses `platform`. `governance.domain` is the source family: `olist_analysis` (Olist files, marketing funnel, IBGE, PostgreSQL) or `product_analysis` (DummyJSON, clickstream). Gold schemas are finer than this field. The map is in [Gold model design](gold-model-design.md) and [ADR-0012](../decisions/0012-medallion-layers.md). A contract version is not required to place one family into several Gold schemas.
 
 `provenance.system` is the static producer name: `kaggle`, `dummyjson`, `postgres`, `ibge`, or `generator`. `generator` is the in-repo demo storefront clickstream generator. Execution lineage stays on the raw object (`source_id`, `execution_id`, `_ingestion_ts` from P1-02). Job and column lineage is emitted later from real runs (OpenLineage and dbt, D-010). Contracts do not list downstream models.
 

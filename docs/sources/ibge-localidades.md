@@ -4,9 +4,9 @@
 | --- | --- |
 | Name | IBGE Localidades |
 | Type | HTTP (collection) |
-| Role | Brazilian locality reference (regions, UFs, municipalities) for `olist_analysis` |
+| Role | Brazilian locality reference (regions, UFs, municipalities) |
 | URL | https://servicodados.ibge.gov.br/api/docs/localidades |
-| Gold Domain | `olist_analysis` |
+| Gold Domain | `brazil_geography` |
 | License | Public government API; no auth |
 | Access | `GET /api/v1/localidades/municipios?orderBy=nome&view=nivelado` |
 | Decision | ADR-0019 / D-019 |
@@ -18,7 +18,7 @@ Each run writes one object:
 
 `raw/ibge_localidades/municipios/dt={YYYY-MM-DD}/execution_id={execution_id}/municipios.json`
 
-The object body is the JSON entity. IBGE sends ``Content-Encoding: gzip``, which is decoded before the write. The 64 MiB cap applies to the decoded bytes. A response without that header is stored as received. `source_id` is `ibge_localidades`. The contract domain is `olist_analysis`. `municipio-id` and `UF-sigla` are the reference attributes for later geography in that domain. No Gold model is built here.
+The object body is the JSON entity. IBGE sends ``Content-Encoding: gzip``, which is decoded before the write. The 64 MiB cap applies to the decoded bytes. A response without that header is stored as received. `source_id` is `ibge_localidades`. The contract source family is `olist_analysis`. The Gold schema is `brazil_geography`. `municipio-id` and `UF-sigla` are the attributes of `dim_municipality` in [Gold model design](../architecture/gold-model-design.md). The municipality bridge is normalized city + UF. No Gold table is built in this source note.
 
 Requests send `User-Agent: open-data-platform/<version> (ibge-localidades)`.
 

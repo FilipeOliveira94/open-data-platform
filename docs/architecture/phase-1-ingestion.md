@@ -73,4 +73,4 @@ Recorded on the Phase 1 issues. This page does not add a new live run. Live coun
 
 ## Out of scope
 
-Bronze tables are documented in [bronze layer](bronze-layer.md) (P2-03). Silver is [silver layer](silver-layer.md) (P2-04). Gold remains later Phase 2 work. Airflow schedules and backfills (Phase 3). Streaming CDC (Phase 4). AWS Terraform apply (Phase 7).
+Bronze tables are documented in [bronze layer](bronze-layer.md) (P2-03). Silver is [silver layer](silver-layer.md) (P2-04). Gold grain and marts are designed in [Gold model design](gold-model-design.md) (P2-05); dbt models are P2-06. Airflow schedules and backfills (Phase 3). Streaming CDC (Phase 4). AWS Terraform apply (Phase 7).

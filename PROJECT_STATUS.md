@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-06 (P2-08 Spark Ivy cache) |
+| Last updated | 2026-11-06 (P2-05 Gold model design) |
 | Current phase | Phase 2 — Lakehouse and analytics |
 | Phase status | In progress |
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P2-05** — Analytical model design (grain, keys, SCD).
+**P2-06** — dbt project and initial Gold models.
 
-P2-08 persists Spark `--packages` jars under `.local/spark-ivy`. Full-data Bronze/Silver live against `odp-raw` already passed. Gold/dbt, Airflow, CDC/streaming, and AWS lakehouse modules stay out of scope. The phase closes on P2-09, then P2-10.
+P2-05 locks grain, keys, and marts in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Silver stays the Spark writer. Type 2 history is P4-08, after the CDC consumer, and the Phase 4 close pair is P4-09 then P4-10. dbt, Airflow, CDC, and AWS lakehouse modules stay out of scope until their issues. The phase closes on P2-09, then P2-10.
 
 ## Next work
 
-1. **P2-05** — Analytical model design (grain, keys, SCD) before dbt models.
+1. **P2-06** — dbt project for the models named in the Gold design. Silver is not migrated in that issue.
 
 ---
 
@@ -40,7 +40,7 @@ P2-08 persists Spark `--packages` jars under `.local/spark-ivy`. Full-data Bronz
 | P2-02 | Local catalog and query-engine choice | Verified | Spark and Trino both returned 2 on two runs. [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) |
 | P2-03 | Bronze layer from raw ingestion | Verified | Full `odp-raw` live. Trino 18/18 (`live_counts.BRONZE_COUNTS`). [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md) |
 | P2-04 | Silver normalization and deduplication | Verified | Full Bronze→Silver live. Trino 22/22 (18 counts + 4 shape). Geolocation 1_000_163→738_332. [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md) |
-| P2-05 | Analytical model design (grain, keys, SCD) | Not started | — |
+| P2-05 | Analytical model design (grain, keys, SCD) | Verified | [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md) |
 | P2-06 | dbt project and initial Gold models | Not started | — |
 | P2-07 | Data quality and reconciliation tests | Not started | — |
 | P2-08 | Spark lakehouse jar / Ivy cache | Verified | Host `.local/spark-ivy` → `/tmp/.ivy2`. Second warm: 6 already retrieved. [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md) |
@@ -109,7 +109,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | D-003 | Parquet + Iceberg 1.12.0, format version 2. Spark writes, Trino reads | Approved |
 | D-004 | JDBC catalog on PostgreSQL plus Trino 484. Glue and Athena stay Phase 7 | Approved |
 | D-005 | Spark and dbt | Proposed |
-| D-012 | Bronze / Silver / Gold; Gold domains already named | Proposed |
+| D-012 | Bronze / Silver / Gold; seven Gold schemas in the model design | Proposed |
 | D-020 | Raw layout that Bronze will read (P2-03) | Approved |
 | D-013 | Contracts; no silent drops | Approved |
 | D-001 / D-002 | Compose + MinIO baseline | Approved |
@@ -134,7 +134,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01–P2-04 verified) |
+| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01–P2-05 and P2-08 verified) |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
@@ -173,6 +173,14 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-06 — Gold schemas revised
+
+The model design now opens with seven business schemas: marketplace operations, customer CRM, seller acquisition, Brazil geography, catalog, storefront, and OLTP operations. On-time rate and `mart_late_orders` carry the delay analysis. Each schema has a quality-findings fact. Contract `governance.domain` stays the source family. Detail: [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md).
+
+### 2026-11-06 — P2-05 verified
+
+Gold grain, keys, refresh rules, and marts are in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Payment rows have no refund status; cancellation after approval is the money-at-risk mart. Silver stays Spark. SCD Type 2 is a single Phase 4 issue, P4-08, and the phase still closes on P4-09 then P4-10. D-012 stays `proposed`. No dbt model was built.
 
 ### 2026-11-05 — P2-04 verified
 

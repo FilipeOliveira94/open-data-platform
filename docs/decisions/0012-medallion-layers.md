@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | `proposed` |
 | Date opened | 2026-10-15 |
-| Date decided | — (Gold domain split recorded 2026-10-17; layer choice still proposed until Phase 2) |
+| Date decided | — (source families recorded 2026-10-17; Gold schemas revised 2026-11-06; layer choice still proposed until Gold tables exist) |
 | Owner | Platform architect |
 | Index ID | D-012 |
 | Related issues | Phase 2 (`P2-03`–`P2-06`) |
@@ -22,14 +22,21 @@ Adopt **Bronze / Silver / Gold**:
 - **Silver:** typed, deduplicated, validated entities; intentional null/duplicate/invalid handling.
 - **Gold:** business marts and analytical models (dbt) with documented grain and keys.
 
-**Gold domains (separate analytical products — do not merge schemas):**
+**Gold schemas (separate analytical products — do not merge schemas):**
 
-| Domain | Primary sources | Example layout |
+The 2026-10-17 split named two source families, `olist_analysis` and `product_analysis`. Ingestion contracts still store that family on `governance.domain`. P2-05 assigns each business audience its own Gold schema. One family feeds several schemas. DummyJSON still does not join Olist. The storefront still does not join either. PostgreSQL ids still do not join the historical orders.
+
+| Schema | Audience | Primary sources |
 | --- | --- | --- |
-| `olist_analysis` | Olist files, Postgres seed/CDC, funnel, IBGE geography (P1-08) | e.g. `gold/olist_analysis/` or dbt package/schema `olist_analysis` |
-| `product_analysis` | DummyJSON products (P1-05) | e.g. `gold/product_analysis/` or dbt package/schema `product_analysis` |
+| `marketplace_operations` | Operations and finance | Olist orders, items, payments, products, sellers |
+| `customer_crm` | CRM | Olist customers, reviews, purchase address |
+| `seller_acquisition` | Marketing | Marketing funnel, plus seller sales |
+| `brazil_geography` | Shared place reference | IBGE municipalities, Olist geolocation |
+| `catalog_commerce` | Catalog | DummyJSON products |
+| `storefront_behavior` | Storefront product and CRM | Demo clickstream |
+| `oltp_operations` | Operations on the live database | PostgreSQL OLTP |
 
-Shared platform infrastructure (Spark, Iceberg, catalog) may serve both; **marts, grains and keys stay domain-scoped**.
+Layout is a dbt schema of the same name. The model list, grains, and quality findings are in [`docs/architecture/gold-model-design.md`](../architecture/gold-model-design.md). `dim_date` is shared. Marts, grains, and keys stay inside the schema except for the links that document names (calendar, municipality, ZIP prefix, and the seller match from a closed deal).
 
 ## Alternatives considered
 
@@ -47,7 +54,7 @@ Shared platform infrastructure (Spark, Iceberg, catalog) may serve both; **marts
 
 ## Evidence / validation
 
-P2-03 (2026-10-31) loaded Bronze tables from raw objects. Detail: [`docs/architecture/bronze-layer.md`](../architecture/bronze-layer.md). P2-04 (2026-11-05) loaded typed Silver tables per `source_id`. Detail: [`docs/architecture/silver-layer.md`](../architecture/silver-layer.md). The layer choice stays `proposed` until Gold exists and this ADR is accepted.
+P2-03 (2026-10-31) loaded Bronze tables from raw objects. Detail: [`docs/architecture/bronze-layer.md`](../architecture/bronze-layer.md). P2-04 (2026-11-05) loaded typed Silver tables per `source_id`. Detail: [`docs/architecture/silver-layer.md`](../architecture/silver-layer.md). P2-05 (2026-11-06) documented Gold grain, keys, and marts. Detail: [`docs/architecture/gold-model-design.md`](../architecture/gold-model-design.md). The layer choice stays `proposed` until Gold tables exist and this ADR is accepted.
 
 ## Revisit when
 

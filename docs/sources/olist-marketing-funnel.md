@@ -6,7 +6,7 @@
 | Type | Files (Kaggle) |
 | Role | Seller MQLs and closed deals |
 | URL | https://www.kaggle.com/datasets/olistbr/marketing-funnel-olist |
-| Gold Domain | `olist_analysis` |
+| Gold Domain | `seller_acquisition` |
 | License | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) (checked 2026-10-17) |
 | Access | Package fetch via the Kaggle download API into gitignored `data/raw/…`. Set `KAGGLE_API_TOKEN`, or `KAGGLE_USERNAME` and `KAGGLE_KEY`. |
 | Decision | ADR-0018 / D-018 |
@@ -14,7 +14,7 @@
 
 **Published files:** `olist_marketing_qualified_leads_dataset.csv`, `olist_closed_deals_dataset.csv`.
 
-**Join:** `olist_closed_deals_dataset.seller_id` equals `olist_sellers_dataset.seller_id` or `olist_order_items_dataset.seller_id`. `qualified_leads` has no `seller_id`. The raw landing keeps one object per CSV.
+**Join:** `olist_closed_deals_dataset.seller_id` equals `olist_sellers_dataset.seller_id` or `olist_order_items_dataset.seller_id`. `qualified_leads` has no `seller_id`. The raw landing keeps one object per CSV. Acquisition marts for this join are in [Gold model design](../architecture/gold-model-design.md). In the profiled snapshot, 380 of 842 closed sellers also exist on the e-commerce seller file.
 
 Slug: `olistbr/marketing-funnel-olist`. Default staging: `data/raw/olist_marketing_funnel` (`ODP_OLIST_FUNNEL_DIR`), the same name as the contract directory and `source_id`.
 

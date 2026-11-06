@@ -15,7 +15,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 
 When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)), a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)), verified Bronze tables ([P2-03](docs/architecture/bronze-layer.md)), and verified Silver tables ([P2-04](docs/architecture/silver-layer.md)). Gold, Airflow schedules, and streaming CDC are later issues.
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)), a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)), verified Bronze tables ([P2-03](docs/architecture/bronze-layer.md)), and verified Silver tables ([P2-04](docs/architecture/silver-layer.md)), and a verified Gold model design ([P2-05](docs/architecture/gold-model-design.md)). dbt models, Airflow schedules, and streaming CDC are later issues.
 
 ## Prerequisites
 
@@ -166,6 +166,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) | P2-02 JDBC catalog and Trino: pins, command, result, limitations |
 | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md) | P2-03 Bronze tables: grain, columns, command, result |
 | [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md) | P2-04 Silver tables: typing, JSON expansion, dedup |
+| [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md) | P2-05 Gold grain, keys, SCD rules, and mart definitions |
 | [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md) | P2-08 host Ivy cache for Spark `--packages` |
 | [`docs/sources/`](docs/sources/) | Per-source license, access, and commands |
 | [`docs/architecture/`](docs/architecture/) | Raw layout and data contracts |

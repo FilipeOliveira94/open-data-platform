@@ -6,7 +6,7 @@
 | Type | Files (Kaggle) |
 | Role | Historical orders, customers, items, payments, reviews, products, sellers, geolocation |
 | URL | https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce |
-| Gold Domain | `olist_analysis` |
+| Gold Domain | `marketplace_operations`, `customer_crm` (place keys in `brazil_geography`) |
 | License | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) (checked 2026-10-17) |
 | Access | Package fetch via the Kaggle download API into gitignored `data/raw/…`. Set `KAGGLE_API_TOKEN`, or `KAGGLE_USERNAME` and `KAGGLE_KEY`. |
 | Decision | ADR-0018 / D-018 |

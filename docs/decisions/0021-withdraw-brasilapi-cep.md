@@ -34,7 +34,7 @@ BrasilAPI CEP is not a platform source. It is not ingested, not contracted, and 
 
 ## Consequences and trade-offs
 
-- `olist_analysis` does not carry street, neighborhood, or CEP-level coordinates from BrasilAPI.
+- Gold geography (`brazil_geography`) does not carry street, neighborhood, or CEP-level coordinates from BrasilAPI. It uses Olist geolocation and IBGE municipalities.
 - A postal-code file that joins to the Olist 5-digit prefix, and that a Gold model needs beyond IBGE and Olist geolocation, is a new decision.
 - ADR-0019 remains approved for DummyJSON and IBGE. Only its CEP clause is superseded.
 
