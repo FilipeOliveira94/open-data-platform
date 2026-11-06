@@ -39,7 +39,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
 | 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | In progress (P2-01 verified) |
+| 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | In progress (P2-01–P2-04 verified) |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
@@ -153,8 +153,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Queries and transforms are reproducible via documented commands.
 - [ ] Quality and reconciliation rules have tests.
 - [ ] Documentation lists component versions and known limitations.
-- [ ] A live run result is recorded and compared to the Phase 2 contracts (P2-08).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P2-09).
+- [ ] A live run result is recorded and compared to the Phase 2 contracts (P2-09).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P2-10).
 
 ### Issues
 
@@ -163,14 +163,15 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Phase 1 | Verified | Create / write / catalog / query one table; versions pinned; result recorded; incompatible combos rejected with a decision note |
 | P2-02 | Local catalog and query-engine choice | P2-01 | Verified | Local table catalog (and Trino or alternative) chosen after PoC; recorded in D-004 / `DECISIONS.md` |
 | P2-03 | Bronze layer from raw ingestion | P2-01, P1-02 | Verified | Bronze preserves source payload + ingestion metadata; grain and PK documented |
-| P2-04 | Silver normalization and deduplication | P2-03 | Not started | Typed, deduplicated Silver tables; null/duplicate/invalid handling intentional |
+| P2-04 | Silver normalization and deduplication | P2-03 | Verified | Typed, deduplicated Silver tables; null/duplicate/invalid handling intentional |
 | P2-05 | Analytical model design (grain, keys, SCD) | P2-04 | Not started | Document grain/keys/update rules for facts, dims and marts before implementing models |
 | P2-06 | dbt project and initial Gold models | P2-05 | Not started | dbt project builds; placeholders replaced only for models with documented contracts (`fct_*`, `dim_*`, `mart_*` as approved) |
-| P2-07 | Data quality and reconciliation tests | P2-06 | Not started | dbt/Python tests cover key metrics vs source; failures are visible |
-| P2-08 | Live run, result, and consistency check | P2-01, P2-06, P2-07 | Not started | On the local stack, run the documented create/write/query path and the Bronze → Silver → Gold/dbt path for the approved models. Record component versions, row counts, and the quality-test result. Compare Gold metrics to the source or Silver counts named in the contracts. Record mismatches. Unit tests alone do not close this issue |
-| P2-09 | Phase 2 documentation and status | P2-08 | Not started | Document component versions, partitioning, file sizing, incremental strategy, known limitations, and the P2-08 result. `PROJECT_STATUS.md` cites that evidence |
+| P2-07 | Data quality and reconciliation tests | P2-06 | Not started | dbt/Python tests cover key metrics vs source; failures are visible. Replace hardcoded `live_counts` snapshot sizes (current `odp-raw` / `run-001` pin, including DummyJSON 194 and growing `full_refresh` / `incremental_window` sources) with counts derived from Bronze/source for that run |
+| P2-08 | Spark lakehouse jar / Ivy cache | P2-03 | Not started | Persist or bake Iceberg/Hadoop/JDBC jars so each `docker compose run spark` does not re-download Maven artifacts; document the local cache path; keep pins unchanged. May run any time after P2-03; does not block P2-05 |
+| P2-09 | Live run, result, and consistency check | P2-01, P2-06, P2-07 | Not started | On the local stack, run the documented create/write/query path and the Bronze → Silver → Gold/dbt path for the approved models. Record component versions, row counts, and the quality-test result. Compare Gold metrics to the source or Silver counts named in the contracts. Record mismatches. Unit tests alone do not close this issue. Persist evidence in architecture docs / `docs/status-log.md` (not only `PROJECT_STATUS.md`) |
+| P2-10 | Phase 2 documentation and status | P2-09 | Not started | Document component versions, partitioning, file sizing, incremental strategy (vs current full-overwrite Bronze/Silver), known limitations, and the P2-09 result. `PROJECT_STATUS.md` cites that evidence |
 
-**Suggested order:** P2-01 → P2-02 → P2-03 → P2-04 → P2-05 → P2-06 → P2-07 → P2-08 → P2-09.
+**Suggested order:** P2-01 → P2-02 → P2-03 → P2-04 → P2-05 → P2-06 → P2-07 → P2-08 → P2-09 → P2-10. Phase close is P2-09 then P2-10; P2-08 may run earlier after P2-03.
 
 **Analytical models (placeholders until P2-05), by Gold domain:**
 
@@ -430,7 +431,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-01 |
+| Last updated | 2026-11-05 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-11-01: Iceberg snapshot expiration is P5-07, before the Phase 5 close. The live run and documentation issues are P5-08 and P5-09. 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09, P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07). Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-11-05: Phase 2 close pair is P2-09/P2-10; Spark Ivy cache inserted as P2-08 before the close (no new work after the last two issues). 2026-11-01: Iceberg snapshot expiration is P5-07, before the Phase 5 close. The live run and documentation issues are P5-08 and P5-09. 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09 at the time; later P2-09/P2-10), P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07. Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

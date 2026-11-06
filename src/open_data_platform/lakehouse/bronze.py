@@ -3,6 +3,10 @@
 Bronze keeps one string column per contract field, plus ingestion metadata.
 It does not cast logical types, drop invalid rows, or deduplicate keys.
 Spark, invoked separately, loads the staging file into the JDBC catalog.
+
+Write mode is full load + overwrite only (``WriteMode.FULL_OVERWRITE``).
+Incremental MERGE / append / CDC placeholders live in
+``open_data_platform.lakehouse.write_mode`` for later phases.
 """
 
 from __future__ import annotations
@@ -24,6 +28,14 @@ from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.records import (
     PayloadStructureError,
     load_jsonl_records,
+)
+from open_data_platform.lakehouse.write_mode import (
+    CURRENT_WRITE_MODE,
+    WriteMode,
+    WriteModeError,
+    render_append_only_sql,
+    render_incremental_merge_sql,
+    require_implemented,
 )
 from open_data_platform.object_storage import client_from_env, ensure_bucket
 
@@ -370,11 +382,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Promote every contract. An empty raw prefix fails the run.",
     )
     parser.add_argument(
+        "--prepare-unit-fixtures",
         "--prepare-live-fixtures",
+        dest="prepare_unit_fixtures",
         action="store_true",
         help=(
-            "Write one synthetic raw object per payload format, then promote "
-            "those four datasets."
+            "Unit-test helper only: write synthetic raw objects for the four "
+            "payload formats into ODP_RAW_BUCKET, then promote those datasets. "
+            "Not used by the full-data live run (make live-bronze)."
         ),
     )
     parser.add_argument(
@@ -386,12 +401,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--print-live-checks",
         action="store_true",
-        help="Print expected-count and Trino SQL pairs for the live fixtures.",
+        help=(
+            "Print expected-count and Trino SQL pairs for the full-data "
+            "Bronze live run (odp-raw)."
+        ),
+    )
+    parser.add_argument(
+        "--print-fixture-checks",
+        action="store_true",
+        help="Print expected-count and Trino SQL pairs for unit-test fixtures.",
     )
     args = parser.parse_args(argv)
     try:
         if args.print_live_checks:
-            _print_live_checks(args)
+            _print_count_checks(args, live=True)
+            return 0
+        if args.print_fixture_checks:
+            _print_count_checks(args, live=False)
             return 0
         _promote_cli(args)
     except BronzeError as exc:
@@ -403,13 +429,26 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _print_live_checks(args: argparse.Namespace) -> None:
-    if args.sql_out or args.dataset or args.all or args.prepare_live_fixtures:
-        msg = "--print-live-checks does not take other arguments"
+def _print_count_checks(args: argparse.Namespace, *, live: bool) -> None:
+    if (
+        args.sql_out
+        or args.dataset
+        or args.all
+        or args.prepare_unit_fixtures
+        or (live and args.print_fixture_checks)
+        or ((not live) and args.print_live_checks)
+    ):
+        msg = "count-check flags do not take other arguments"
         raise BronzeError(msg)
-    from open_data_platform.lakehouse.fixtures import live_checks
+    if live:
+        from open_data_platform.lakehouse.live_counts import bronze_count_checks
 
-    for expected, statement in live_checks():
+        checks = bronze_count_checks()
+    else:
+        from open_data_platform.lakehouse.fixtures import live_checks
+
+        checks = live_checks()
+    for expected, statement in checks:
         print(f"{expected}\t{statement}")
 
 
@@ -417,8 +456,8 @@ def _promote_cli(args: argparse.Namespace) -> None:
     if args.all and args.dataset:
         msg = "pass either --all or --dataset"
         raise BronzeError(msg)
-    if not args.all and not args.dataset and not args.prepare_live_fixtures:
-        msg = "pass --dataset, --all, or --prepare-live-fixtures"
+    if not args.all and not args.dataset and not args.prepare_unit_fixtures:
+        msg = "pass --dataset, --all, or --prepare-unit-fixtures"
         raise BronzeError(msg)
     if args.sql_out is None:
         msg = "--sql-out is required"
@@ -427,7 +466,7 @@ def _promote_cli(args: argparse.Namespace) -> None:
     client = client_from_env(env)
     raw_bucket = env["ODP_RAW_BUCKET"]
     warehouse_bucket = env["ODP_WAREHOUSE_BUCKET"]
-    if args.prepare_live_fixtures:
+    if args.prepare_unit_fixtures:
         from open_data_platform.lakehouse.fixtures import write_live_fixtures
 
         write_live_fixtures(client, bucket=raw_bucket)
@@ -475,11 +514,11 @@ def _selected_contracts(args: argparse.Namespace) -> tuple[DataContract, ...]:
                 raise BronzeError(msg)
             selected.append(contract)
         return tuple(selected)
-    if args.prepare_live_fixtures:
+    if args.prepare_unit_fixtures:
         from open_data_platform.lakehouse.fixtures import LIVE_DATASETS
 
         return tuple(index[identity] for identity in LIVE_DATASETS)
-    msg = "pass --dataset, --all, or --prepare-live-fixtures"
+    msg = "pass --dataset, --all, or --prepare-unit-fixtures"
     raise BronzeError(msg)
 
 
@@ -491,7 +530,22 @@ def _parse_dataset_arg(value: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def _table_sql(contract: DataContract, bucket: str, row_count: int) -> str:
+def _table_sql(
+    contract: DataContract,
+    bucket: str,
+    row_count: int,
+    *,
+    write_mode: WriteMode = CURRENT_WRITE_MODE,
+) -> str:
+    context = f"{contract.source_id}.{contract.dataset}"
+    try:
+        if write_mode is WriteMode.INCREMENTAL_MERGE:
+            return render_incremental_merge_sql(context=context)
+        if write_mode is WriteMode.APPEND_ONLY:
+            return render_append_only_sql(context=context)
+        require_implemented(write_mode, context=context)
+    except WriteModeError as exc:
+        raise BronzeError(str(exc)) from exc
     source_id = _require_segment("source_id", contract.source_id)
     dataset = _require_segment("dataset", contract.dataset)
     table = bronze_table_name(source_id, dataset)
@@ -505,6 +559,7 @@ def _table_sql(contract: DataContract, bucket: str, row_count: int) -> str:
     location = f"s3a://{bucket}/bronze/{source_id}/{dataset}"
     lines = [
         f"-- {source_id}.{dataset}",
+        f"-- write_mode={write_mode.value} (full load + overwrite)",
         f"CREATE TABLE IF NOT EXISTS bronze.{quoted_table} (",
         column_sql,
         ") USING iceberg",

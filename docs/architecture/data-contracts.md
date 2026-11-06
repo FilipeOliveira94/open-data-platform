@@ -22,7 +22,7 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | Provenance | `provenance.system` | Producer of the bytes |
 | Evolution | `changelog[]` | Note for each `contract_version` |
 
-Logical types are `string`, `integer`, `number`, `boolean`, `timestamp`, `date`, and `json`. Bronze stores each field as Iceberg `STRING` ([bronze layer](bronze-layer.md)). Casting to the logical type is P2-04.
+Logical types are `string`, `integer`, `number`, `boolean`, `timestamp`, `date`, and `json`. Bronze stores each field as Iceberg `STRING` ([bronze layer](bronze-layer.md)). Casting to the logical type is [Silver](silver-layer.md) (P2-04).
 
 Field classification is `public`, `internal`, or `pii`. The dataset classification is the strictest of its fields (envelope included). It is computed by the loader and is not stored, so the rollup cannot drift from the fields.
 
@@ -32,7 +32,7 @@ Field classification is `public`, `internal`, or `pii`. The dataset classificati
 
 ## Invalid records
 
-Every shipped contract uses `on_invalid: quarantine` and `on_structural_error: fail_batch`. The loader checks that those values are in the allowed set. Runtime classification is `open_data_platform.contracts.records`. Each ingestor calls `prepare_quarantine` and then `write_raw_object` for the raw payload. The sidecar put also goes through `write_raw_object` with the `quarantine` prefix. Reprocessing a quarantined row is P3-07. Choosing which duplicate survives is P2-04.
+Every shipped contract uses `on_invalid: quarantine` and `on_structural_error: fail_batch`. The loader checks that those values are in the allowed set. Runtime classification is `open_data_platform.contracts.records`. Each ingestor calls `prepare_quarantine` and then `write_raw_object` for the raw payload. The sidecar put also goes through `write_raw_object` with the `quarantine` prefix. Reprocessing a quarantined row is P3-07. Choosing which duplicate survives in Silver is documented in [silver layer](silver-layer.md).
 
 A structural error fails the batch before that object is written. That covers an unreadable payload, a CSV header or data row whose width does not match the contract, a JSON key set that does not match, and an empty IBGE array. Objects already written in the same execution stay, including any sidecar they already have. The failing object gets no raw put and no quarantine put.
 
@@ -93,7 +93,7 @@ BrasilAPI CEP is not a contracted source ([ADR-0021](../decisions/0021-withdraw-
 ## Out of scope
 
 - Reprocessing a quarantined record (P3-07)
-- Choosing a surviving duplicate (P2-04)
 - OpenLineage events, discovery catalogs, retention periods, SLAs, and cost tags
 - Masking or tokenization of `pii` fields
-- Typed Iceberg schemas (P2-04)
+
+Silver typing and survivor rules: [silver layer](silver-layer.md).

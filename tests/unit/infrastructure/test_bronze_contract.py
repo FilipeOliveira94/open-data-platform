@@ -44,27 +44,25 @@ def test_compose_keeps_bronze_on_the_shared_spark_runtime() -> None:
     assert "docker compose config --services" not in compose
 
 
-def test_make_target_uses_a_dedicated_raw_bucket_and_checks_trino() -> None:
+def test_make_live_bronze_uses_odp_raw_not_a_fixture_bucket() -> None:
     text = MAKEFILE.read_text(encoding="utf-8")
-    assert "test-bronze:" in text
-    assert "ODP_RAW_BUCKET=odp-bronze-live" in text
-    assert "--prepare-live-fixtures" in text
-    assert "--print-live-checks" in text
-    assert "spark /opt/odp/run_bronze.sh" in text
-    assert "ODP_SPARK_SQL=/tmp/bronze.sql" in text
-    assert ".local/bronze-sql" in text
-    assert "spark-bronze" not in text
-    assert (
-        "</dev/null"
-        in text.split("test-bronze:", maxsplit=1)[1].split(
-            "\nup:",
-            maxsplit=1,
-        )[0]
-    )
-    assert (
-        "odp-raw"
-        not in text.split("test-bronze:", maxsplit=1)[1].split(
-            "\nup:",
-            maxsplit=1,
-        )[0]
-    )
+    assert "live-bronze:" in text
+    assert "live-silver:" in text
+    bronze_block = text.split("live-bronze:", maxsplit=1)[1].split(
+        "\nlive-silver:",
+        maxsplit=1,
+    )[0]
+    assert "--all" in bronze_block
+    assert "--print-live-checks" in bronze_block
+    assert "spark /opt/odp/run_bronze.sh" in bronze_block
+    assert "ODP_SPARK_SQL=/tmp/bronze.sql" in bronze_block
+    assert ".local/bronze-sql" in bronze_block
+    assert "odp-bronze-live" not in bronze_block
+    assert "--prepare-unit-fixtures" not in bronze_block
+    assert "--prepare-live-fixtures" not in bronze_block
+    silver_block = text.split("live-silver:", maxsplit=1)[1].split(
+        "\nup:",
+        maxsplit=1,
+    )[0]
+    assert "--all" in silver_block
+    assert "odp-bronze-live" not in silver_block

@@ -58,6 +58,7 @@ services:
   #   docker compose --profile lakehouse run --rm -T spark /opt/odp/run_catalog_probe.sh
   #   docker compose --profile lakehouse run --rm -T \
   #     -e ODP_SPARK_SQL=/tmp/bronze.sql spark /opt/odp/run_bronze.sh
+  #     -e ODP_SPARK_SQL=/tmp/silver.sql spark /opt/odp/run_silver.sh
   spark:
     image: spark:3.5.8-java17
     profiles: [lakehouse]

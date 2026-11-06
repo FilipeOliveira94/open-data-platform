@@ -4,6 +4,14 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-05 — Full-data Bronze and Silver live (`odp-raw`)
+
+Re-verified P2-03 / P2-04 against every object under `ODP_RAW_BUCKET=odp-raw` (not fixture buckets). Write mode is full load + overwrite only (`lakehouse.write_mode`). DummyJSON nested JSON expands via shared `silver.common` helpers; source module maps fields only. `make live-bronze` → Trino 18/18. `make live-silver` → Trino 22/22 (18 counts + DummyJSON shape + clickstream null product_id). Notable Silver deltas vs Bronze: geolocation 1_000_163→738_332; postgres_oltp 3/3/3/5→2/2/2/3. Unit fixtures remain pytest-only. Phase 2 close pair is P2-09 / P2-10; Spark Ivy cache is P2-08 (before the close). Hardcoded `live_counts` → P2-07.
+
+### 2026-11-05 — P2-04 Silver layer
+
+Silver is one Iceberg table per contract on the JDBC catalog, namespace `silver`, format version 2. Columns follow contract types. Modules under `lakehouse.silver` are split by `source_id`. `order_reviews` contract v2 primary key is `(review_id, order_id)`. `make test-silver` wrote the four Bronze live fixtures, promoted Bronze, then Silver. Spark printed `2`, `100`, `2`, `2`. Trino passed 17 checks, including category CSV dedup (3→2) and typed DummyJSON envelope fields. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` → 261 passed. `docker compose config --services` listed `minio` and `postgres`. D-012 stays `proposed`. Gold is P2-05+.
+
 ### 2026-11-01 — snapshot retention moved to Phase 5
 
 Iceberg `INSERT OVERWRITE` keeps old snapshots and their Parquet files. That maintenance is P5-07 in the FinOps phase: it uses the retention named by the P5-05 cost model and sits before the Phase 5 live run (P5-08) and documentation (P5-09). The Phase 5 close pair numbered P5-07/P5-08 on 2026-10-28 is now P5-08/P5-09. No cleanup job was added.

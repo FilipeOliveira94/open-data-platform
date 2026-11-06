@@ -441,11 +441,38 @@ def test_short_csv_row_writes_nothing(tmp_path: Path) -> None:
     assert client.delete_object.call_count == 0
 
 
-def test_duplicate_review_ids_stay_in_raw_and_are_quarantined(tmp_path: Path) -> None:
+def test_same_review_id_on_different_orders_is_not_quarantined(
+    tmp_path: Path,
+) -> None:
     contract = _contracts()[("olist_brazilian_ecommerce", "order_reviews")]
     header = [field.name for field in contract.fields]
     first = _valid_row(contract, review_id="same")
     second = _valid_row(contract, review_id="same", order_id="other")
+    extra = io.StringIO()
+    writer = csv.writer(extra)
+    writer.writerow(header)
+    writer.writerow(first)
+    writer.writerow(second)
+    body = extra.getvalue().encode("utf-8")
+
+    client = _ingest_one(
+        tmp_path,
+        dataset="order_reviews",
+        object_name="olist_order_reviews_dataset.csv",
+        body=body,
+    )
+
+    assert client.put_object.call_count == 1
+    assert client.put_object.call_args.kwargs["Body"] == body
+    deleted = client.delete_object.call_args.kwargs["Key"]
+    assert deleted.endswith("/olist_order_reviews_dataset.csv.jsonl")
+
+
+def test_duplicate_review_order_pair_is_quarantined(tmp_path: Path) -> None:
+    contract = _contracts()[("olist_brazilian_ecommerce", "order_reviews")]
+    header = [field.name for field in contract.fields]
+    first = _valid_row(contract, review_id="same", order_id="order-a")
+    second = _valid_row(contract, review_id="same", order_id="order-a")
     extra = io.StringIO()
     writer = csv.writer(extra)
     writer.writerow(header)

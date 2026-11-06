@@ -70,7 +70,7 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 - Same `(source_id, dataset, dt, execution_id, object_name)` → same object key.
 - A re-run with the same execution identity **overwrites** the object (last write wins).
 - Changing `execution_id` creates a new key (new run), which is intentional for audit of distinct executions.
-- The raw object keeps every row. A repeated primary key is reported, not reduced to one survivor (Silver, P2-04).
+- The raw object keeps every row. A repeated primary key is reported, not reduced to one survivor ([Silver](silver-layer.md)).
 - Invalid rows are copied to a sidecar in the same bucket. The key is `quarantine/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_name}.jsonl`. A clean rerun of that identity deletes the sidecar. Reprocessing it is P3-07.
 
 ## Package API

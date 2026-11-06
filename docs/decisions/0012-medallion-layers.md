@@ -47,7 +47,7 @@ Shared platform infrastructure (Spark, Iceberg, catalog) may serve both; **marts
 
 ## Evidence / validation
 
-P2-03 (2026-10-31) loaded Bronze tables from raw objects. Detail: [`docs/architecture/bronze-layer.md`](../architecture/bronze-layer.md). The layer choice stays `proposed` until Silver and Gold exist and this ADR is accepted.
+P2-03 (2026-10-31) loaded Bronze tables from raw objects. Detail: [`docs/architecture/bronze-layer.md`](../architecture/bronze-layer.md). P2-04 (2026-11-05) loaded typed Silver tables per `source_id`. Detail: [`docs/architecture/silver-layer.md`](../architecture/silver-layer.md). The layer choice stays `proposed` until Gold exists and this ADR is accepted.
 
 ## Revisit when
 

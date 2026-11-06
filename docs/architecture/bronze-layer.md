@@ -1,6 +1,8 @@
 # Bronze layer
 
-Near-source Iceberg tables built from the raw objects in [raw storage layout](raw-storage-layout.md). Decision context: [ADR-0012](../decisions/0012-medallion-layers.md) (still `proposed`) and [ADR-0020](../decisions/0020-raw-storage-layout.md). Silver typing and deduplication are P2-04. This layer does not replace the raw objects.
+Near-source Iceberg tables built from the raw objects in [raw storage layout](raw-storage-layout.md). Decision context: [ADR-0012](../decisions/0012-medallion-layers.md) (still `proposed`) and [ADR-0020](../decisions/0020-raw-storage-layout.md). Silver typing, JSON expansion, and deduplication are documented in [silver layer](silver-layer.md). This layer does not replace the raw objects.
+
+**Write mode (P2-03):** `WriteMode.FULL_OVERWRITE` only — each run overwrites the whole Bronze table from every object under that dataset’s raw prefix. Placeholders for incremental MERGE / append live in `open_data_platform.lakehouse.write_mode` for later phases.
 
 ## Table
 
@@ -37,34 +39,32 @@ Quarantine objects are not read. Invalid rows that remain inside a raw object ar
 
 ## Write
 
-Each run reads every object under `raw/{source_id}/{dataset}/`. Keys are sorted. After every object parses, the job writes one staging file and then Spark commits one overwrite per table:
+Each run reads every object under `raw/{source_id}/{dataset}/` in `ODP_RAW_BUCKET` (default `odp-raw`). Keys are sorted. After every object parses, the job writes one staging file and then Spark commits one overwrite per table:
 
 ```text
 s3a://{ODP_WAREHOUSE_BUCKET}/bronze/_staging/{source_id}/{dataset}/rows.jsonl
 ```
 
-Staging is a build artifact. The auditable bytes stay under `raw/`. An empty prefix fails and does not delete the table. A second run with the same objects produces the same rows. Several `execution_id` values all remain. There is no `MERGE` and no exactly-once claim.
+Staging is a build artifact in the warehouse bucket. The auditable bytes stay under `raw/`. An empty prefix fails and does not delete the table. A second run with the same objects produces the same rows. Several `execution_id` values all remain. There is no `MERGE` and no exactly-once claim.
 
 An empty JSON array is a successful object with zero records. The table overwrite then commits zero rows. PostgreSQL can land that array for an empty window. A prefix with no objects is a different case and fails.
 
-## Command
+## Live run vs unit fixtures
 
-`docker compose up` does not start Spark or Trino. PostgreSQL and MinIO must be healthy. The catalog database `iceberg` is created when it is missing.
+| Mode | Command | Data |
+| --- | --- | --- |
+| **Live run** | `make live-bronze` | Every contract from `ODP_RAW_BUCKET` (default `odp-raw`) |
+| **Unit fixtures** | `open_data_platform.lakehouse.fixtures` via pytest / `--prepare-unit-fixtures` | Synthetic objects for deterministic unit tests only |
+
+The live run does **not** use a separate fixture bucket. Buckets in normal local use are `odp-raw` (landing) and `odp-warehouse` (Iceberg). `odp-smoke` remains the Phase 0 MinIO smoke bucket.
 
 ```bash
-make test-bronze
+make live-bronze
 ```
 
-The target writes four synthetic objects into the bucket `odp-bronze-live`, one for each payload shape, promotes those datasets with one Spark invocation each, and checks the Trino counts. It does not read or write `ODP_RAW_BUCKET` from `.env`. Run it again to overwrite the same four tables and read the same counts. The fixture helper is `open_data_platform.lakehouse.fixtures`.
+PostgreSQL and MinIO must be healthy. The catalog database `iceberg` is created when it is missing. Expected Trino counts for the current `odp-raw` snapshot are in `open_data_platform.lakehouse.live_counts`.
 
-| Payload | Dataset | Execution | Rows |
-| --- | --- | --- | --- |
-| CSV, with a leading BOM | `olist_brazilian_ecommerce.product_category_name_translation` | `p203-csv` | 3, including one repeated category name and one empty English label |
-| JSONL | `demo_storefront.clickstream` | `p203-jsonl` | 100 actions from seed 7 |
-| JSON array | `ibge_localidades.municipios` | `p203-json-array` | 2, one with null microregion and mesoregion |
-| JSON page | `dummyjson_products.products` | `p203-json-page` | 2 products, one without `brand` |
-
-These fixtures are not the published Olist file, the IBGE municipality list, or a DummyJSON response. The clickstream body is the repository generator. To promote objects that are already in the configured raw bucket:
+To promote a subset after objects are already in the raw bucket:
 
 ```bash
 uv run python -m open_data_platform.lakehouse.bronze \
@@ -74,27 +74,13 @@ uv run python -m open_data_platform.lakehouse.bronze \
 
 Then run the shared Spark runtime once per file in that directory. Mount the file at `/tmp/bronze.sql` and set `ODP_SPARK_SQL` to that path. `--all` promotes every contract and fails if any prefix is empty. Each Spark process loads one dataset, so a failed dataset leaves the others at the snapshot written by their own invocation.
 
-## Result (2026-11-01)
+## Result (2026-11-05 full-data live)
 
-`make test-bronze` ran again with one Spark process per dataset. Spark printed `100`, `2`, `2`, and `3` for clickstream, products, municipalities, and the category CSV, in the alphabetical order of the SQL files. Trino matched the same 18 checks.
+`make live-bronze` against `odp-raw` (`WriteMode.FULL_OVERWRITE`). Spark promoted all 18 contract tables. Trino matched `live_counts.BRONZE_COUNTS` (18/18), including geolocation 1_000_163, DummyJSON products 194, Olist customers 99_441, and postgres_oltp window stacks 3/3/3/5. Evidence: `PROJECT_STATUS.md`, [status log](../status-log.md).
 
-## Result (2026-10-31)
+## Earlier fixture-shaped check (2026-10-31 / 2026-11-01)
 
-`make test-bronze` completed on WSL2. Spark printed `3`, `100`, `2`, and `2`. Trino matched 18 checks:
-
-| Check | Count |
-| --- | --- |
-| Category CSV rows, and rows with the live `_ingestion_ts` | 3 |
-| Repeated `categoria_teste` | 2 |
-| Null English label, `test_category`, and `test_category_again` | 1 each |
-| Clickstream rows, and rows with the live execution metadata | 100 |
-| Null `product_id` | 16 |
-| Municipality rows, and rows with the live execution metadata | 2 |
-| `São Teste`, and a null `microrregiao-id` | 1 each |
-| Product rows, tags text `["demo"]`, envelope `total`/`skip`/`limit`, and live execution metadata | 2 |
-| Null `brand` | 1 |
-
-Earlier Spark overwrites the same evening printed the same four table counts. `docker compose config --services` listed `minio` and `postgres` only. `uv run pytest tests/unit` → 245 passed in 10.96s.
+An earlier verification used synthetic objects only to prove payload-shape handling. That path is retained as **unit fixtures**, not as the layer live run. Historical counts (3 / 100 / 2 / 2) are archived in `docs/status-log.md`.
 
 ## Pins
 
@@ -104,8 +90,7 @@ The Spark image, Iceberg runtime, S3A jars, PostgreSQL JDBC driver, JDBC schema 
 
 - `INSERT OVERWRITE` leaves the previous Parquet files in the bucket. Expiring snapshots and deleting orphan files is P5-07.
 - The first `CREATE TABLE` fixes the table location. A later run does not move it.
-- Logical contract types are not cast. That cast is P2-04.
-- `make test-bronze` overwrites the four Bronze tables named above. It does not delete raw objects in the Phase 1 bucket.
+- Logical contract types are not cast. Nested JSON stays compact text. Typing and expansion are in [silver layer](silver-layer.md).
 - Each Spark run downloads the pinned jars. The container is removed afterwards.
 - CI does not start Compose. Unit tests cover parsing, staging, and the SQL text.
 - D-012 stays `proposed`.

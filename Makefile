@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe test-bronze up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe live-bronze live-silver up down ps logs clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  %-22s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -63,13 +63,12 @@ test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehous
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(COMPOSE) --profile lakehouse exec -T trino trino --execute "SELECT COUNT(*) AS row_count FROM iceberg.catalog_probe.probe"
 
-test-bronze: ## Promote one raw object per payload format and read it with Trino
+live-bronze: ## Full-data Bronze live run from ODP_RAW_BUCKET (default odp-raw)
 	@set -e; \
 	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
-	export ODP_RAW_BUCKET=odp-bronze-live; \
 	mkdir -p .local; \
 	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
 	case "$$db" in \
@@ -81,8 +80,9 @@ test-bronze: ## Promote one raw object per payload format and read it with Trino
 		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
 	fi; \
 	rm -rf .local/bronze-sql; \
-	$(UV) run python -m open_data_platform.lakehouse.bronze --prepare-live-fixtures --sql-out .local/bronze-sql; \
+	$(UV) run python -m open_data_platform.lakehouse.bronze --all --sql-out .local/bronze-sql; \
 	for sql in .local/bronze-sql/*.sql; do \
+		echo "Spark Bronze: $$sql"; \
 		$(COMPOSE) --profile lakehouse run --rm -T \
 			-v "$(CURDIR)/$$sql:/tmp/bronze.sql:ro" \
 			-e ODP_SPARK_SQL=/tmp/bronze.sql \
@@ -94,7 +94,7 @@ test-bronze: ## Promote one raw object per payload format and read it with Trino
 		out=$$($(COMPOSE) --profile lakehouse exec -T trino trino --execute "$$sql" </dev/null); \
 		got=$$(printf '%s\n' "$$out" | awk 'NF { line = $$0 } END { gsub(/[" \r]/, "", line); print line }'); \
 		if [ "$$got" != "$$expected" ]; then \
-			echo "Bronze check failed" >&2; \
+			echo "Bronze live check failed" >&2; \
 			echo "$$sql" >&2; \
 			echo "expected $$expected" >&2; \
 			printf '%s\n' "$$out" >&2; \
@@ -102,6 +102,46 @@ test-bronze: ## Promote one raw object per payload format and read it with Trino
 		fi; \
 		echo "$$sql -> $$got"; \
 	done < .local/bronze-checks.tsv
+
+live-silver: ## Full-data Silver live run from existing Bronze tables
+	@set -e; \
+	set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	mkdir -p .local; \
+	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
+	case "$$db" in \
+		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
+	esac; \
+	$(COMPOSE) up -d --wait postgres minio; \
+	exists=$$($(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'"); \
+	if [ "$$exists" != "1" ]; then \
+		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
+	fi; \
+	rm -rf .local/silver-sql; \
+	$(UV) run python -m open_data_platform.lakehouse.silver --all --sql-out .local/silver-sql; \
+	for sql in .local/silver-sql/*.sql; do \
+		echo "Spark Silver: $$sql"; \
+		$(COMPOSE) --profile lakehouse run --rm -T \
+			-v "$(CURDIR)/$$sql:/tmp/silver.sql:ro" \
+			-e ODP_SPARK_SQL=/tmp/silver.sql \
+			spark /opt/odp/run_silver.sh; \
+	done; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(UV) run python -m open_data_platform.lakehouse.silver --print-live-checks > .local/silver-checks.tsv; \
+	while IFS=$$(printf '\t') read -r expected sql; do \
+		out=$$($(COMPOSE) --profile lakehouse exec -T trino trino --execute "$$sql" </dev/null); \
+		got=$$(printf '%s\n' "$$out" | awk 'NF { line = $$0 } END { gsub(/[" \r]/, "", line); print line }'); \
+		if [ "$$got" != "$$expected" ]; then \
+			echo "Silver live check failed" >&2; \
+			echo "$$sql" >&2; \
+			echo "expected $$expected" >&2; \
+			printf '%s\n' "$$out" >&2; \
+			exit 1; \
+		fi; \
+		echo "$$sql -> $$got"; \
+	done < .local/silver-checks.tsv
 
 up: ## Start PostgreSQL and MinIO
 	$(COMPOSE) up -d

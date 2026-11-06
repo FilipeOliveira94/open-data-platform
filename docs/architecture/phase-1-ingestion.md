@@ -66,11 +66,11 @@ Recorded on the Phase 1 issues. This page does not add a new live run. Live coun
 
 ## Limitations
 
-- The staged Olist snapshot still has 1_603 `order_reviews` rows with a repeated `review_id`. Those rows stay in the CSV and are quarantined.
+- Contract v1 treated `review_id` alone as the key, so the staged Olist snapshot quarantined 1_603 `order_reviews` rows with a repeated `review_id`. Contract v2 uses `(review_id, order_id)`; that pair is unique in the published file, so a fresh ingest no longer quarantines those rows as duplicates.
 - `product_category_name_translation.csv` may start with a UTF-8 BOM. The header check ignores it. The raw bytes keep it.
-- Reprocessing a quarantined row is P3-07. Choosing which duplicate survives is P2-04.
+- Reprocessing a quarantined row is P3-07. Silver survivor rules are in [silver layer](silver-layer.md).
 - Exactly-once end-to-end is not claimed.
 
 ## Out of scope
 
-Bronze tables are documented in [bronze layer](bronze-layer.md) (P2-03). Silver and Gold remain later Phase 2 work. Airflow schedules and backfills (Phase 3). Streaming CDC (Phase 4). AWS Terraform apply (Phase 7).
+Bronze tables are documented in [bronze layer](bronze-layer.md) (P2-03). Silver is [silver layer](silver-layer.md) (P2-04). Gold remains later Phase 2 work. Airflow schedules and backfills (Phase 3). Streaming CDC (Phase 4). AWS Terraform apply (Phase 7).

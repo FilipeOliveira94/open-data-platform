@@ -1,11 +1,12 @@
-contract_version: 1
+contract_version: 2
 source_id: olist_brazilian_ecommerce
 dataset: order_reviews
-description: "Customer reviews for historical Olist orders. Comment title and message are often null. The published file contains duplicate review_id values; those rows violate this key and are quarantined later, not dropped here."
+description: "Customer reviews for historical Olist orders. Comment title and message are often null. The published file reuses review_id across different order_id values; the natural key is the (review_id, order_id) pair."
 payload_format: csv
-grain: "One row per review submission."
+grain: "One row per review submission for one order."
 primary_key:
   - review_id
+  - order_id
 update_pattern: snapshot
 on_invalid: quarantine
 on_structural_error: fail_batch
@@ -19,12 +20,12 @@ fields:
     type: string
     nullable: false
     classification: internal
-    description: "Review identifier."
+    description: "Review identifier. May repeat across orders in the published file."
   - name: order_id
     type: string
     nullable: false
     classification: internal
-    description: "Order identifier."
+    description: "Order identifier for this review submission."
   - name: review_score
     type: integer
     nullable: false
@@ -53,3 +54,5 @@ fields:
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
+  - version: 2
+    note: "Primary key is (review_id, order_id). The published file reuses review_id with different order_id values; that pair is unique and is the Silver grain."

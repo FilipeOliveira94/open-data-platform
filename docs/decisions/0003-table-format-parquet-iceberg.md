@@ -7,7 +7,7 @@
 | Date decided | 2026-10-29 |
 | Owner | Platform architect |
 | Index ID | D-003 |
-| Related issues | P2-01, P2-03–P2-09 |
+| Related issues | P2-01, P2-03–P2-10 |
 | Supersedes | — |
 | Superseded by | — |
 

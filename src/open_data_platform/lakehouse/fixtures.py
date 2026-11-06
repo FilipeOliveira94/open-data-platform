@@ -1,9 +1,10 @@
-"""Helper that lands one synthetic raw object per payload format.
+"""Unit-test fixtures: one synthetic raw object per payload format.
 
-Later lakehouse checks (Silver, Gold, or another live load) call
-``live_raw_fixtures`` and ``write_live_fixtures`` instead of copying these
-payloads. Values are generated for the check. They are not Olist, IBGE, or
-DummyJSON extracts. The clickstream body comes from the storefront generator.
+Full-data live runs use ``ODP_RAW_BUCKET`` (default ``odp-raw``) via
+``make live-bronze`` / ``make live-silver``. These helpers are only for
+deterministic unit tests. Values are generated for the check. They are not
+Olist, IBGE, or DummyJSON extracts. The clickstream body comes from the
+storefront generator.
 """
 
 from __future__ import annotations

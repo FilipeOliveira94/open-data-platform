@@ -69,6 +69,13 @@ def test_geolocation_has_no_primary_key() -> None:
     assert geolocation.classification == "pii"
 
 
+def test_order_reviews_primary_key_is_review_and_order() -> None:
+    reviews = _by_identity()[("olist_brazilian_ecommerce", "order_reviews")]
+    assert reviews.primary_key == ("review_id", "order_id")
+    assert reviews.contract_version == 2
+    assert reviews.grain == "One row per review submission for one order."
+
+
 def test_dummyjson_page_envelope_is_not_an_olist_key() -> None:
     products = _by_identity()[("dummyjson_products", "products")]
     assert products.record_locator == "products"

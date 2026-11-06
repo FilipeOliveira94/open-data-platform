@@ -15,7 +15,7 @@ A short multi-page **platform report** (home, architecture, pipeline, operations
 
 When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)), a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)), and verified Bronze tables ([P2-03](docs/architecture/bronze-layer.md)). Silver, Gold, Airflow schedules, and streaming CDC are later issues.
+**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)), a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)), verified Bronze tables ([P2-03](docs/architecture/bronze-layer.md)), and verified Silver tables ([P2-04](docs/architecture/silver-layer.md)). Gold, Airflow schedules, and streaming CDC are later issues.
 
 ## Prerequisites
 
@@ -107,7 +107,8 @@ docker compose down
 | `make test-minio` | Live MinIO put/get smoke |
 | `make test-iceberg-poc` | P2-01 Iceberg probe (MinIO must be healthy; profile `lakehouse`) |
 | `make test-catalog-probe` | P2-02 JDBC catalog probe: Spark write, Trino read (PostgreSQL and MinIO must be healthy) |
-| `make test-bronze` | P2-03 Bronze load: one raw object per payload format, Spark write, Trino checks |
+| `make live-bronze` | P2-03 full-data Bronze live run from `ODP_RAW_BUCKET` (`odp-raw`), Spark write, Trino counts |
+| `make live-silver` | P2-04 full-data Silver live run from Bronze, Spark write, Trino counts |
 
 ## Local services (Phase 0)
 
@@ -141,7 +142,7 @@ make test-catalog-probe
 
 ## Bronze (P2-03)
 
-`make test-bronze` writes one synthetic raw object per payload shape into bucket `odp-bronze-live`, loads four Iceberg tables on the JDBC catalog, and checks them with Trino. Grain, columns, and the 2026-10-31 counts are in [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md). The target overwrites those four Bronze tables. It does not read the Phase 1 raw bucket.
+`make live-bronze` promotes every contract from `ODP_RAW_BUCKET` (default `odp-raw`) into Iceberg Bronze tables and checks Trino counts. `make live-silver` types, expands DummyJSON nested JSON, and deduplicates into Silver. Synthetic fixtures under `lakehouse.fixtures` are for unit tests only. Grain and columns: [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md), [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md).
 
 ## CI
 
@@ -166,4 +167,4 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 
 ## Not in the verified platform yet
 
-Silver and Gold tables, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. P2-03 covers Bronze tables on that catalog. The `site/` scaffold previews verified facts locally.
+Gold tables, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. P2-03 covers Bronze tables on that catalog. P2-04 covers typed Silver tables per source. The `site/` scaffold previews verified facts locally.

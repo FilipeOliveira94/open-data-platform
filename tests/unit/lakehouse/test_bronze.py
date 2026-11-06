@@ -585,10 +585,18 @@ def test_cli_rejects_mixed_selectors(capsys: pytest.CaptureFixture[str]) -> None
     assert main([]) == 1
     assert "pass --dataset" in capsys.readouterr().err
     assert main(["--print-live-checks", "--sql-out", "x"]) == 1
+    assert "do not take other arguments" in capsys.readouterr().err
 
 
-def test_cli_prints_live_checks(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_prints_live_and_fixture_checks(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     assert main(["--print-live-checks"]) == 0
-    printed = capsys.readouterr().out
-    assert "\tSELECT COUNT(*) AS row_count FROM iceberg.bronze." in printed
-    assert "demo_storefront__clickstream" in printed
+    live = capsys.readouterr().out
+    assert "\tSELECT COUNT(*) AS row_count FROM iceberg.bronze." in live
+    assert "olist_brazilian_ecommerce__orders" in live
+    assert "99441\t" in live
+    assert main(["--print-fixture-checks"]) == 0
+    fixtures = capsys.readouterr().out
+    assert "demo_storefront__clickstream" in fixtures
+    assert "product_category_name_translation" in fixtures
