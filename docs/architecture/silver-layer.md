@@ -97,7 +97,7 @@ uv run python -m open_data_platform.lakehouse.silver \
 
 ## Result (2026-11-05 full-data live)
 
-`make live-silver` after the full Bronze live (`WriteMode.FULL_OVERWRITE`). Trino matched 22/22 checks (`SILVER_COUNTS` + shape): geolocation 738_332 after identical-row dedup; DummyJSON 194 with expanded `dimensions_width` / `meta_barcode` / `tags`; postgres_oltp survivors 2/2/2/3; clickstream null `product_id` 16. See `PROJECT_STATUS.md` and [status log](../status-log.md).
+`make live-silver` after the full Bronze live (`WriteMode.FULL_OVERWRITE`). Trino matched 22/22 checks (`SILVER_COUNTS` + shape): geolocation 738_332 after identical-row dedup; DummyJSON 194 with expanded `dimensions_width` / `meta_barcode` / `tags`; postgres_oltp survivors 2/2/2/3; clickstream null `product_id` 16. Chronological note: [status log](../status-log.md).
 
 ## Pins
 

@@ -49,5 +49,5 @@ Two executions of that Compose command, after the S3A jars were added. Each `SEL
 - The Hadoop catalog is a single-writer proof. It is not the AWS Glue counterpart, and it is not a safe catalog for concurrent writers. P2-02 chose the Iceberg JDBC catalog and Trino. This probe stays on the Hadoop catalog. See [`phase-2-catalog-query.md`](phase-2-catalog-query.md).
 - `INSERT OVERWRITE` adds a new snapshot. Older Parquet files stay in the bucket. This probe does not expire snapshots.
 - `spark-sql` logs Hive `ObjectStore` warnings from its session catalog. No Hive Metastore service was added. The Iceberg table metadata is the Hadoop catalog on MinIO.
-- Each run downloads the pinned jars from Maven Central. The container is removed afterwards, so the Ivy cache is not kept.
+- `--packages` pins are unchanged. The Compose Spark service mounts `.local/spark-ivy` at `/tmp/.ivy2` so jars persist across `run --rm` (P2-08). See [`phase-2-spark-ivy-cache.md`](phase-2-spark-ivy-cache.md).
 - CI does not start Compose. The unit test checks the probe files only.

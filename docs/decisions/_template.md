@@ -32,7 +32,7 @@ Positive, negative, and follow-up work this choice creates.
 
 ## Evidence / validation
 
-Commands, PoC results, links to `PROJECT_STATUS.md` and/or `docs/status-log.md`. Write “none yet” while still proposed.
+Commands, PoC results, and durable links (`docs/status-log.md` and/or architecture docs). Do not rely on `PROJECT_STATUS.md` as the only evidence citation — that ledger is rewritten per phase. Write “none yet” while still proposed.
 
 ## Revisit when
 

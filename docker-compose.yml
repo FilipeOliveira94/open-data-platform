@@ -78,6 +78,8 @@ services:
       HOME: /tmp
     volumes:
       - ./docker/spark:/opt/odp:ro
+      # Host Ivy cache for --packages (P2-08). Survives `compose run --rm`.
+      - ./.local/spark-ivy:/tmp/.ivy2
     entrypoint: ["/bin/bash"]
     command: ["-c", "exec sleep infinity"]
 

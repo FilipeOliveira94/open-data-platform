@@ -31,7 +31,7 @@ node_modules/
 site/dist/
 site/.astro/
 
-# Generated Bronze Spark SQL for the local live check
+# Local runtime artifacts (generated SQL, Spark Ivy jar cache under spark-ivy/)
 .local/
 
 # IDE / OS

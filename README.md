@@ -107,6 +107,7 @@ docker compose down
 | `make test-minio` | Live MinIO put/get smoke |
 | `make test-iceberg-poc` | P2-01 Iceberg probe (MinIO must be healthy; profile `lakehouse`) |
 | `make test-catalog-probe` | P2-02 JDBC catalog probe: Spark write, Trino read (PostgreSQL and MinIO must be healthy) |
+| `make spark-ivy-warm` | P2-08 download pinned Spark lakehouse jars into `.local/spark-ivy` |
 | `make live-bronze` | P2-03 full-data Bronze live run from `ODP_RAW_BUCKET` (`odp-raw`), Spark write, Trino counts |
 | `make live-silver` | P2-04 full-data Silver live run from Bronze, Spark write, Trino counts |
 
@@ -140,9 +141,11 @@ Spark writes `catalog_probe.probe` through the Iceberg JDBC catalog on the Compo
 make test-catalog-probe
 ```
 
-## Bronze (P2-03)
+## Bronze and Silver (P2-03 / P2-04)
 
 `make live-bronze` promotes every contract from `ODP_RAW_BUCKET` (default `odp-raw`) into Iceberg Bronze tables and checks Trino counts. `make live-silver` types, expands DummyJSON nested JSON, and deduplicates into Silver. Synthetic fixtures under `lakehouse.fixtures` are for unit tests only. Grain and columns: [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md), [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md).
+
+Spark `--packages` resolve into the host Ivy cache at `.local/spark-ivy` (mounted at `/tmp/.ivy2`). Warm once with `make spark-ivy-warm` after a fresh clone: [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md).
 
 ## CI
 
@@ -162,6 +165,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) | P2-01 Spark + Iceberg probe: pins, command, result, limitations |
 | [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) | P2-02 JDBC catalog and Trino: pins, command, result, limitations |
 | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md) | P2-03 Bronze tables: grain, columns, command, result |
+| [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md) | P2-04 Silver tables: typing, JSON expansion, dedup |
+| [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md) | P2-08 host Ivy cache for Spark `--packages` |
 | [`docs/sources/`](docs/sources/) | Per-source license, access, and commands |
 | [`docs/architecture/`](docs/architecture/) | Raw layout and data contracts |
 

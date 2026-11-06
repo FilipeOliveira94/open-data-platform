@@ -76,7 +76,7 @@ Then run the shared Spark runtime once per file in that directory. Mount the fil
 
 ## Result (2026-11-05 full-data live)
 
-`make live-bronze` against `odp-raw` (`WriteMode.FULL_OVERWRITE`). Spark promoted all 18 contract tables. Trino matched `live_counts.BRONZE_COUNTS` (18/18), including geolocation 1_000_163, DummyJSON products 194, Olist customers 99_441, and postgres_oltp window stacks 3/3/3/5. Evidence: `PROJECT_STATUS.md`, [status log](../status-log.md).
+`make live-bronze` against `odp-raw` (`WriteMode.FULL_OVERWRITE`). Spark promoted all 18 contract tables. Trino matched `live_counts.BRONZE_COUNTS` (18/18), including geolocation 1_000_163, DummyJSON products 194, Olist customers 99_441, and postgres_oltp window stacks 3/3/3/5. Chronological note: [status log](../status-log.md).
 
 ## Earlier fixture-shaped check (2026-10-31 / 2026-11-01)
 
@@ -91,6 +91,6 @@ The Spark image, Iceberg runtime, S3A jars, PostgreSQL JDBC driver, JDBC schema 
 - `INSERT OVERWRITE` leaves the previous Parquet files in the bucket. Expiring snapshots and deleting orphan files is P5-07.
 - The first `CREATE TABLE` fixes the table location. A later run does not move it.
 - Logical contract types are not cast. Nested JSON stays compact text. Typing and expansion are in [silver layer](silver-layer.md).
-- Each Spark run downloads the pinned jars. The container is removed afterwards.
+- Spark `--packages` pins are unchanged. Jars resolve into the host Ivy cache at `.local/spark-ivy` (P2-08); see [Spark Ivy cache](phase-2-spark-ivy-cache.md).
 - CI does not start Compose. Unit tests cover parsing, staging, and the SQL text.
 - D-012 stays `proposed`.

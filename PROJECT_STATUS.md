@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-05 (full-data Bronze/Silver live) |
+| Last updated | 2026-11-06 (P2-08 Spark Ivy cache) |
 | Current phase | Phase 2 — Lakehouse and analytics |
 | Phase status | In progress |
 
@@ -24,7 +24,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 **P2-05** — Analytical model design (grain, keys, SCD).
 
-P2-04 builds typed, deduplicated Silver tables from Bronze, one module per `source_id`. Full-data live runs against `odp-raw` passed (Bronze 18/18, Silver 22/22 Trino checks). Gold/dbt, Airflow, CDC/streaming, and AWS lakehouse modules stay out of scope. The phase closes on P2-09, then P2-10.
+P2-08 persists Spark `--packages` jars under `.local/spark-ivy`. Full-data Bronze/Silver live against `odp-raw` already passed. Gold/dbt, Airflow, CDC/streaming, and AWS lakehouse modules stay out of scope. The phase closes on P2-09, then P2-10.
 
 ## Next work
 
@@ -43,7 +43,7 @@ P2-04 builds typed, deduplicated Silver tables from Bronze, one module per `sour
 | P2-05 | Analytical model design (grain, keys, SCD) | Not started | — |
 | P2-06 | dbt project and initial Gold models | Not started | — |
 | P2-07 | Data quality and reconciliation tests | Not started | — |
-| P2-08 | Spark lakehouse jar / Ivy cache | Not started | — |
+| P2-08 | Spark lakehouse jar / Ivy cache | Verified | Host `.local/spark-ivy` → `/tmp/.ivy2`. Second warm: 6 already retrieved. [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md) |
 | P2-09 | Live run, result, and consistency check | Not started | — |
 | P2-10 | Phase 2 documentation and status | Not started | — |
 
@@ -64,10 +64,10 @@ Acceptance detail: `ROADMAP.md` → Phase 2.
 
 | | |
 | --- | --- |
-| Date | 2026-11-05 |
-| Environment | WSL2 / Ubuntu. PostgreSQL, MinIO, Spark, Trino healthy |
-| Checks | `make live-bronze`; `make live-silver`; unit tests + Ruff earlier in the same change set |
-| Result | Full load + overwrite from `odp-raw`. Bronze Trino 18/18 (geolocation 1_000_163, DummyJSON 194, Olist customers 99_441, …). Silver Trino 22/22: geolocation exact-row dedup 738_332; postgres_oltp windows collapsed to 2/2/2/3; DummyJSON `dimensions_width` / `meta_barcode` / `tags` all 194; clickstream null `product_id` 16. Write mode is `FULL_OVERWRITE` only. Hardcoded `live_counts` remain a P2-07 follow-up; Ivy re-download per Spark job is P2-08 |
+| Date | 2026-11-06 |
+| Environment | WSL2 / Ubuntu. PostgreSQL, MinIO, Spark healthy |
+| Checks | `make spark-ivy-warm` (empty cache, then repeat); Bronze `run_bronze.sh` for clickstream |
+| Result | First warm downloaded 6 pinned artifacts (~634 MiB under `.local/spark-ivy`). Second warm: `0 artifacts copied, 6 already retrieved (0kB/6ms)`. Fresh `compose run --rm` Bronze clickstream reused the host cache (`artifacts dl 8ms`) and printed `100`. Pins unchanged. Prior full-data Bronze/Silver live remains the P2-03/P2-04 evidence |
 
 ---
 

@@ -6,7 +6,16 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe live-bronze live-silver up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver up down ps logs clean
+
+# Host path mounted at /tmp/.ivy2 in the Spark service (P2-08).
+SPARK_IVY_DIR ?= .local/spark-ivy
+
+# Spark image runs as uid 185; the bind mount must be writable by that user.
+define ensure_spark_ivy
+	mkdir -p "$(SPARK_IVY_DIR)/cache" "$(SPARK_IVY_DIR)/jars" "$(SPARK_IVY_DIR)/local"
+	chmod -R a+rwX "$(SPARK_IVY_DIR)"
+endef
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  %-22s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -41,6 +50,7 @@ test-iceberg-poc: ## Create the warehouse bucket and run the Iceberg probe
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
+	$(ensure_spark_ivy); \
 	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
 	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/run_poc.sh
 
@@ -49,6 +59,7 @@ test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehous
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
+	$(ensure_spark_ivy); \
 	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
 	case "$$db" in \
 		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
@@ -63,6 +74,15 @@ test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehous
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(COMPOSE) --profile lakehouse exec -T trino trino --execute "SELECT COUNT(*) AS row_count FROM iceberg.catalog_probe.probe"
 
+spark-ivy-warm: ## Download pinned Spark lakehouse jars into .local/spark-ivy (P2-08)
+	@set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(ensure_spark_ivy); \
+	$(COMPOSE) up -d --wait postgres minio; \
+	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/warm_ivy.sh
+
 live-bronze: ## Full-data Bronze live run from ODP_RAW_BUCKET (default odp-raw)
 	@set -e; \
 	set -a; \
@@ -70,6 +90,7 @@ live-bronze: ## Full-data Bronze live run from ODP_RAW_BUCKET (default odp-raw)
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	mkdir -p .local; \
+	$(ensure_spark_ivy); \
 	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
 	case "$$db" in \
 		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
@@ -110,6 +131,7 @@ live-silver: ## Full-data Silver live run from existing Bronze tables
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	mkdir -p .local; \
+	$(ensure_spark_ivy); \
 	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
 	case "$$db" in \
 		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \

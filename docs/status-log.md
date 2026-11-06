@@ -1,8 +1,12 @@
 # Status log (archive)
 
-Chronological history of program status updates. The operational ledger is [`PROJECT_STATUS.md`](../PROJECT_STATUS.md) (current phase only). Append closed-phase or long narrative entries here when trimming the live ledger; keep `PROJECT_STATUS.md` → Log to recent / current-phase notes.
+Chronological history of program status updates. The operational ledger is [`PROJECT_STATUS.md`](../PROJECT_STATUS.md) (current phase only; **rewritable**). Append closed-phase or long narrative entries here when trimming the live ledger. Architecture docs and ADRs should cite this log (or carry the facts inline), not `PROJECT_STATUS.md`, for durable evidence.
 
 ---
+
+### 2026-11-06 — P2-08 Spark Ivy cache
+
+Compose Spark mounts `.local/spark-ivy` at `/tmp/.ivy2`. `make spark-ivy-warm` seeds the pinned Iceberg/Hadoop/AWS/JDBC jars. Second warm and a Bronze clickstream `compose run --rm` both reported `6 already retrieved` with no Maven re-download. Host dirs are world-writable for Spark `uid=185`. Detail: `docs/architecture/phase-2-spark-ivy-cache.md`.
 
 ### 2026-11-05 — Full-data Bronze and Silver live (`odp-raw`)
 

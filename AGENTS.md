@@ -36,6 +36,8 @@ Do not mark a task complete unless its acceptance criteria have been verified.
 
 `PROJECT_STATUS.md` tracks the **current phase** (progress, acceptance, latest validation, active decision gates). Issue inventory lives in `ROADMAP.md`; full ADRs in `DECISIONS.md`; chronological archive in `docs/status-log.md`.
 
+Do **not** treat `PROJECT_STATUS.md` as durable evidence storage. Architecture docs, ADRs, and `docs/status-log.md` must carry the verified facts themselves. Other docs may point at the status log for chronology; they must not rely on `PROJECT_STATUS.md` as the only (or primary) citation, because that ledger is rewritten each phase.
+
 ## 4. Architecture Principles
 
 - Prefer simple, modular, reproducible solutions over unnecessary infrastructure.
