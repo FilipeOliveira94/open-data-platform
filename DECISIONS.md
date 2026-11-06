@@ -29,14 +29,14 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-002 | Object storage | MinIO (local, AGPLv3); Amazon S3 (AWS) | `coollabsio/minio:RELEASE.2025-10-15T17-29-55Z` (community rebuild; official images pulled for AIStor); S3 still Phase 7 | `approved` | [ADR-0002](docs/decisions/0002-object-storage-minio-s3.md) |
 | D-003 | Table format | Parquet + Apache Iceberg | Parquet files, Iceberg `1.12.0`, `format-version` 2. Spark `3.5.8-java17` writes. Trino `trinodb/trino:484` reads | `approved` | [ADR-0003](docs/decisions/0003-table-format-parquet-iceberg.md) |
 | D-004 | Table catalog / SQL | Iceberg JDBC on Compose PostgreSQL + Trino; Glue Catalog + Athena (AWS) | JDBC catalog, database `iceberg`, schema V1, name `local`; Trino `trinodb/trino:484`; Spark `3.5.8-java17` writes. Glue and Athena are still Phase 7 | `approved` | [ADR-0004](docs/decisions/0004-table-catalog-and-sql-engines.md) |
-| D-005 | Compute / transform | Apache Spark; dbt for Gold | — | `proposed` | [ADR-0005](docs/decisions/0005-compute-and-transform.md) |
+| D-005 | Compute / transform | Apache Spark; dbt for Gold | Spark for Bronze/Silver; dbt-trino `1.11.0` (dbt Core `1.12.6`) for Gold on Trino `484` | `approved` | [ADR-0005](docs/decisions/0005-compute-and-transform.md) |
 | D-006 | Orchestration | Apache Airflow (OSS) locally; MWAA / Step Functions as AWS counterparts | — | `proposed` | [ADR-0006](docs/decisions/0006-orchestration.md) |
 | D-007 | Daily / weekly batch | Windowed PostgreSQL extract; Airflow daily and weekly schedules | — | `proposed` | [ADR-0007](docs/decisions/0007-daily-weekly-batch.md) |
 | D-008 | Streaming CDC | PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming | — | `proposed` | [ADR-0008](docs/decisions/0008-streaming-cdc.md) |
 | D-009 | Observability | Prometheus + Grafana locally; CloudWatch (+ optional Datadog/New Relic) on AWS | — | `proposed` | [ADR-0009](docs/decisions/0009-observability.md) |
 | D-010 | Lineage | OpenLineage where verified; dbt lineage | — | `proposed` | [ADR-0010](docs/decisions/0010-lineage.md) |
 | D-011 | IaC / CI | Terraform (`fmt`/`validate` in CI; apply gated); GitHub Actions; OIDC | — | `proposed` | [ADR-0011](docs/decisions/0011-iac-and-ci-credentials.md) |
-| D-012 | Medallion layers | Bronze / Silver / Gold. Source families `olist_analysis` and `product_analysis`. Gold schemas: marketplace operations, customer CRM, seller acquisition, Brazil geography, catalog, storefront, OLTP operations | — | `proposed` | [ADR-0012](docs/decisions/0012-medallion-layers.md) |
+| D-012 | Medallion layers | Bronze / Silver / Gold. Source families `olist_analysis` and `product_analysis`. Gold schemas: marketplace operations, customer CRM, seller acquisition, Brazil geography, catalog, storefront, OLTP operations | Bronze + Silver Iceberg namespaces; Gold Iceberg schemas via dbt-trino (55 tables, P2-06) | `approved` | [ADR-0012](docs/decisions/0012-medallion-layers.md) |
 | D-013 | Data contracts | Contracts under `config/contracts/`; explicit quarantine/fail (no silent drops) | YAML contracts, structural loader (P1-03), and quarantine sidecar through the shared object writer (P1-10) | `approved` | [ADR-0013](docs/decisions/0013-data-contracts.md) |
 | D-014 | Batch vs streaming | Daily batch, weekly batch, and CDC coexist; CDC does not replace batch | — | `proposed` | [ADR-0014](docs/decisions/0014-batch-vs-streaming-coexistence.md) |
 | D-015 | Monorepo boundaries | Package owns business logic; thin DAGs and IaC | — | `proposed` | [ADR-0015](docs/decisions/0015-monorepo-package-boundaries.md) |
@@ -61,6 +61,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-11-06 | D-005 and D-012 approved: Spark remains Bronze/Silver; dbt-trino builds Gold (P2-06). Evidence in [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md) |
 | 2026-10-29 | D-003 approved: Parquet + Iceberg 1.12.0, format version 2, after Spark and Trino both used that table. D-004 approved: Iceberg JDBC catalog on PostgreSQL database `iceberg` plus Trino 484. Glue and Athena stay the AWS counterparts (Phase 7) |
 | 2026-10-26 | D-013 approved. Invalid-record classification and the `quarantine/` sidecar are in the repository. The sidecar put goes through `write_raw_object` |
 | 2026-10-25 | D-021 approved: BrasilAPI CEP withdrawn as obsolete. D-019 CEP clause superseded; DummyJSON and IBGE stay |

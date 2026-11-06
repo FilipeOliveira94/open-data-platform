@@ -2,7 +2,7 @@
 
 Business models for the local lakehouse. dbt builds them in P2-06. This document names every Gold table, who it is for, and the grain. Engine, keys, and the snapshot profile follow the catalog.
 
-D-012 stays `proposed` until the tables exist. Silver stays the Spark writer from P2-04.
+D-012 is `approved` after P2-06 built the tables ([Gold layer](gold-layer.md)). Silver stays the Spark writer from P2-04.
 
 ## Domains
 
@@ -216,7 +216,7 @@ Today's raw bucket has one execution per dataset. Silver overwrites and keeps th
 
 ### Build order in P2-06
 
-Shared calendar and `brazil_geography` first, then marketplace operations, customer CRM, seller acquisition, catalog commerce, storefront behavior, and OLTP operations. The dbt adapter is chosen in P2-06.
+Shared calendar and `brazil_geography` first, then marketplace operations, customer CRM, seller acquisition, catalog commerce, storefront behavior, and OLTP operations. P2-06 chose **dbt-trino**; implementation detail: [Gold layer](gold-layer.md).
 
 ## Profile of the 2026-11-06 snapshot
 

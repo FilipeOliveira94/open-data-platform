@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-06 — P2-06 dbt Gold verified
+
+Scaffolded `dbt/` with **dbt-trino** `1.11.0` (dbt Core `1.12.6`) against Trino `484` on the Iceberg JDBC catalog. Staged MinIO quarantine JSONL into `iceberg.gold_staging.quarantine_findings` (1_603 rows from the legacy `order_reviews` sidecar). `dbt build` created **55** Gold tables (plus one ephemeral primary-payment helper). Smoke: on-time rate **0.932** on `mart_delivery_performance`; `mart_late_orders` **6_534**; `dim_customers` 96_096; `dim_zip_prefix` 19_015. Compose publishes Trino `TRINO_PORT` (default 8080) for host dbt. Silver remains the Spark writer. D-005 and D-012 approved. `uv run ruff check src tests` passed. `uv run pytest tests/unit` → 272 passed. Detail: [`docs/architecture/gold-layer.md`](architecture/gold-layer.md).
+
 ### 2026-11-06 — Gold schemas split by audience
 
 Revised [`docs/architecture/gold-model-design.md`](architecture/gold-model-design.md) and ADR-0012. Source families on contracts stay `olist_analysis` and `product_analysis`. Gold schemas are `marketplace_operations`, `customer_crm`, `seller_acquisition`, `brazil_geography`, `catalog_commerce`, `storefront_behavior`, and `oltp_operations`, plus shared `dim_date`. Delivered orders with both dates are 93.2% on time (89_936 / 96_470) and 6.8% late (6_534). `mart_delivery_performance` publishes the rate. `mart_late_orders` lists each late order. Each schema has `fct_*_quality_findings` for contract violations and business anomalies. Late delivery is not filed as a data error. D-012 stays `proposed`. No dbt model was built.

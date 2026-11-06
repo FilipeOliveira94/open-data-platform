@@ -107,5 +107,5 @@ Same Spark, Iceberg, JDBC, and Trino pins as [catalog and query](phase-2-catalog
 
 - `INSERT OVERWRITE` / table recreate leaves previous Parquet files in the bucket (P5-07).
 - CI does not start Compose. Unit tests cover SQL text, policies, and expansions.
-- D-012 stays `proposed` until Gold tables exist. Grain and mart rules are in [Gold model design](gold-model-design.md). P2-06 reads these Silver tables. A later port of this SQL into dbt is a note in that design, not a change to this writer.
+- D-012 is `approved` after Gold tables exist ([Gold layer](gold-layer.md)). Grain and mart rules are in [Gold model design](gold-model-design.md). Gold reads these Silver tables via dbt-trino. A later port of this Silver SQL into dbt is a note in that design, not a change to this writer.
 - Broader quality and reconciliation tests are P2-07; orchestration is Phase 3.

@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` |
 | Date opened | 2026-10-15 |
-| Date decided | — (source families recorded 2026-10-17; Gold schemas revised 2026-11-06; layer choice still proposed until Gold tables exist) |
+| Date decided | 2026-11-06 (source families recorded 2026-10-17; Gold schemas revised 2026-11-06; approved when Gold tables existed) |
 | Owner | Platform architect |
 | Index ID | D-012 |
 | Related issues | Phase 2 (`P2-03`–`P2-06`) |
@@ -54,7 +54,7 @@ Layout is a dbt schema of the same name. The model list, grains, and quality fin
 
 ## Evidence / validation
 
-P2-03 (2026-10-31) loaded Bronze tables from raw objects. Detail: [`docs/architecture/bronze-layer.md`](../architecture/bronze-layer.md). P2-04 (2026-11-05) loaded typed Silver tables per `source_id`. Detail: [`docs/architecture/silver-layer.md`](../architecture/silver-layer.md). P2-05 (2026-11-06) documented Gold grain, keys, and marts. Detail: [`docs/architecture/gold-model-design.md`](../architecture/gold-model-design.md). The layer choice stays `proposed` until Gold tables exist and this ADR is accepted.
+P2-03 (2026-10-31) loaded Bronze tables from raw objects. Detail: [`docs/architecture/bronze-layer.md`](../architecture/bronze-layer.md). P2-04 (2026-11-05) loaded typed Silver tables per `source_id`. Detail: [`docs/architecture/silver-layer.md`](../architecture/silver-layer.md). P2-05 (2026-11-06) documented Gold grain, keys, and marts. Detail: [`docs/architecture/gold-model-design.md`](../architecture/gold-model-design.md). P2-06 (2026-11-06) built the named Gold tables with dbt-trino. Detail: [`docs/architecture/gold-layer.md`](../architecture/gold-layer.md).
 
 ## Revisit when
 

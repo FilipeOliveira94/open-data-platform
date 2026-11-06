@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` |
 | Date opened | 2026-10-15 |
-| Date decided | — |
+| Date decided | 2026-11-06 |
 | Owner | Platform architect |
 | Index ID | D-005 |
 | Related issues | Phases 2–4 |
@@ -37,7 +37,7 @@ Use **Apache Spark** for heavy engineering transforms (batch and later Structure
 
 ## Evidence / validation
 
-None yet — introduced per phase, not in Phase 0.
+P2-06 (2026-11-06): Gold models run with **dbt-trino** `1.11.0` (dbt Core `1.12.6`) against Trino `484` on the Iceberg JDBC catalog. Spark remains the Bronze/Silver writer. `dbt build` created 55 Gold tables. Detail: [`docs/architecture/gold-layer.md`](../architecture/gold-layer.md).
 
 ## Revisit when
 
