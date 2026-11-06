@@ -1,0 +1,16 @@
+# Local developer profile (gitignored via dbt/profiles.yml pattern — keep example in profiles.yml.example).
+# This checked-in copy uses only .env.example placeholders for Compose Trino.
+open_data_platform:
+  target: local
+  outputs:
+    local:
+      type: trino
+      method: none
+      user: odp
+      host: localhost
+      port: 8080
+      database: iceberg
+      schema: gold_shared
+      threads: 4
+      http_scheme: http
+      timezone: UTC

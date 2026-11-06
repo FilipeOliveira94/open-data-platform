@@ -1,0 +1,16 @@
+# Copy to dbt/profiles.yml (gitignored) or set DBT_PROFILES_DIR.
+# Values match .env.example placeholders for the local Compose Trino.
+open_data_platform:
+  target: local
+  outputs:
+    local:
+      type: trino
+      method: none
+      user: "{{ env_var('TRINO_USER', 'odp') }}"
+      host: "{{ env_var('TRINO_HOST', 'localhost') }}"
+      port: "{{ env_var('TRINO_PORT', '8080') | int }}"
+      database: iceberg
+      schema: gold_shared
+      threads: 4
+      http_scheme: http
+      timezone: UTC

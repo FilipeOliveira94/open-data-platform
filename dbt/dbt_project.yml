@@ -1,0 +1,40 @@
+# Gold analytical models (P2-06). Silver stays the Spark writer.
+name: open_data_platform
+version: "1.0.0"
+config-version: 2
+profile: open_data_platform
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  warehouse_bucket: "odp-warehouse"
+  gold_location_prefix: "gold"
+
+models:
+  open_data_platform:
+    +materialized: table
+    +on_table_exists: replace
+    +properties:
+      format: "PARQUET"
+    gold_shared:
+      +schema: gold_shared
+    brazil_geography:
+      +schema: brazil_geography
+    marketplace_operations:
+      +schema: marketplace_operations
+    customer_crm:
+      +schema: customer_crm
+    seller_acquisition:
+      +schema: seller_acquisition
+    catalog_commerce:
+      +schema: catalog_commerce
+    storefront_behavior:
+      +schema: storefront_behavior
+    oltp_operations:
+      +schema: oltp_operations

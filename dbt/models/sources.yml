@@ -1,0 +1,33 @@
+version: 2
+
+sources:
+  - name: silver
+    database: iceberg
+    schema: silver
+    description: Typed Spark Silver tables (P2-04). Gold reads these; it does not replace the writer.
+    tables:
+      - name: olist_brazilian_ecommerce__customers
+      - name: olist_brazilian_ecommerce__geolocation
+      - name: olist_brazilian_ecommerce__order_items
+      - name: olist_brazilian_ecommerce__order_payments
+      - name: olist_brazilian_ecommerce__order_reviews
+      - name: olist_brazilian_ecommerce__orders
+      - name: olist_brazilian_ecommerce__products
+      - name: olist_brazilian_ecommerce__sellers
+      - name: olist_brazilian_ecommerce__product_category_name_translation
+      - name: olist_marketing_funnel__qualified_leads
+      - name: olist_marketing_funnel__closed_deals
+      - name: ibge_localidades__municipios
+      - name: dummyjson_products__products
+      - name: demo_storefront__clickstream
+      - name: postgres_oltp__customers
+      - name: postgres_oltp__orders
+      - name: postgres_oltp__order_items
+      - name: postgres_oltp__sellers
+
+  - name: gold_staging
+    database: iceberg
+    schema: gold_staging
+    description: Quarantine findings staged from MinIO JSONL sidecars before Gold quality facts.
+    tables:
+      - name: quarantine_findings

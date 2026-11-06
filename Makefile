@@ -6,7 +6,10 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build live-gold up down ps logs clean
+DBT ?= $(UV) run dbt
+DBT_PROJECT_DIR ?= dbt
+DBT_PROFILES_DIR ?= dbt
 
 # Host path mounted at /tmp/.ivy2 in the Spark service (P2-08).
 SPARK_IVY_DIR ?= .local/spark-ivy
@@ -164,6 +167,32 @@ live-silver: ## Full-data Silver live run from existing Bronze tables
 		fi; \
 		echo "$$sql -> $$got"; \
 	done < .local/silver-checks.tsv
+
+stage-quarantine: ## Stage MinIO quarantine JSONL into iceberg.gold_staging.quarantine_findings
+	@set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(UV) run python -m open_data_platform.lakehouse.quarantine_stage
+
+dbt-parse: ## Parse the Gold dbt project (Trino profile required)
+	@set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(DBT) parse --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR)
+
+dbt-build: ## Build all Gold dbt models (requires Silver + staged quarantine)
+	@set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(DBT) build --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR)
+
+live-gold: stage-quarantine dbt-build ## Stage quarantine sidecars then build Gold models
 
 up: ## Start PostgreSQL and MinIO
 	$(COMPOSE) up -d

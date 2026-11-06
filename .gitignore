@@ -66,3 +66,6 @@ kaggle.json
 
 # Logs
 *.log
+
+# Local dbt machine id
+dbt/.user.yml
