@@ -1,0 +1,119 @@
+version: 2
+models:
+- name: fct_leads
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          mql_id: varchar
+          first_contact_date: timestamp
+          first_contact_day: date
+          origin: varchar
+          landing_page_id: varchar
+  columns:
+  - name: mql_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_closed_deals
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          mql_id: varchar
+          seller_id: varchar
+          sdr_id: varchar
+          sr_id: varchar
+          won_date: timestamp
+          won_day: date
+          business_segment: varchar
+          lead_type: varchar
+          lead_behaviour_profile: varchar
+          has_company: boolean
+          has_gtin: boolean
+          average_stock: varchar
+          business_type: varchar
+          declared_product_catalog_size: double
+          declared_monthly_revenue: double
+  columns:
+  - name: mql_id
+    data_tests:
+    - not_null
+    - unique
+- name: mart_lead_outcome
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          mql_id: varchar
+          origin: varchar
+          first_contact_date: timestamp
+          won_date: timestamp
+          is_won: boolean
+          days_to_win: bigint
+          seller_id: varchar
+          seller_matched_in_orders: boolean
+          matched_seller_item_gmv: double
+          business_segment: varchar
+  columns:
+  - name: mql_id
+    data_tests:
+    - not_null
+    - unique
+  - name: is_won
+    data_tests:
+    - not_null
+- name: mart_marketing_acquisition
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          origin: varchar
+          lead_count: bigint
+          win_count: bigint
+          win_rate: decimal
+          median_days_to_win: bigint
+          matched_seller_item_gmv: double
+          top_declared_segment: varchar
+  columns:
+  - name: origin
+    data_tests:
+    - unique
+- name: fct_acquisition_quality_findings
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          finding_id: varchar
+          issue_class: varchar
+          reason: varchar
+          source_dataset: varchar
+          business_key: varchar
+          field: varchar
+          detail: varchar
+  columns:
+  - name: finding_id
+    data_tests:
+    - not_null
+    - unique
+  - name: issue_class
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - contract_violation
+          - business_anomaly
+  - name: reason
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - null_violation
+          - type_mismatch
+          - duplicate_primary_key
+          - won_seller_not_in_orders
+          - won_before_first_contact
+          - lead_without_origin
+          - deal_without_lead
