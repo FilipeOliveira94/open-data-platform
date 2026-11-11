@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from open_data_platform.contracts.load import load_contracts
-from open_data_platform.lakehouse.live_counts import (
-    silver_count_checks,
-    silver_shape_checks,
+from open_data_platform.lakehouse.reconciliation import (
+    ReconciliationError,
+    silver_live_checks,
 )
 from open_data_platform.lakehouse.silver import (
     demo_storefront,
@@ -119,8 +119,13 @@ def write_scripts(
 
 
 def live_checks() -> tuple[tuple[str, str], ...]:
-    """Trino statements for the full-data Silver live run."""
-    return (*silver_count_checks(), *silver_shape_checks())
+    """Trino statements for the full-data Silver live run.
+
+    Each expected value is ``ok``. The statement compares Silver to Bronze
+    keys, or a shape rule to the Silver table.
+    """
+    entries = selected_entries(source_id=None, datasets=(), all_sources=True)
+    return silver_live_checks(entries)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -158,7 +163,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--print-live-checks",
         action="store_true",
-        help="Print expected-count and Trino SQL pairs for the full Silver live run.",
+        help=(
+            "Print ok and Trino SQL pairs that compare Silver to Bronze "
+            "for the full live run."
+        ),
     )
     args = parser.parse_args(argv)
     try:
@@ -185,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyError as exc:
         print(f"missing environment variable: {exc}", file=sys.stderr)
         return 1
-    except SilverError as exc:
+    except (SilverError, ReconciliationError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0

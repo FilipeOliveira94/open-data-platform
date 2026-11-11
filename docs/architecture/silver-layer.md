@@ -85,7 +85,7 @@ make live-bronze   # prerequisite: full Bronze from odp-raw
 make live-silver
 ```
 
-Expected Trino counts (and DummyJSON shape checks) live in `open_data_platform.lakehouse.live_counts`.
+Each live check is one Trino statement that returns `ok` or `mismatch`. Primary-key datasets compare the Silver row count with the count of Bronze groups whose partition keys are not null, using the same key list as the Spark dedup. Geolocation compares distinct payload columns. DummyJSON rows must carry `dimensions_width`, `meta_barcode`, and at least one tag. Cart and purchase events must have a product id; a page view may omit it. The expected value is `ok`, not a pinned size.
 
 Per source:
 
@@ -97,7 +97,7 @@ uv run python -m open_data_platform.lakehouse.silver \
 
 ## Result (2026-11-05 full-data live)
 
-`make live-silver` after the full Bronze live (`WriteMode.FULL_OVERWRITE`). Trino matched 22/22 checks (`SILVER_COUNTS` + shape): geolocation 738_332 after identical-row dedup; DummyJSON 194 with expanded `dimensions_width` / `meta_barcode` / `tags`; postgres_oltp survivors 2/2/2/3; clickstream null `product_id` 16. Chronological note: [status log](../status-log.md).
+`make live-silver` after the full Bronze live (`WriteMode.FULL_OVERWRITE`). Trino matched 22/22 checks for that run: geolocation 738_332 after identical-row dedup; DummyJSON 194 with expanded `dimensions_width` / `meta_barcode` / `tags`; postgres_oltp survivors 2/2/2/3; clickstream null `product_id` 16. Those figures describe the 2026-11-05 snapshot. Chronological note: [status log](../status-log.md).
 
 ## Pins
 

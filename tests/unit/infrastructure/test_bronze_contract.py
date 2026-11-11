@@ -54,6 +54,8 @@ def test_make_live_bronze_uses_odp_raw_not_a_fixture_bucket() -> None:
     )[0]
     assert "--all" in bronze_block
     assert "--print-live-checks" in bronze_block
+    assert "--counts-out .local/bronze-source-counts.tsv" in bronze_block
+    assert "--counts-file .local/bronze-source-counts.tsv" in bronze_block
     assert "spark /opt/odp/run_bronze.sh" in bronze_block
     assert "ODP_SPARK_SQL=/tmp/bronze.sql" in bronze_block
     assert ".local/bronze-sql" in bronze_block

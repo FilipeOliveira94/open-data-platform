@@ -104,7 +104,7 @@ live-bronze: ## Full-data Bronze live run from ODP_RAW_BUCKET (default odp-raw)
 		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
 	fi; \
 	rm -rf .local/bronze-sql; \
-	$(UV) run python -m open_data_platform.lakehouse.bronze --all --sql-out .local/bronze-sql; \
+	$(UV) run python -m open_data_platform.lakehouse.bronze --all --sql-out .local/bronze-sql --counts-out .local/bronze-source-counts.tsv; \
 	for sql in .local/bronze-sql/*.sql; do \
 		echo "Spark Bronze: $$sql"; \
 		$(COMPOSE) --profile lakehouse run --rm -T \
@@ -113,7 +113,7 @@ live-bronze: ## Full-data Bronze live run from ODP_RAW_BUCKET (default odp-raw)
 			spark /opt/odp/run_bronze.sh; \
 	done; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(UV) run python -m open_data_platform.lakehouse.bronze --print-live-checks > .local/bronze-checks.tsv; \
+	$(UV) run python -m open_data_platform.lakehouse.bronze --print-live-checks --counts-file .local/bronze-source-counts.tsv > .local/bronze-checks.tsv; \
 	while IFS=$$(printf '\t') read -r expected sql; do \
 		out=$$($(COMPOSE) --profile lakehouse exec -T trino trino --execute "$$sql" </dev/null); \
 		got=$$(printf '%s\n' "$$out" | awk 'NF { line = $$0 } END { gsub(/[" \r]/, "", line); print line }'); \

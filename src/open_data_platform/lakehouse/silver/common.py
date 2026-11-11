@@ -357,13 +357,20 @@ def _cast_expr(quoted: str, field: ContractField, style: TimestampStyle) -> str:
     raise SilverError(msg)
 
 
-def _partition_columns(contract: DataContract, policy: DedupPolicy) -> str:
+def partition_key_names(
+    contract: DataContract,
+    policy: DedupPolicy,
+) -> tuple[str, ...]:
+    """Columns Silver groups by: the full payload, or the primary key.
+
+    Reconciliation counts distinct values of this same list on Bronze.
+    """
     if policy.partition_payload_fields:
         names = _payload_column_names(contract)
         if not names:
             msg = f"{contract.source_id}.{contract.dataset}: no payload columns"
             raise SilverError(msg)
-        return ", ".join(_quote_ident(name) for name in names)
+        return names
     keys = (
         contract.primary_key if policy.partition_keys is None else policy.partition_keys
     )
@@ -381,7 +388,13 @@ def _partition_columns(contract: DataContract, policy: DedupPolicy) -> str:
                 f"partition key {key!r} is not a payload column"
             )
             raise SilverError(msg)
-    return ", ".join(_quote_ident(name) for name in keys)
+    return keys
+
+
+def _partition_columns(contract: DataContract, policy: DedupPolicy) -> str:
+    return ", ".join(
+        _quote_ident(name) for name in partition_key_names(contract, policy)
+    )
 
 
 def _primary_key_filter(partition_sql: str) -> str:

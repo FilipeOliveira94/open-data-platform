@@ -62,7 +62,7 @@ The live run does **not** use a separate fixture bucket. Buckets in normal local
 make live-bronze
 ```
 
-PostgreSQL and MinIO must be healthy. The catalog database `iceberg` is created when it is missing. Expected Trino counts for the current `odp-raw` snapshot are in `open_data_platform.lakehouse.live_counts`.
+PostgreSQL and MinIO must be healthy. The catalog database `iceberg` is created when it is missing. `--all` writes `.local/bronze-source-counts.tsv` (`source.dataset`, then the raw row count). `--print-live-checks` requires that file and emits one `COUNT(*)` per Bronze table. A missing or partial file fails the check. The expected side is the count from that run, not a pinned snapshot.
 
 To promote a subset after objects are already in the raw bucket:
 
@@ -76,7 +76,7 @@ Then run the shared Spark runtime once per file in that directory. Mount the fil
 
 ## Result (2026-11-05 full-data live)
 
-`make live-bronze` against `odp-raw` (`WriteMode.FULL_OVERWRITE`). Spark promoted all 18 contract tables. Trino matched `live_counts.BRONZE_COUNTS` (18/18), including geolocation 1_000_163, DummyJSON products 194, Olist customers 99_441, and postgres_oltp window stacks 3/3/3/5. Chronological note: [status log](../status-log.md).
+`make live-bronze` against `odp-raw` (`WriteMode.FULL_OVERWRITE`). Spark promoted all 18 contract tables. Trino matched the raw counts recorded for that run (18/18), including geolocation 1_000_163, DummyJSON products 194, Olist customers 99_441, and postgres_oltp window stacks 3/3/3/5. Those figures describe the 2026-11-05 snapshot. Chronological note: [status log](../status-log.md).
 
 ## Earlier fixture-shaped check (2026-10-31 / 2026-11-01)
 

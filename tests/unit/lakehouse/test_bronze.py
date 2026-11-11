@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -590,12 +591,25 @@ def test_cli_rejects_mixed_selectors(capsys: pytest.CaptureFixture[str]) -> None
 
 def test_cli_prints_live_and_fixture_checks(
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
-    assert main(["--print-live-checks"]) == 0
+    counts = tmp_path / "counts.tsv"
+    counts.write_text(
+        "\n".join(
+            f"{contract.source_id}.{contract.dataset}\t7"
+            for contract in load_contracts()
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert main(["--print-live-checks", "--counts-file", str(counts)]) == 0
     live = capsys.readouterr().out
     assert "\tSELECT COUNT(*) AS row_count FROM iceberg.bronze." in live
     assert "olist_brazilian_ecommerce__orders" in live
-    assert "99441\t" in live
+    assert "7\t" in live
+    assert "99441\t" not in live
+    assert main(["--print-live-checks"]) == 1
+    assert "pass --counts-file" in capsys.readouterr().err
     assert main(["--print-fixture-checks"]) == 0
     fixtures = capsys.readouterr().out
     assert "demo_storefront__clickstream" in fixtures

@@ -399,11 +399,29 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory for one Spark SQL file per dataset.",
     )
     parser.add_argument(
+        "--counts-out",
+        type=str,
+        default=None,
+        help=(
+            "Write source.dataset<TAB>count for the raw objects read in this "
+            "promotion. make live-bronze passes that file to --print-live-checks."
+        ),
+    )
+    parser.add_argument(
+        "--counts-file",
+        type=str,
+        default=None,
+        help=(
+            "Count file from --counts-out. Required with --print-live-checks. "
+            "The expected Trino count is the raw read for that run."
+        ),
+    )
+    parser.add_argument(
         "--print-live-checks",
         action="store_true",
         help=(
-            "Print expected-count and Trino SQL pairs for the full-data "
-            "Bronze live run (odp-raw)."
+            "Print expected-count and Trino SQL pairs for the Bronze live run. "
+            "Requires --counts-file from the promotion that just read raw."
         ),
     )
     parser.add_argument(
@@ -435,15 +453,31 @@ def _print_count_checks(args: argparse.Namespace, *, live: bool) -> None:
         or args.dataset
         or args.all
         or args.prepare_unit_fixtures
+        or args.counts_out
         or (live and args.print_fixture_checks)
-        or ((not live) and args.print_live_checks)
+        or ((not live) and (args.print_live_checks or args.counts_file))
     ):
         msg = "count-check flags do not take other arguments"
         raise BronzeError(msg)
     if live:
-        from open_data_platform.lakehouse.live_counts import bronze_count_checks
+        from open_data_platform.lakehouse.reconciliation import (
+            ReconciliationError,
+            bronze_count_checks,
+            parse_counts,
+        )
 
-        checks = bronze_count_checks()
+        if not args.counts_file:
+            msg = "pass --counts-file"
+            raise BronzeError(msg)
+        try:
+            text = Path(args.counts_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            msg = f"cannot read count file: {args.counts_file}"
+            raise BronzeError(msg) from exc
+        try:
+            checks = bronze_count_checks(parse_counts(text), load_contracts())
+        except ReconciliationError as exc:
+            raise BronzeError(str(exc)) from exc
     else:
         from open_data_platform.lakehouse.fixtures import live_checks
 
@@ -478,6 +512,12 @@ def _promote_cli(args: argparse.Namespace) -> None:
         contracts=contracts,
     )
     _write_dataset_scripts(args.sql_out, promotion.scripts)
+    if args.counts_out:
+        from open_data_platform.lakehouse.reconciliation import format_counts
+
+        destination = Path(args.counts_out)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(format_counts(promotion.counts), encoding="utf-8")
     for name, count in promotion.counts:
         print(f"{name} {count}")
 
