@@ -1,0 +1,36 @@
+version: 2
+models:
+- name: dim_date
+  description: One day from 2016-09-01 through 2026-12-31.
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          date_day: date
+          year_num: bigint
+          month_num: bigint
+          day_of_month: bigint
+          day_of_week: bigint
+          week_start: date
+          month_start: date
+          quarter_start: date
+          year_start: date
+          year_month: varchar
+          year_quarter: varchar
+  columns:
+  - name: date_day
+    data_tests:
+    - not_null
+    - unique
+  - name: month_num
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 12
+  - name: day_of_month
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 31
