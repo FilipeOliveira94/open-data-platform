@@ -45,7 +45,11 @@ def test_catalog_run_script_uses_jdbc_and_env_credentials() -> None:
     assert "s3a://${ODP_WAREHOUSE_BUCKET}/catalog" in script
     assert "jdbc:postgresql://postgres:5432/${ICEBERG_CATALOG_DB}" in script
     assert "${POSTGRES_USER}" in script
-    assert "${POSTGRES_PASSWORD}" in script
+    assert "POSTGRES_PASSWORD:?" in script
+    credentials = (ROOT / "docker" / "spark" / "credentials.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "${POSTGRES_PASSWORD}" in credentials
     assert "minioadmin" not in script
     assert "java11" not in script.lower()
 

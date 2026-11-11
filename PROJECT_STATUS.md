@@ -148,7 +148,8 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 - P2-02 proved one table on the Iceberg JDBC catalog: Spark writes, Trino 484 reads. An overwrite leaves the previous Parquet files in the bucket. JDBC is not the Glue protocol. The Hadoop catalog remains the P2-01 probe only.
 - P2-03 stores Bronze contract fields as `STRING` on that same catalog. P2-04 Silver reads those tables, casts by contract type, and deduplicates per source module.
-- P2-06 Gold writes through Trino CTAS (`dbt-trino`). Quarantine findings are staged from MinIO JSONL into `gold_staging` before quality facts.
+- P2-06 Gold writes through Trino CTAS (`dbt-trino`). Quarantine findings are staged from MinIO JSONL into `gold_staging` before quality facts. The Spark load script names the staging object path. Finding values stay in that JSONL file.
+- Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Exactly-once end-to-end will not be claimed without a written proof.
 - `terraform apply` / `destroy` and destructive volume ops need explicit approval.
@@ -174,6 +175,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-11 — Log exposure fix
+
+Quarantine staging no longer inlines finding values in SQL. `make stage-quarantine` writes warehouse JSONL and loads it with Spark. Spark runners pass the JDBC password and S3 keys through a properties file. `tests/unit/infrastructure/test_spark_credentials.py` fails if another `docker/spark/*.sh` assigns those keys. The agent rule is `.cursor/rules/05-runtime-data-exposure.mdc`. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` passed 294. `make stage-quarantine` was not re-run on the live stack. Detail: [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md).
 
 ### 2026-11-11 — P2-07 verified
 

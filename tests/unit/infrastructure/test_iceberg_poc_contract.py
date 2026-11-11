@@ -30,8 +30,13 @@ def test_run_script_pins_iceberg_and_reads_credentials_from_env() -> None:
     assert HADOOP_AWS in script
     assert AWS_SDK_BUNDLE in script
     assert "spark.sql.catalog.local.type=hadoop" in script
-    assert "${MINIO_ROOT_USER}" in script
-    assert "${MINIO_ROOT_PASSWORD}" in script
+    assert "MINIO_ROOT_USER:?" in script
+    assert "MINIO_ROOT_PASSWORD:?" in script
+    credentials = (ROOT / "docker" / "spark" / "credentials.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "${MINIO_ROOT_USER}" in credentials
+    assert "${MINIO_ROOT_PASSWORD}" in credentials
     assert "minioadmin" not in script
     assert "java11" not in script.lower()
 

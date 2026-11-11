@@ -83,6 +83,7 @@ Do **not** treat `PROJECT_STATUS.md` as durable evidence storage. Architecture d
 ## 8. Security and Cost
 
 - Never commit secrets, credentials, access tokens or sensitive datasets.
+- Not committing a value is not enough. Do not place row values or secrets in query text, process arguments, exception messages, or `print` output. Counts, names, paths, and field names are fine. Write rows to a data file and reference the path. Spark secrets go through `docker/spark/credentials.sh`, not `--conf`.
 - Use `.env.example` for variable names and safe placeholders.
 - Treat public API responses and downloaded files as untrusted input.
 - Prefer short-lived AWS credentials and OIDC for CI/CD.
@@ -122,4 +123,4 @@ At the end of every task, report:
 
 The user makes final architectural decisions and approves significant changes.
 
-Cursor project rules in `.cursor/rules/` split this contract by concern (`00` principles, `01` Python/testing, `02` data engineering, `03` infrastructure/security, `04` agent workflow). Keep `AGENTS.md` as the canonical source.
+Cursor project rules in `.cursor/rules/` split this contract by concern (`00` principles, `01` Python/testing, `02` data engineering, `03` infrastructure/security, `04` agent workflow, `05` runtime data exposure). Keep `AGENTS.md` as the canonical source.

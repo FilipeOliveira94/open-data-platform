@@ -13,7 +13,7 @@ alwaysApply: true
 - Use Terraform for the AWS deployment path (local→AWS mapping: MinIO→S3, catalog→Glue, Trino→Athena) and document required permissions.
 - Present the AWS path as Infrastructure as Code that shows how the platform provisions on AWS; do not frame documentation around unpaid cloud usage.
 - Do not install or upgrade system-wide dependencies without explaining the impact.
-- Never commit secrets, credentials, access tokens or sensitive datasets. Do not hard-code them in source.
+- Never commit secrets, credentials, access tokens or sensitive datasets. Do not hard-code them in source. Runtime exposure (query text, process arguments, driver logs) is a separate rule.
 - Treat public API responses and downloaded files as untrusted input.
 - Use `.env.example` for variable names and safe placeholders.
 - Prefer short-lived AWS credentials and OIDC for CI/CD.

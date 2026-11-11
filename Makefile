@@ -169,12 +169,29 @@ live-silver: ## Full-data Silver live run from existing Bronze tables
 	done < .local/silver-checks.tsv
 
 stage-quarantine: ## Stage MinIO quarantine JSONL into iceberg.gold_staging.quarantine_findings
-	@set -a; \
+	@set -e; \
+	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
-	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(UV) run python -m open_data_platform.lakehouse.quarantine_stage
+	mkdir -p .local; \
+	$(ensure_spark_ivy); \
+	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
+	case "$$db" in \
+		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
+	esac; \
+	$(COMPOSE) up -d --wait postgres minio; \
+	exists=$$($(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'"); \
+	if [ "$$exists" != "1" ]; then \
+		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
+	fi; \
+	rm -rf .local/quarantine-sql; \
+	$(UV) run python -m open_data_platform.lakehouse.quarantine_stage --sql-out .local/quarantine-sql; \
+	echo "Spark quarantine staging"; \
+	$(COMPOSE) --profile lakehouse run --rm -T \
+		-v "$(CURDIR)/.local/quarantine-sql/quarantine_findings.sql:/tmp/quarantine.sql:ro" \
+		-e ODP_SPARK_SQL=/tmp/quarantine.sql \
+		spark /opt/odp/run_bronze.sh
 
 dbt-parse: ## Parse the Gold dbt project (Trino profile required)
 	@set -a; \
