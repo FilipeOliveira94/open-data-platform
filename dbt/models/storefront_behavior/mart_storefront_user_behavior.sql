@@ -6,21 +6,31 @@
     }
 ) }}
 
-with sessions as (
-  select * from {{ ref('mart_storefront_session') }}
+with session_agg as (
+  select
+    user_id,
+    count(*) as session_count,
+    count_if(has_purchase) as purchase_session_count,
+    count_if(has_cart and not has_purchase) as cart_no_purchase_sessions
+  from {{ ref('mart_storefront_session') }}
+  group by 1
 ),
-events as (
-  select * from {{ ref('fct_storefront_events') }}
+event_agg as (
+  select
+    user_id,
+    count(distinct product_id) as products_touched,
+    max(event_time) as last_session_time
+  from {{ ref('fct_storefront_events') }}
+  group by 1
 )
 select
   u.user_id,
-  count(distinct s.session_id) as session_count,
-  count_if(s.has_purchase) as purchase_session_count,
-  count(distinct e.product_id) as products_touched,
-  count_if(s.has_cart and not s.has_purchase) as cart_no_purchase_sessions,
-  max(e.event_time) as last_session_time
+  coalesce(s.session_count, 0) as session_count,
+  coalesce(s.purchase_session_count, 0) as purchase_session_count,
+  coalesce(e.products_touched, 0) as products_touched,
+  coalesce(s.cart_no_purchase_sessions, 0) as cart_no_purchase_sessions,
+  e.last_session_time
 from {{ ref('dim_storefront_users') }} u
-left join sessions s on s.user_id = u.user_id
-left join events e on e.user_id = u.user_id
-group by 1
+left join session_agg s on s.user_id = u.user_id
+left join event_agg e on e.user_id = u.user_id
 
