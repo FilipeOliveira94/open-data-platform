@@ -1,0 +1,290 @@
+version: 2
+models:
+- name: dim_oltp_customers
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          customer_id: varchar
+          customer_unique_id: varchar
+          zip_prefix: varchar
+          city: varchar
+          state_code: varchar
+          updated_at: timestamp
+          municipality_id: bigint
+          municipality_name: varchar
+  columns:
+  - name: customer_id
+    data_tests:
+    - not_null
+    - unique
+- name: dim_oltp_sellers
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          seller_id: varchar
+          zip_prefix: varchar
+          city: varchar
+          state_code: varchar
+          updated_at: timestamp
+          municipality_id: bigint
+          municipality_name: varchar
+  columns:
+  - name: seller_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_oltp_orders
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          order_id: varchar
+          customer_id: varchar
+          customer_unique_id: varchar
+          order_status: varchar
+          order_purchase_timestamp: timestamp
+          order_approved_at: timestamp
+          order_delivered_carrier_date: timestamp
+          order_delivered_customer_date: timestamp
+          order_estimated_delivery_date: timestamp
+          purchase_date: date
+          purchase_city: varchar
+          purchase_state: varchar
+          purchase_zip_prefix: varchar
+          municipality_id: bigint
+          municipality_name: varchar
+          updated_at: timestamp
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+    - unique
+  - name: order_status
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - created
+          - approved
+          - invoiced
+          - processing
+          - shipped
+          - delivered
+          - canceled
+          - unavailable
+- name: fct_oltp_order_items
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          order_id: varchar
+          order_item_id: bigint
+          product_id: varchar
+          seller_id: varchar
+          shipping_limit_date: timestamp
+          price: double
+          freight_value: double
+          item_gmv: double
+          seller_zip_prefix: varchar
+          seller_city: varchar
+          seller_state_code: varchar
+          updated_at: timestamp
+  - unique_combination:
+      arguments:
+        combination:
+        - order_id
+        - order_item_id
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+  - name: order_item_id
+    data_tests:
+    - not_null
+- name: mart_oltp_platform_sales
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_date: date
+          order_count: bigint
+          delivered_order_count: bigint
+          item_gmv: double
+  columns:
+  - name: purchase_date
+    data_tests:
+    - not_null
+    - unique
+- name: mart_oltp_seller_performance
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          seller_id: varchar
+          item_gmv: double
+          order_count: bigint
+          freight_to_price_ratio: double
+          on_time_handoff_rate: decimal
+  columns:
+  - name: seller_id
+    data_tests:
+    - not_null
+    - unique
+- name: mart_oltp_buyer_geography
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          seller_id: varchar
+          municipality_id: bigint
+          municipality_name: varchar
+          order_count: bigint
+          item_gmv: double
+  - unique_combination:
+      arguments:
+        combination:
+        - seller_id
+        - municipality_id
+        - municipality_name
+- name: mart_oltp_order_milestones
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_month: timestamp
+          order_count: bigint
+          approved_count: bigint
+          carrier_handoff_count: bigint
+          customer_delivery_count: bigint
+  columns:
+  - name: purchase_month
+    data_tests:
+    - not_null
+    - unique
+- name: mart_oltp_delivery_performance
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_month: timestamp
+          delivered_with_both_dates: bigint
+          on_time_rate: decimal
+          late_rate: decimal
+          on_time_handoff_rate: double
+  columns:
+  - name: purchase_month
+    data_tests:
+    - not_null
+    - unique
+- name: mart_oltp_late_orders
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          order_id: varchar
+          purchase_date: date
+          customer_state: varchar
+          seller_id: varchar
+          days_late: bigint
+          carrier_handoff_missed_deadline: boolean
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+    - unique
+  - name: days_late
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 1
+- name: mart_oltp_freight
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          customer_state: varchar
+          distance_band: varchar
+          item_count: bigint
+          avg_freight_per_item: double
+          freight_to_price_ratio: double
+  - unique_combination:
+      arguments:
+        combination:
+        - customer_state
+        - distance_band
+  columns:
+  - name: distance_band
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - 0_50km
+          - 50_200km
+          - 200_500km
+          - 500km_plus
+          - unknown
+- name: mart_oltp_cancellations
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_month: timestamp
+          order_status: varchar
+          order_count: bigint
+          approved_before_cancel_count: bigint
+  - unique_combination:
+      arguments:
+        combination:
+        - purchase_month
+        - order_status
+  columns:
+  - name: order_status
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - canceled
+          - unavailable
+- name: fct_oltp_quality_findings
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          finding_id: varchar
+          issue_class: varchar
+          reason: varchar
+          source_dataset: varchar
+          business_key: varchar
+          field: varchar
+          detail: varchar
+  columns:
+  - name: finding_id
+    data_tests:
+    - not_null
+    - unique
+  - name: issue_class
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - contract_violation
+          - business_anomaly
+  - name: reason
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - null_violation
+          - type_mismatch
+          - duplicate_primary_key
+          - order_without_items
+          - delivered_without_timestamp
+          - address_without_municipality
+          - zip_prefix_unknown
