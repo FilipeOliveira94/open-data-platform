@@ -1,0 +1,443 @@
+version: 2
+models:
+- name: dim_products
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          product_id: varchar
+          category_portuguese: varchar
+          category_english: varchar
+          product_name_length: bigint
+          product_description_length: bigint
+          product_photos_qty: bigint
+          product_weight_g: bigint
+          product_length_cm: bigint
+          product_height_cm: bigint
+          product_width_cm: bigint
+  columns:
+  - name: product_id
+    data_tests:
+    - not_null
+    - unique
+- name: dim_sellers
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          seller_id: varchar
+          zip_prefix: varchar
+          city: varchar
+          state_code: varchar
+          municipality_id: bigint
+          municipality_name: varchar
+  columns:
+  - name: seller_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_orders
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          order_id: varchar
+          customer_id: varchar
+          customer_unique_id: varchar
+          order_status: varchar
+          order_purchase_timestamp: timestamp
+          order_approved_at: timestamp
+          order_delivered_carrier_date: timestamp
+          order_delivered_customer_date: timestamp
+          order_estimated_delivery_date: timestamp
+          purchase_date: date
+          purchase_city: varchar
+          purchase_state: varchar
+          purchase_zip_prefix: varchar
+          municipality_id: bigint
+          municipality_name: varchar
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+    - unique
+  - name: order_status
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - created
+          - approved
+          - invoiced
+          - processing
+          - shipped
+          - delivered
+          - canceled
+          - unavailable
+- name: fct_order_items
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          order_id: varchar
+          order_item_id: bigint
+          product_id: varchar
+          seller_id: varchar
+          shipping_limit_date: timestamp
+          price: double
+          freight_value: double
+          item_gmv: double
+          seller_city: varchar
+          seller_state_code: varchar
+          seller_zip_prefix: varchar
+          seller_municipality_id: bigint
+          seller_municipality_name: varchar
+  - unique_combination:
+      arguments:
+        combination:
+        - order_id
+        - order_item_id
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+  - name: order_item_id
+    data_tests:
+    - not_null
+  - name: price
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 0
+  - name: freight_value
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 0
+- name: fct_payments
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          order_id: varchar
+          payment_sequential: bigint
+          payment_type: varchar
+          payment_installments: bigint
+          payment_value: double
+  - unique_combination:
+      arguments:
+        combination:
+        - order_id
+        - payment_sequential
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+  - name: payment_sequential
+    data_tests:
+    - not_null
+  - name: payment_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - credit_card
+          - boleto
+          - voucher
+          - debit_card
+          - not_defined
+  - name: payment_installments
+    description: Published rows can use 0. The contract does not require a positive count.
+    data_tests:
+    - not_null
+    - accepted_range:
+        arguments:
+          min_value: 0
+  - name: payment_value
+    data_tests:
+    - not_null
+    - accepted_range:
+        arguments:
+          min_value: 0
+- name: int_order_primary_payment
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+    - unique
+  - name: primary_payment_method
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - credit_card
+          - boleto
+          - voucher
+          - debit_card
+          - not_defined
+- name: mart_platform_sales
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_date: date
+          order_count: bigint
+          delivered_order_count: bigint
+          item_gmv: double
+          amount_collected: double
+  columns:
+  - name: purchase_date
+    data_tests:
+    - not_null
+    - unique
+- name: mart_seller_performance
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          seller_id: varchar
+          item_gmv: double
+          order_count: bigint
+          on_time_handoff_rate: double
+          freight_to_price_ratio: double
+          distinct_buyer_municipalities: bigint
+  columns:
+  - name: seller_id
+    data_tests:
+    - not_null
+    - unique
+- name: mart_seller_buyer_geography
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          seller_id: varchar
+          municipality_id: bigint
+          municipality_name: varchar
+          order_count: bigint
+          item_gmv: double
+  - unique_combination:
+      arguments:
+        combination:
+        - seller_id
+        - municipality_id
+        - municipality_name
+- name: mart_order_milestones
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_month: timestamp
+          primary_payment_method: varchar
+          order_count: bigint
+          approved_count: bigint
+          carrier_handoff_count: bigint
+          customer_delivery_count: bigint
+          canceled_after_approval_count: bigint
+          unavailable_count: bigint
+  - unique_combination:
+      arguments:
+        combination:
+        - purchase_month
+        - primary_payment_method
+  columns:
+  - name: primary_payment_method
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - credit_card
+          - boleto
+          - voucher
+          - debit_card
+          - not_defined
+          - unknown
+- name: mart_payment_mix
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          payment_method: varchar
+          installment_count: bigint
+          payment_row_count: bigint
+          order_count: bigint
+          amount_collected: double
+  - unique_combination:
+      arguments:
+        combination:
+        - payment_method
+        - installment_count
+  columns:
+  - name: payment_method
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - credit_card
+          - boleto
+          - voucher
+          - debit_card
+          - not_defined
+- name: mart_order_cancellations
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_month: timestamp
+          order_status: varchar
+          primary_payment_method: varchar
+          order_count: bigint
+          item_gmv: double
+          amount_collected: double
+          approved_before_cancel_count: bigint
+  - unique_combination:
+      arguments:
+        combination:
+        - purchase_month
+        - order_status
+        - primary_payment_method
+  columns:
+  - name: order_status
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - canceled
+          - unavailable
+  - name: primary_payment_method
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - credit_card
+          - boleto
+          - voucher
+          - debit_card
+          - not_defined
+          - unknown
+- name: mart_delivery_performance
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          purchase_month: timestamp
+          customer_state: varchar
+          delivered_order_count: bigint
+          delivered_with_both_dates: bigint
+          on_time_count: bigint
+          late_count: bigint
+          on_time_rate: decimal
+          late_rate: decimal
+          on_time_handoff_rate: double
+  - unique_combination:
+      arguments:
+        combination:
+        - purchase_month
+        - customer_state
+- name: mart_late_orders
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          order_id: varchar
+          purchase_date: date
+          customer_state: varchar
+          seller_id: varchar
+          days_late: bigint
+          review_score: double
+          freight_to_price_ratio: double
+          primary_payment_method: varchar
+          carrier_handoff_missed_deadline: boolean
+  columns:
+  - name: order_id
+    data_tests:
+    - not_null
+    - unique
+  - name: days_late
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 1
+  - name: primary_payment_method
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - credit_card
+          - boleto
+          - voucher
+          - debit_card
+          - not_defined
+- name: mart_freight
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          customer_state: varchar
+          distance_band: varchar
+          item_count: bigint
+          avg_freight_per_item: double
+          freight_to_price_ratio: double
+  - unique_combination:
+      arguments:
+        combination:
+        - customer_state
+        - distance_band
+  columns:
+  - name: distance_band
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - 0_50km
+          - 50_200km
+          - 200_500km
+          - 500km_plus
+          - unknown
+- name: fct_operations_quality_findings
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          finding_id: varchar
+          issue_class: varchar
+          reason: varchar
+          source_dataset: varchar
+          business_key: varchar
+          field: varchar
+          detail: varchar
+  columns:
+  - name: finding_id
+    data_tests:
+    - not_null
+    - unique
+  - name: issue_class
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - contract_violation
+          - business_anomaly
+  - name: reason
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - null_violation
+          - type_mismatch
+          - duplicate_primary_key
+          - order_without_items
+          - order_without_payment
+          - payment_amount_mismatch
+          - delivered_without_timestamp
+          - product_without_category
