@@ -1,0 +1,150 @@
+version: 2
+models:
+- name: dim_storefront_users
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          user_id: varchar
+  columns:
+  - name: user_id
+    data_tests:
+    - not_null
+    - unique
+- name: dim_storefront_products
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          product_id: varchar
+  columns:
+  - name: product_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_storefront_events
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          event_id: varchar
+          event_time: timestamp
+          event_type: varchar
+          session_id: varchar
+          user_id: varchar
+          product_id: varchar
+  columns:
+  - name: event_id
+    data_tests:
+    - not_null
+    - unique
+  - name: event_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - page_view
+          - add_to_cart
+          - purchase
+  - name: session_id
+    data_tests:
+    - not_null
+  - name: user_id
+    data_tests:
+    - not_null
+- name: mart_storefront_session
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          session_id: varchar
+          user_id: varchar
+          event_count: bigint
+          has_cart: boolean
+          has_purchase: boolean
+          cart_events_before_first_purchase: bigint
+          last_event_type: varchar
+          last_product_id: varchar
+  columns:
+  - name: session_id
+    data_tests:
+    - not_null
+    - unique
+  - name: last_event_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - page_view
+          - add_to_cart
+          - purchase
+- name: mart_storefront_product_behavior
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          product_id: varchar
+          view_count: bigint
+          cart_count: bigint
+          purchase_count: bigint
+          sessions_viewed: bigint
+          sessions_purchased: bigint
+          sessions_ended_on_product: bigint
+  columns:
+  - name: product_id
+    data_tests:
+    - not_null
+    - unique
+- name: mart_storefront_user_behavior
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          user_id: varchar
+          session_count: bigint
+          purchase_session_count: bigint
+          products_touched: bigint
+          cart_no_purchase_sessions: bigint
+          last_session_time: timestamp
+  columns:
+  - name: user_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_storefront_quality_findings
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          finding_id: varchar
+          issue_class: varchar
+          reason: varchar
+          source_dataset: varchar
+          business_key: varchar
+          field: varchar
+          detail: varchar
+  columns:
+  - name: finding_id
+    data_tests:
+    - not_null
+    - unique
+  - name: issue_class
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - contract_violation
+          - business_anomaly
+  - name: reason
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - null_violation
+          - type_mismatch
+          - duplicate_primary_key
+          - cart_or_purchase_without_product
