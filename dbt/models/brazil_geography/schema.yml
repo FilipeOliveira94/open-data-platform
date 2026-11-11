@@ -1,0 +1,75 @@
+version: 2
+models:
+- name: dim_municipality
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          municipality_id: bigint
+          municipality_name: varchar
+          municipality_name_norm: varchar
+          state_code: varchar
+          state_name: varchar
+          region_code: varchar
+          region_name: varchar
+          microregion_id: bigint
+          microregion_name: varchar
+  columns:
+  - name: municipality_id
+    data_tests:
+    - not_null
+    - unique
+- name: dim_zip_prefix
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          zip_prefix: varchar
+          modal_state: varchar
+          modal_city: varchar
+          mean_latitude: double
+          mean_longitude: double
+          multi_state_flag: boolean
+  columns:
+  - name: zip_prefix
+    data_tests:
+    - not_null
+    - unique
+  - name: multi_state_flag
+    data_tests:
+    - not_null
+- name: fct_geography_quality_findings
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          finding_id: varchar
+          issue_class: varchar
+          reason: varchar
+          source_dataset: varchar
+          business_key: varchar
+          field: varchar
+          detail: varchar
+  columns:
+  - name: finding_id
+    data_tests:
+    - not_null
+    - unique
+  - name: issue_class
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - contract_violation
+          - business_anomaly
+  - name: reason
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - null_violation
+          - type_mismatch
+          - duplicate_primary_key
+          - zip_prefix_multi_state
