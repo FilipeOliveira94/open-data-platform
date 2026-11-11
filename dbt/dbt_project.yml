@@ -38,3 +38,25 @@ models:
       +schema: storefront_behavior
     oltp_operations:
       +schema: oltp_operations
+
+# `make dbt-build` and `make live-gold` pass `--exclude tag:reconciliation`.
+# Run the suite with `make dbt-test-reconciliation`. A plain `dbt build` still includes it.
+tests:
+  open_data_platform:
+    reconciliation:
+      gold_shared:
+        +tags: ["reconciliation", "gold_shared"]
+      brazil_geography:
+        +tags: ["reconciliation", "brazil_geography"]
+      marketplace_operations:
+        +tags: ["reconciliation", "marketplace_operations"]
+      customer_crm:
+        +tags: ["reconciliation", "customer_crm"]
+      seller_acquisition:
+        +tags: ["reconciliation", "seller_acquisition"]
+      catalog_commerce:
+        +tags: ["reconciliation", "catalog_commerce"]
+      storefront_behavior:
+        +tags: ["reconciliation", "storefront_behavior"]
+      oltp_operations:
+        +tags: ["reconciliation", "oltp_operations"]

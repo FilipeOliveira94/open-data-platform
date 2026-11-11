@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build live-gold up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold up down ps logs clean
 DBT ?= $(UV) run dbt
 DBT_PROJECT_DIR ?= dbt
 DBT_PROFILES_DIR ?= dbt
@@ -184,13 +184,21 @@ dbt-parse: ## Parse the Gold dbt project (Trino profile required)
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(DBT) parse --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR)
 
-dbt-build: ## Build all Gold dbt models (requires Silver + staged quarantine)
+dbt-build: ## Build Gold models and schema tests (excludes reconciliation)
 	@set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(DBT) build --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR)
+	$(DBT) build --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR) --exclude tag:reconciliation
+
+dbt-test-reconciliation: ## Run reconciliation tests (separate from live-gold; daily cadence)
+	@set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(DBT) test --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR) --select tag:reconciliation
 
 live-gold: stage-quarantine dbt-build ## Stage quarantine sidecars then build Gold models
 
