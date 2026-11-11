@@ -1,9 +1,9 @@
 ---
 title: Pipeline
-description: Verified raw ingestion and the lakehouse, orchestration, and CDC work that is not started.
+description: Verified raw ingestion, the verified lakehouse, and the orchestration and CDC work that is not started.
 ---
 
-Phase 1 raw ingestion is **verified**. Bronze, Silver, Gold, Airflow schedules, and streaming CDC are **not started**.
+Phase 1 raw ingestion is **verified**. Bronze, Silver, and Gold are **verified** in the repository and are not charted on this page yet. Airflow schedules and streaming CDC are **not started**.
 
 ## Verified raw landing
 
@@ -29,10 +29,10 @@ Index: [Phase 1 ingestion](https://github.com/FilipeOliveira94/open-data-platfor
 | Weekly batch | The same extract with a seven-day window. The Airflow schedule is Phase 3 |
 | Streaming | Phase 4. CDC does not replace the batch extract |
 
-## Not started
+## Lakehouse and later phases
 
 | Status | Item |
 | --- | --- |
-| **Not started** | Bronze / Silver / Gold and dbt (Phase 2) |
+| **Verified, not charted here** | Bronze / Silver / Gold and dbt (Phase 2). Domain charts are Phase 9. Index: [Gold model design](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/gold-model-design.md) |
 | **Not started** | Airflow daily and weekly schedules, backfills (Phase 3) |
 | **Not started** | Streaming CDC (Phase 4) |

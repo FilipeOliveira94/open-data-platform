@@ -2,7 +2,7 @@
 
 Issue-level plan for the Open Data Platform. This file is the source of truth for **scope, dependencies, issue status and acceptance criteria**. `PROJECT_STATUS.md` is the **current-phase** operational ledger (progress, latest validation, active gates). Longer history lives in `docs/status-log.md`.
 
-**Estimated window:** ~16 weeks / 240–320 hours at 15+ h/week. Windows are planning guides, not delivery promises.
+**Estimated window:** ~16 weeks / 240–320 hours at 15+ h/week, set before Phase 8 existed. Windows are planning guides, not delivery promises.
 
 **Status values:** `not started` · `in progress` · `delivered` · `verified` · `blocked`
 
@@ -39,13 +39,14 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | --- | --- | --- | --- | --- |
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
 | 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | In progress (P2-01–P2-06 and P2-08 verified) |
+| 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | In progress (P2-01–P2-08 verified) |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
 | 7 | AWS deployment path as IaC (Terraform, local→AWS mapping), case-study docs | Sprint 6 (weeks 14–16) | Phase 6 verified | Not started |
-| 8 | Platform report site: multi-page static report | Sprint 7 (weeks 16–18) | Phase 7 verified | Not started |
+| 8 | JupyterLab exploration and Superset charts over Gold, read-only via Trino | After Phase 2 (parallel with 3–7) | Phase 2 verified | Not started |
+| 9 | Platform report site: multi-page static report | After Phases 7 and 8 | Phase 7 and Phase 8 verified | Not started |
 
 ### Platform report site — growth scheme
 
@@ -53,15 +54,32 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 | Page | Role | Primary sources |
 | --- | --- | --- |
-| **Home** | What the platform is, current status, one architecture sketch | `README.md`, `PROJECT_STATUS.md` |
-| **Architecture** | Stack, medallion layers, contracts, batch vs streaming coexistence | `docs/architecture/`, ADRs, `DECISIONS.md` |
-| **Pipeline** | Ingestion → Bronze / Silver / Gold, orchestration, CDC | Phase 1–4 docs and diagrams |
-| **Operations** | Quality, observability, lineage, CI, local→AWS IaC path | Phases 5–7 docs; P7 case study |
-| **Reference** | Links to repository, ADRs, roadmap, setup | Repo root docs |
+| **Home** | What the platform is, current status, and the on-time delivery chart | `README.md`, `PROJECT_STATUS.md`, figure 1 |
+| **Architecture** | Stack, medallion, contracts, batch vs stream, and the read path through Trino to JupyterLab and Superset | `docs/architecture/`, ADRs, figure 10 |
+| **Pipeline** | Ingestion → Bronze / Silver / Gold, one chart per Gold domain, orchestration and CDC when those phases are verified | Phase 1–4 docs; figures 2–9 |
+| **Operations** | Quality, lineage, CI, local→AWS path; a Grafana image when Phase 5 is verified | Phases 5–7 docs; P7 case study |
+| **Reference** | Links to the repository, ADRs, roadmap, setup, and the figure manifest | Repo root docs |
 
-**Incremental rule (Phases 1–7):** a scaffold under `site/` may exist early (Astro Starlight + Catppuccin theme). Content updates must use only facts already **verified** in `PROJECT_STATUS.md`. Do **not** complete public hosting or final copy polish until Phase 8.
+**Figure caption.** Each caption records the question, the value, the grain, what the rate excludes, the Gold table, the tool, the version, and the run id. The number in the caption is the number in the image and the number recorded for that run.
 
-**Phase 7 vs Phase 8:** P7-07 delivers the **in-repo case study** (markdown, diagrams, reproduction steps). P7-08 checks that case study against a recorded IaC result, and P7-09 records status. Phase 8 turns that material into the **deployed multi-page report** and sets the GitHub repository Website URL.
+**Site figures.** Phase 8 draws them. Phase 9 publishes them as static images under `site/src/assets/figures/`, with a caption manifest. The site does not embed Jupyter or Superset. `.ipynb` files stay free of outputs. An image shows an aggregate. It does not show an order id, a review text, an email, a customer name, or a single-person location. Olist figures are aggregates of the CC BY-NC-SA source, the same class of fact already written in the Gold docs, and the caption says so. A Grafana image is added on Operations only when Phase 5 is verified. P9-06 compares every caption to the manifest and to that run.
+
+| # | Page | Question | Mart | What the image shows | Tool |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Home | Did delivery meet the promised date? | `mart_delivery_performance` | On-time rate | Superset |
+| 2 | Pipeline | How late are the missed promises? | `mart_late_orders` | Days-late buckets or a count, not order rows | Superset |
+| 3 | Pipeline | How does marketplace GMV move? | `mart_platform_sales` | Item GMV by purchase date | Superset |
+| 4 | Pipeline | Does delay change the review score? | `mart_review_drivers` | Mean score by delay bucket | Superset |
+| 5 | Pipeline | Which lead origins become sellers that sell? | `mart_marketing_acquisition` | Win rate and matched item GMV by origin | Superset |
+| 6 | Pipeline | Where are the buyers, by state? | `mart_customer_geography` | Buyer counts by UF | Superset |
+| 7 | Pipeline | How are catalog prices spread? | `mart_catalog_prices` | Median price by category | Superset |
+| 8 | Pipeline | How often does a session purchase? | `mart_storefront_session` | Session counts by cart and purchase | Superset |
+| 9 | Pipeline | Does the OLTP sample keep the same promise? | `mart_oltp_delivery_performance` | On-time rate, labeled as a different population from Olist | Superset |
+| 10 | Architecture | Does the notebook reach the same rate? | `mart_delivery_performance` | The on-time query, same value as figure 1 | JupyterLab |
+
+**Incremental rule (Phases 1–8):** a scaffold under `site/` may exist early (Astro Starlight + Catppuccin theme). Content updates must use only facts already **verified** in `PROJECT_STATUS.md`. Do **not** complete public hosting, the figure gallery, or final copy polish until Phase 9. Phase 8 may add the exported images and the manifest once P8-06 has checked them. It does not publish the hosted report.
+
+**Phase 7 vs Phase 9:** P7-07 delivers the **in-repo case study** (markdown, diagrams, reproduction steps). P7-08 checks that case study against a recorded IaC result, and P7-09 records status. Phase 9 turns that material, plus verified Phase 8 exploration notes, into the **deployed multi-page report** and sets the GitHub repository Website URL.
 
 ---
 
@@ -89,7 +107,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P0-03 | Project engineering rules | P0-02 | Delivered | `.cursor/rules/` covers principles, Python/testing, data engineering, infra/security, workflow |
 | P0-04 | Project status ledger | — | Delivered | `PROJECT_STATUS.md` distinguishes delivered vs verified |
 | P0-05 | Program context document | — | Delivered | `docs/project-context-for-cursor.md` captures objectives, constraints, target architecture |
-| P0-06 | Program roadmap | P0-04, P0-05 | Delivered | This file: phases 0–8, issue IDs, dependencies, acceptance, out-of-scope |
+| P0-06 | Program roadmap | P0-04, P0-05 | Delivered | This file: phases 0–9, issue IDs, dependencies, acceptance, out-of-scope |
 | P0-07 | Decision log scaffold | P0-06 | Delivered | `DECISIONS.md` is a summary index; ADRs under `docs/decisions/` hold rationale; proposed vs approved visible |
 | P0-08 | Python 3.12 package with `uv` | — | Delivered | Package under `src/open_data_platform/`; `pyproject.toml` + committed lockfile; installable via documented command |
 | P0-09 | Ruff and pytest smoke | P0-08 | Verified | Lint and a toolchain smoke test pass via documented commands |
@@ -145,7 +163,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Depends on:** Phase 1 verified. **Hard gate:** P2-01 must succeed before scaling transforms.
 
-**Out of scope:** Airflow orchestration, CDC/streaming, AWS lakehouse modules (Phase 7 IaC).
+**Out of scope:** Airflow orchestration, CDC/streaming, AWS lakehouse modules (Phase 7 IaC), notebooks and business BI (Phase 8).
 
 **Phase acceptance (all required):**
 
@@ -353,7 +371,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P7-04 | GitHub Actions OIDC to AWS | P7-03 | Not started | OIDC provider and deploy role as Terraform + docs; no long-lived access keys in the repository |
 | P7-05 | CI: Terraform fmt and validate | P7-02, P6-03 | Not started | Workflow runs `terraform fmt -check` and `validate` on the IaC tree |
 | P7-06 | AWS cost model | P7-01 | Not started | Cost model with assumptions, drivers and monthly estimate ranges for the documented AWS design |
-| P7-07 | Case study: README, diagrams, demo path | P7-03, P7-04, P7-05, P7-06 | Not started | In-repo case study: local platform + AWS IaC path, architecture diagrams, setup and provisioning guidance; content ready for Phase 8 site consumption |
+| P7-07 | Case study: README, diagrams, demo path | P7-03, P7-04, P7-05, P7-06 | Not started | In-repo case study: local platform + AWS IaC path, architecture diagrams, setup and provisioning guidance; content ready for Phase 9 site consumption |
 | P7-08 | Live run, result, and consistency check | P7-03, P7-04, P7-05, P7-06, P7-07 | Not started | Run `terraform fmt -check` and `terraform validate` on the IaC tree. Record the result. Compare module resources to the local→AWS mapping and to the cost-model drivers. `terraform plan` only with explicit approval. `apply` and `destroy` are outside this issue. Record mismatches. Do not invent spend figures |
 | P7-09 | Phase 7 documentation and status | P7-08 | Not started | README, the case study, and `PROJECT_STATUS.md` cite the P7-08 result. P7-07 remains the case-study content issue |
 
@@ -361,13 +379,49 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 ---
 
-## Phase 8 — Platform report site
+## Phase 8 — Interactive exploration and data visualization
 
-**Goal:** Finish the program with a small, polished **multi-page static report** that documents the verified platform (home, architecture, pipeline, operations, reference). Host it and link it from the repository Website field and the README.
+**Goal:** Give two read-only surfaces over verified Gold marts, both through Trino. JupyterLab is for iterative exploration. Apache Superset is for saved business charts. Spark stays the Bronze/Silver writer. dbt-trino stays the Gold writer.
 
-**Depends on:** Phase 7 verified (in-repo case study and AWS IaC path available as source material).
+**Depends on:** Phase 2 verified. This phase may run in parallel with Phases 3–7. It does not wait for Airflow, CDC, or the AWS path.
 
-**Out of scope:** Backend, CMS, authentication, analytics pixels, interactive demos that require a live cluster, duplicating the full `ROADMAP.md` issue backlog on the site.
+**Out of scope:** Writing Iceberg or PostgreSQL from notebooks or Superset. Using Superset SQL Lab as the exploration product. Using Grafana as business BI (Phase 5 keeps Grafana for operations). Replacing the static site or embedding a live BI session in it. SSO, public embedding, and row-level security as a product. Building Amazon QuickSight (document it as the AWS counterpart only). Kubernetes. New business metrics. Committing `.ipynb` cell outputs, row extracts, or Olist source rows. Creating `notebooks/` before this phase starts. The reviewed aggregate images for the site figure table are in scope at P8-06.
+
+**Phase acceptance (all required):**
+
+- [ ] P8-01 records pinned versions and a successful read-only Trino 484 query from JupyterLab plus one Superset chart on a verified Gold mart, or it records a rejection in ADR-0017.
+- [ ] Notebooks query Gold by table and column name, do not write, and are committed without outputs.
+- [ ] Superset runs in Compose with its metadata in a PostgreSQL database that is neither `odp` nor `iceberg`.
+- [ ] Saved charts use only metrics already defined for Gold. They do not invent a figure.
+- [ ] Secrets stay out of argv, SQL text, notebook output, and logs.
+- [ ] Docs name four surfaces: JupyterLab, Superset, Grafana, and the Phase 9 site.
+- [ ] P8-06 exports one static image per row of the site figure table, plus a caption manifest a later page can publish.
+- [ ] A live run result is recorded and compared to Trino or the Phase 2 result for that run (P8-06).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P8-07).
+
+### Issues
+
+| ID | Title | Depends on | Status | Acceptance |
+| --- | --- | --- | --- | --- |
+| P8-01 | Notebook and BI compatibility PoC | Phase 2 | Not started | Pin JupyterLab (host `uv` dependency) and the Superset image. From JupyterLab, run one read-only query against a verified Gold mart on Trino 484. From Superset, render one chart on that same mart. Record versions, licenses, the Superset metadata database name, and every extra service the pinned image actually requires. Do not add Redis, a Celery worker, or a Jupyter Compose service unless this run shows they are required; state the purpose of each. Update ADR-0017 with the result. D-017 stays `proposed` until this evidence exists. No dashboard suite in this issue |
+| P8-02 | JupyterLab exploration notebooks | P8-01 | Not started | Notebooks live under `notebooks/` and start with a documented host command against the published Trino port, same pattern as dbt. Cover at least two verified marts, including on-time rate and late orders. Connection secrets, if any, come from the environment or a mode-600 file, not from argv. A test fails if a code cell contains `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `DROP`, or `ALTER`. A test fails if a committed notebook has non-empty outputs. Cells do not print record values |
+| P8-03 | Superset in local Compose | P8-01 | Not started | Pinned image, health check, and a documented UI URL. Metadata database on the existing PostgreSQL, separate from `odp` and `iceberg`. Admin and database passwords come from the environment, not argv. Compose adds only the services named in P8-01. The saved Trino connection is read-only: a repo check rejects DDL and DML in the committed Superset assets |
+| P8-04 | Dashboards as code on verified Gold marts | P8-03 | Not started | Commit a re-importable Superset export with the nine Superset charts in the site figure table (growth scheme). Each chart uses that row's mart and a measure already named in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). No new metric. Charts read Gold through Trino. Re-import does not duplicate the dashboard. A chart does not render an order id, review text, email, or a single-customer location |
+| P8-05 | Exploration, BI, ops, and site boundaries | P8-02, P8-04 | Not started | Document the four surfaces and the AWS counterpart: JupyterLab explores, Superset saves business charts, Grafana (Phase 5) is operations, the Phase 9 site publishes the static figures from those tools. QuickSight on Athena is the unbuilt AWS counterpart of Superset. State that SQL Lab is not a second notebook product. State the Olist CC BY-NC-SA limit: aggregate figures may be published with the caption; row extracts stay out of git and off the site |
+| P8-06 | Live run, result, and consistency check | P8-02, P8-04, P8-05 | Not started | On the local stack, run the documented notebooks and open the Superset charts. Record component versions, the Gold tables queried, and the chart values. Compare those values to the same metrics from Trino, or to the Phase 2 result for that run. Export one static image per row of the site figure table, including the Jupyter image of the same on-time query, and a caption manifest (question, value, grain, Gold table, tool, version, run id). The image shows the caption value. Images are aggregates only. Confirm committed notebooks have empty outputs and that logs from this run do not contain credentials or row values. Record mismatches. Unit tests alone do not close this issue. Persist evidence in architecture docs / `docs/status-log.md` (not only `PROJECT_STATUS.md`) |
+| P8-07 | Phase 8 documentation and status | P8-06 | Not started | Document versions, start commands, the four surfaces, the QuickSight counterpart, licenses, known limitations, and the P8-06 result. `PROJECT_STATUS.md` cites that evidence |
+
+**Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-06 → P8-07. Phase close is P8-06 then P8-07.
+
+---
+
+## Phase 9 — Platform report site
+
+**Goal:** Finish the program with a small, polished **multi-page static report** of the verified platform, including the site figures. Host it and link it from the repository Website field and the README.
+
+**Depends on:** Phase 7 verified (in-repo case study and AWS IaC path available as source material) and Phase 8 verified (exploration and Superset evidence available to cite).
+
+**Out of scope:** Backend, CMS, authentication, analytics pixels, interactive demos that require a live cluster, duplicating the full `ROADMAP.md` issue backlog on the site, embedding a live Superset or Jupyter service.
 
 **Phase acceptance (all required):**
 
@@ -376,23 +430,24 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Site builds locally via a documented command; CI builds (and optionally deploys) the static output.
 - [ ] Public URL is set on the GitHub repository Website field and linked from the README Platform report block.
 - [ ] Navigation and page roles match the growth scheme above; reference page links back to repo docs/ADRs.
-- [ ] A live site result is recorded and compared to `PROJECT_STATUS.md` (P8-06).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P8-07).
+- [ ] Every row of the site figure table is a static image on the named page, with its caption. Figure 1 and figure 10 show the same on-time value.
+- [ ] A live site result is recorded and compared to `PROJECT_STATUS.md` (P9-06).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P9-07).
 
 ### Issues
 
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
-| P8-01 | Site scaffold and page map | Phase 7 | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev`. Early scaffold allowed before Phase 7; Phase 8 completes content depth and hosting |
-| P8-02 | Home and Architecture pages | P8-01, P7-07 | Not started | Home states platform purpose and verified status; Architecture covers stack, medallion, contracts, batch vs stream with diagrams sourced from `docs/` |
-| P8-03 | Pipeline and Operations pages | P8-01, P7-07 | Not started | Pipeline covers ingestion through Gold, orchestration and CDC; Operations covers quality, observability, lineage, CI and local→AWS IaC path |
-| P8-04 | Reference page and repo cross-links | P8-02, P8-03 | Not started | Reference links to GitHub, ADRs, roadmap, setup; README Platform report block points to the live URL (or staging URL if deploy is gated) |
-| P8-05 | Static hosting and GitHub Website field | P8-04 | Not started | Hosting documented (e.g. GitHub Pages or equivalent); CI build green; repository About → Website set to the report URL |
-| P8-06 | Live run, result, and consistency check | P8-04, P8-05 | Not started | Build the site and open the published URL, or the production build when the URL is not up yet. Walk Home, Architecture, Pipeline, Operations, and Reference. Compare status, counts, and any metric or cost claim to `PROJECT_STATUS.md` and the phase docs. Record broken links and mismatches. Do not treat a single screenshot as this check |
-| P8-07 | Phase 8 documentation and status | P8-06 | Not started | Site copy, README, and `PROJECT_STATUS.md` match the P8-06 findings. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
+| P9-01 | Site scaffold and page map | Phase 7 | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev`. Early scaffold allowed before Phase 7 and Phase 8; Phase 9 completes content depth and hosting |
+| P9-02 | Home and Architecture pages | P9-01, P7-07, Phase 8 | Not started | Home states platform purpose, verified status, and figure 1 (on-time Superset chart) with its caption. Architecture covers stack, medallion, contracts, batch vs stream, and the read path Gold → Trino → JupyterLab and Superset, with figure 10 beside figure 1's value. Diagrams come from `docs/` and from the P8-06 export |
+| P9-03 | Pipeline and Operations pages | P9-01, P7-07, Phase 8 | Not started | Pipeline covers ingestion through Gold, orchestration and CDC, and places figures 2–9 on the domain each question belongs to. Operations covers quality, observability, lineage, CI, and the local→AWS IaC path. It includes a Grafana image only when Phase 5 is verified, and it says so when that image is absent |
+| P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Not started | Reference links to GitHub, ADRs, roadmap, setup, and the figure manifest; README Platform report block points to the live URL (or staging URL if deploy is gated) |
+| P9-05 | Static hosting and GitHub Website field | P9-04 | Not started | Hosting documented (e.g. GitHub Pages or equivalent); CI build green; repository About → Website set to the report URL |
+| P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Not started | Build the site and open the published URL, or the production build when the URL is not up yet. Walk Home, Architecture, Pipeline, Operations, and Reference. Open each figure. Compare status, counts, caption values, and any metric or cost claim to `PROJECT_STATUS.md`, the phase docs, and the P8-06 manifest. Figure 1 and figure 10 match. Record broken links, missing images, and mismatches. Do not treat a single screenshot of the site as this check |
+| P9-07 | Phase 9 documentation and status | P9-06 | Not started | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
 
 
-**Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-06 → P8-07.
+**Suggested order:** P9-01 → P9-02 ∥ P9-03 → P9-04 → P9-05 → P9-06 → P9-07. Phase close is P9-06 then P9-07.
 
 ---
 
@@ -408,7 +463,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | Secrets | Never commit credentials, tokens, live `.env`, or private datasets |
 | Cloud / AWS IaC | Phase 7 delivers the AWS path as Terraform IaC and local→AWS mapping. CI validates with `fmt`/`validate`. Cost models must state assumptions. Never invent metrics or spend figures. Do not run `terraform apply`/`destroy` without explicit user approval |
 | Phase close | From Phase 2 on, every phase ends with a live run, result, and consistency check, then a phase documentation and status issue. The next phase waits until both are verified. Phases 0 and 1 stay verified on results already in `docs/status-log.md` |
-| Platform report site | Scaffold may land early; full content, design and hosting finalized in Phase 8. Earlier phases may add verified facts only. Site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
+| Exploration vs BI | JupyterLab explores iteratively and is read-only. Superset holds saved charts over verified Gold metrics. Grafana (Phase 5) is operations. The static site (Phase 9) publishes the checked images from those tools and does not embed them |
+| Platform report site | Scaffold may land early; figures, full content, design, and hosting are finalized in Phase 9. Earlier phases may add verified facts only. Phase 8 may add the exported images once P8-06 has checked them. The site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
 | Empty dirs | Do not scaffold later-phase trees until that phase starts |
 | Language | Code/docs in English; agent↔user communication in Brazilian Portuguese |
 
@@ -429,7 +485,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | | |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-06 |
+| Last updated | 2026-11-11 |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
-| Changelog | 2026-11-06: P2-06 verified (dbt-trino Gold, 55 tables). 2026-11-06: P2-05 verified (Gold grain, keys, marts). Phase 4 close pair is P4-09/P4-10. P4-08 is SCD Type 2, before the close, and is not folded into P4-05. 2026-11-05: Phase 2 close pair is P2-09/P2-10; Spark Ivy cache inserted as P2-08 before the close (no new work after the last two issues). 2026-11-01: Iceberg snapshot expiration is P5-07, before the Phase 5 close. The live run and documentation issues are P5-08 and P5-09. 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09 at the time; later P2-09/P2-10), P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07. Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |
+| Changelog | 2026-11-11: Site figure table added. P8-04 draws the nine Superset charts plus the Jupyter on-time check. P8-06 exports the static images. Phase 9 publishes them. 2026-11-11: Phase 8 is JupyterLab + Superset (P8-01–P8-07), read-only via Trino, startable after Phase 2. The platform report site moves to Phase 9 (P9-01–P9-07). Close pair is P8-06 then P8-07. Earlier changelog lines that say Phase 8 or P8-06/P8-07 mean the site, now Phase 9. 2026-11-06: P2-06 verified (dbt-trino Gold, 55 tables). 2026-11-06: P2-05 verified (Gold grain, keys, marts). Phase 4 close pair is P4-09/P4-10. P4-08 is SCD Type 2, before the close, and is not folded into P4-05. 2026-11-05: Phase 2 close pair is P2-09/P2-10; Spark Ivy cache inserted as P2-08 before the close (no new work after the last two issues). 2026-11-01: Iceberg snapshot expiration is P5-07, before the Phase 5 close. The live run and documentation issues are P5-08 and P5-09. 2026-10-28: phase close pair applies from Phase 2 on (P2-08/P2-09 at the time; later P2-09/P2-10), P3-10/P3-11, P4-08/P4-09, P5-07/P5-08, P6-07/P6-08, P7-08/P7-09, P8-06/P8-07. Phases 0 and 1 stay verified on logged results; P0-14/P0-15 and P1-12/P1-13 removed. 2026-10-28: P1-11 verified; Phase 1 documentation pass (ingestion index, README, status). 2026-10-26: P1-10 verified (invalid-record sidecar under `quarantine/`). 2026-10-25: P1-09 withdrawn (BrasilAPI CEP obsolete; ADR-0021). 2026-10-25: P1-08 verified (IBGE `municipios` raw ingest). 2026-10-18: P1-02 verified (D-020 raw layout + metadata helpers). 2026-10-17: Source metadata standardized; P1-08 IBGE / P1-09 CEP before closing P1-10/P1-11; Phase 3 daily/weekly → P3-04/P3-05 (tests P3-09). D-019 approved; Gold domains D-012; status ledger scoped; P1-01 verified. 2026-10-16: site scaffold; Phase 8; Phase 0 verified. 2026-10-15: ADRs; AWS IaC; three update patterns |

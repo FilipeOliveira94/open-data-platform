@@ -255,7 +255,7 @@ Catalog, Athena, IAM e OIDC (GitHub Actions). - Documentar backend
 remoto (S3 + lock) como padrão de produção e layout adequado à
 validação em CI. - Publicar modelo de custo com premissas. - Entregar
 estudo de caso **no repositório** (README, diagramas, passos de
-reprodução) como base para a Fase 8.
+reprodução) como base para a Fase 9.
 
 Critérios de aceite: - Mapeamento de serviços e módulos Terraform
 claros e alinhados. - IAM segue o princípio do menor privilégio. -
@@ -264,7 +264,27 @@ documentados. - Modelo de custo e limitações arquiteturais são
 explícitos. - O case study in-repo apresenta a plataforma local e o
 caminho de provisionamento AWS via IaC.
 
-### Fase 8 --- Site/relatório da plataforma (semanas 16--18)
+### Fase 8 --- Exploração iterativa e visualização (depois da Fase 2; em paralelo com 3--7)
+
+Objetivos: - Consultar Gold verificado pelo Trino, somente leitura. -
+JupyterLab no host (`uv`), no mesmo padrão do dbt, para exploração
+iterativa. - Apache Superset no Compose para gráficos salvos. - Manter
+Spark como writer de Bronze/Silver e dbt-trino como writer de Gold. -
+Grafana continua sendo observabilidade (Fase 5), não BI de negócio.
+
+Critérios de aceite: - P8-01 registra versões e uma consulta Trino 484
+mais um gráfico Superset, ou rejeita o par no ADR-0017. - Notebooks
+não escrevem e entram no git sem output. - Metadados do Superset ficam
+num database PostgreSQL que não é `odp` nem `iceberg`. - Gráficos usam
+métricas já definidas no Gold. - O fechamento é P8-06 (live run) e
+depois P8-07 (documentação).
+
+D-017 permanece `proposed` até o PoC. QuickSight é o correspondente AWS
+e não é construído aqui. A tabela de figuras do site, no `ROADMAP.md`,
+é o conjunto de gráficos: nove no Superset e um no JupyterLab com a
+mesma taxa de pontualidade. P8-06 exporta as imagens estáticas.
+
+### Fase 9 --- Site/relatório da plataforma (depois das Fases 7 e 8)
 
 Objetivos: - Completar o hub Starlight multi-página (Home, Architecture,
 Pipeline, Operations, Reference) sob `site/` com tema Catppuccin. -
@@ -272,13 +292,18 @@ Popular apenas com trabalho verificado. - Publicar hosting estático e
 preencher o campo Website do repositório GitHub. - Ligar o bloco
 Platform report do README à URL pública.
 
-Critérios de aceite: - Cinco páginas do esquema publicadas. - Build
-local e CI documentados. - Conteúdo alinhado a `PROJECT_STATUS.md`
-(nada apresentado como pronto sem evidência). - URL no About → Website
-do GitHub e no README.
+Critérios de aceite: - Cinco páginas do esquema publicadas. - Cada
+figura da tabela do site aparece com a legenda (pergunta, valor, grão,
+tabela Gold, ferramenta e execução). - A figura de pontualidade do
+Superset e a do JupyterLab mostram o mesmo valor. - Build local e CI
+documentados. - Conteúdo
+alinhado a `PROJECT_STATUS.md` (nada apresentado como pronto sem
+evidência). - URL no About → Website do GitHub e no README.
 
-Regra incremental (Fases 1--7): scaffold Starlight + Catppuccin em `site/`
-permitido; conteúdo só com fatos já verificados; hosting fica na Fase 8.
+Regra incremental (Fases 1--8): scaffold Starlight + Catppuccin em `site/`
+permitido; conteúdo só com fatos já verificados; a galeria de figuras
+e o hosting ficam na Fase 9. A Fase 8 pode gravar as imagens depois
+que o P8-06 as conferir. O site não embute o JupyterLab nem o Superset.
 
 ## 5. Estrutura de diretórios proposta
 
@@ -317,10 +342,11 @@ open-data-platform/
 │   ├── kafka/
 │   └── schemas/
 ├── dbt/
+├── notebooks/               # JupyterLab exploration; create in Phase 8, not before
 ├── infrastructure/
 │   └── terraform/
 ├── observability/
-├── site/                    # Starlight + Catppuccin report; hosting in Phase 8
+├── site/                    # Starlight + Catppuccin report; hosting in Phase 9
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -732,26 +758,52 @@ Deliver modular Terraform for S3, Glue Catalog, Athena, least-privilege IAM, and
 Document backend options (local for CI validation; remote S3 + lock as the production pattern).
 Add CI for terraform fmt/validate.
 Publish a cost model with explicit assumptions.
-Finish with an in-repo case study: README, diagrams, local reproduction path, and AWS provisioning guidance via IaC (feeds Phase 8).
+Finish with an in-repo case study: README, diagrams, local reproduction path, and AWS provisioning guidance via IaC (feeds Phase 9).
 
 Do not invent metrics or cost figures.
 Do not run terraform apply/destroy or delete cloud resources without my explicit approval.
-Do not build the full platform report site in this phase (Phase 8).
+Do not build the full platform report site in this phase (Phase 9).
+Do not add JupyterLab or Superset in this phase (Phase 8).
 ```
 
-### Fase 8 --- Site/relatório da plataforma
+### Fase 8 --- Exploração e visualização
 
 ``` text
-Work only on Phase 8 — Platform report site.
+Work only on Phase 8 — Interactive exploration and data visualization.
+
+Query verified Gold marts through Trino, read-only.
+Run JupyterLab as a host uv process, the same pattern as dbt.
+Run Apache Superset in Compose, with its metadata database on the existing PostgreSQL, not odp and not iceberg.
+Keep Spark as the Bronze/Silver writer and dbt-trino as the Gold writer.
+Pin versions in P8-01 before expanding. D-017 stays proposed until that PoC is recorded.
+Charts use metrics already defined for Gold. The site figure table in ROADMAP.md is the chart set: nine Superset charts and one JupyterLab chart of the same on-time rate.
+P8-06 exports one static image per row and a caption manifest. Notebook files stay free of outputs. Images show aggregates only.
+Commit notebooks without outputs. Do not print record values or put secrets in argv or SQL text.
+Close on P8-06 (live run, result, and consistency check), then P8-07 (phase documentation and status).
+
+Do not use Superset SQL Lab as the exploration product.
+Do not use Grafana as business BI.
+Do not build QuickSight, SSO, or a public embed.
+Do not invent metrics.
+```
+
+### Fase 9 --- Site/relatório da plataforma
+
+``` text
+Work only on Phase 9 — Platform report site.
 
 Complete the Starlight + Catppuccin report under site/: Home, Architecture, Pipeline, Operations, Reference.
-Use only verified platform material from PROJECT_STATUS.md, docs/, and the Phase 7 case study.
+Use only verified platform material from PROJECT_STATUS.md, docs/, the Phase 7 case study, and the Phase 8 live-run result.
+Publish every row of the site figure table as a static image with its caption. Figure 1 and figure 10 show the same on-time value.
+Add a Grafana image on Operations only when Phase 5 is verified.
 Document npm run build; add CI build (and optional deploy).
 Publish hosting and set the GitHub repository About → Website URL; link it from the README Platform report block.
 Keep tone factual (platform documentation).
+Close on P9-06 (live run, result, and consistency check), then P9-07 (phase documentation and status).
 
 Do not invent metrics, lineage, or cost figures.
 Do not claim unfinished phases as complete.
+Do not embed a live Jupyter or Superset service.
 ```
 
 ## 10. Estratégia de Git

@@ -41,7 +41,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-014 | Batch vs streaming | Daily batch, weekly batch, and CDC coexist; CDC does not replace batch | — | `proposed` | [ADR-0014](docs/decisions/0014-batch-vs-streaming-coexistence.md) |
 | D-015 | Monorepo boundaries | Package owns business logic; thin DAGs and IaC | — | `proposed` | [ADR-0015](docs/decisions/0015-monorepo-package-boundaries.md) |
 | D-016 | Discovery / metadata | Deferred; evaluate DataHub / Amundsen / OpenMetadata later | — | `proposed` | [ADR-0016](docs/decisions/0016-data-discovery.md) |
-| D-017 | Dataviz | Deferred until Gold; OSS BI locally; QuickSight as AWS counterpart | — | `proposed` | [ADR-0017](docs/decisions/0017-dataviz.md) |
+| D-017 | Dataviz | JupyterLab + Superset, read-only via Trino; QuickSight as AWS counterpart. Approval waits on the P8-01 PoC | — | `proposed` | [ADR-0017](docs/decisions/0017-dataviz.md) |
 | D-018 | Historical Olist datasets | CC BY-NC-SA 4.0 e-commerce + marketing funnel; no vendor; fetch-from-source | Provenance under `docs/sources/`; no dataset binaries in git (P1-01) | `approved` | [ADR-0018](docs/decisions/0018-historical-dataset-redistribution.md) |
 | D-019 | HTTP API sources | P1-05 DummyJSON `/products`; IBGE Localidades (P1-08). BrasilAPI CEP withdrawn | DummyJSON products client; IBGE `municipios` client. No CEP dataset | `approved` | [ADR-0019](docs/decisions/0019-public-api-ingestion-source.md) |
 | D-020 | Raw storage layout | Object-store `raw/{source_id}/{dataset}/dt=…/execution_id=…/`; metadata `source_id`, `execution_id`, `_ingestion_ts`; `data/raw/` is local staging only | Package helpers + unit tests (P1-02) | `approved` | [ADR-0020](docs/decisions/0020-raw-storage-layout.md) |
@@ -61,6 +61,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-11-11 | D-017 selects JupyterLab + Superset for Phase 8. State stays `proposed` until the P8-01 Trino 484 PoC. QuickSight stays the AWS counterpart |
 | 2026-11-06 | D-005 and D-012 approved: Spark remains Bronze/Silver; dbt-trino builds Gold (P2-06). Evidence in [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md) |
 | 2026-10-29 | D-003 approved: Parquet + Iceberg 1.12.0, format version 2, after Spark and Trino both used that table. D-004 approved: Iceberg JDBC catalog on PostgreSQL database `iceberg` plus Trino 484. Glue and Athena stay the AWS counterparts (Phase 7) |
 | 2026-10-26 | D-013 approved. Invalid-record classification and the `quarantine/` sidecar are in the repository. The sidecar put goes through `write_raw_object` |

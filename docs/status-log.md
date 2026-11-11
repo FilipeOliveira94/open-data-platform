@@ -4,6 +4,14 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-11 — Site figures
+
+The site scaffold still has no charts. Architecture and Pipeline no longer call the verified lakehouse "not started". `ROADMAP.md` now lists ten figures: nine Superset charts, one per question already in the Gold model, and one JupyterLab image of the same on-time query. P8-04 draws them. P8-06 exports static images and a caption manifest. Phase 9 publishes them on Home, Architecture, and Pipeline. No image file was added.
+
+### 2026-11-11 — Phase 8 is exploration and BI; the site moves to Phase 9
+
+`ROADMAP.md` inserts Phase 8 before the platform report. Phase 8 is JupyterLab on the host and Apache Superset in Compose, both read-only through Trino, and may start after Phase 2 in parallel with Phases 3–7. Issues are P8-01 through P8-05, then the close pair P8-06 (live run, result, and consistency check) and P8-07 (phase documentation and status). The report site is Phase 9 (P9-01–P9-07); its close pair is P9-06 then P9-07. D-017 records the selection and stays `proposed` until the P8-01 PoC against Trino 484. No notebook, image, or Compose service was added. Earlier log lines that call Phase 8 the site mean what is now Phase 9.
+
 ### 2026-11-11 — P2-07 quality and reconciliation tests
 
 Removed the pinned `live_counts` module. Bronze `--all` writes `.local/bronze-source-counts.tsv` from the raw row counts of that run; `--print-live-checks` requires the file. Silver live checks return `ok` when the Silver count matches the Bronze dedup policy (distinct payload columns for geolocation) and when DummyJSON expansion and clickstream cart/purchase product ids hold. dbt singular tests in `dbt/tests/reconciliation/` cover all 55 Gold tables plus ephemeral `int_order_primary_payment`. Schema tests check type-family prefixes, grain uniqueness, closed value sets, and numeric bounds. Money sums use absolute tolerance `0.01`.

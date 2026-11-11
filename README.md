@@ -4,11 +4,11 @@ Reproducible open-source data platform: local development on Windows 11 + WSL2 +
 
 ## Platform report
 
-A short multi-page **platform report** (home, architecture, pipeline, operations, reference) lives under [`site/`](site/) as an Astro [Starlight](https://starlight.astro.build/) app with the [Catppuccin](https://starlight-themes.netlify.app/catppuccin/) theme. Content reflects **verified** work only; public hosting is **Phase 8**. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) remains the source of truth.
+A short multi-page **platform report** (home, architecture, pipeline, operations, reference) lives under [`site/`](site/) as an Astro [Starlight](https://starlight.astro.build/) app with the [Catppuccin](https://starlight-themes.netlify.app/catppuccin/) theme. Content reflects **verified** work only; public hosting is **Phase 9**. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) remains the source of truth.
 
 | | |
 | --- | --- |
-| Live report | *Not published yet* (Phase 8) |
+| Live report | *Not published yet* (Phase 9) |
 | Local preview | `cd site && npm ci && npm run dev` — see [`site/README.md`](site/README.md) (Node.js 22.22+) |
 | Scheme | See [`ROADMAP.md`](ROADMAP.md) → Platform report site |
 | Status | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) → Platform report site |
@@ -156,7 +156,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 | Document | Role |
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | Agent and contributor operating contract |
-| [`ROADMAP.md`](ROADMAP.md) | Issue-level scope and acceptance criteria (phases 0–8) |
+| [`ROADMAP.md`](ROADMAP.md) | Issue-level scope and acceptance criteria (phases 0–9) |
 | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Current-phase status ledger (verified work + next steps) |
 | [`docs/status-log.md`](docs/status-log.md) | Chronological status archive |
 | [`DECISIONS.md`](DECISIONS.md) | Architecture decision index |
@@ -174,4 +174,4 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test com
 
 ## Not in the verified platform yet
 
-Gold tables, Airflow schedules, Kafka, streaming CDC, Kubernetes, the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 8). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. P2-03 covers Bronze tables on that catalog. P2-04 covers typed Silver tables per source. The `site/` scaffold previews verified facts locally.
+Airflow schedules, Kafka, streaming CDC, Kubernetes, JupyterLab and Superset (Phase 8), the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 9). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. P2-03 covers Bronze tables on that catalog. P2-04 covers typed Silver tables per source. The `site/` scaffold previews verified facts locally.

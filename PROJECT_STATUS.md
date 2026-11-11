@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-11 (P2-07 quality and reconciliation) |
+| Last updated | 2026-11-11 (Phase 8 roadmap insert; P2-07 still the latest verified issue) |
 | Current phase | Phase 2 — Lakehouse and analytics |
 | Phase status | In progress |
 
@@ -140,7 +140,8 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
 | 7 | AWS path as Terraform IaC | Not started |
-| 8 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
+| 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–7) |
+| 9 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
 
 ---
 
@@ -163,7 +164,7 @@ None.
 
 ## Platform report site
 
-Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only). Public hosting is Phase 8. Preview: `cd site && npm run dev` — see `site/README.md`.
+Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only). Public hosting and the figure gallery are Phase 9. Preview: `cd site && npm run dev` — see `site/README.md`. JupyterLab and Superset are Phase 8 and are not started. The site figure table in `ROADMAP.md` names the charts Phase 9 will publish.
 
 | Page | Status |
 | --- | --- |
@@ -175,6 +176,14 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-11 — Site figure table
+
+The scaffold still has no charts. The roadmap growth scheme now lists ten figures for Phase 9: nine Superset charts and one JupyterLab image of the same on-time rate. P8-06 exports them. Detail: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-11 — Phase 8 exploration and BI inserted
+
+Phase 8 is JupyterLab (host) plus Apache Superset (Compose), both read-only through Trino, and may start after Phase 2. The platform report site is Phase 9 (P9-01–P9-07). The Phase 8 close pair is P8-06 then P8-07. D-017 stays `proposed` until the P8-01 PoC. No notebook, Superset service, or test was added.
 
 ### 2026-11-11 — Log exposure fix
 

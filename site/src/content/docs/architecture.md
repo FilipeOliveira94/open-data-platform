@@ -1,6 +1,6 @@
 ---
 title: Architecture
-description: Verified local runtime, raw ingestion, and the planned AWS path.
+description: Verified local runtime, verified lakehouse, and the planned AWS path.
 ---
 
 What is verified locally today, and what remains planned until later phases land with evidence.
@@ -30,16 +30,20 @@ What is verified locally today, and what remains planned until later phases land
         ▼
 [ CI: lint + unit tests ] ◄── verified
 
+Verified in the repository, not yet drawn on this page:
+  Bronze / Silver / Gold on Iceberg, Spark writes, Trino reads, dbt builds Gold
+  Charts from JupyterLab and Superset are Phase 9
+
 Later (not started):
-  Bronze / Silver / Gold → query / dbt
+  Airflow schedules, streaming CDC, Grafana
   AWS path: MinIO→S3, catalog→Glue, SQL→Athena (Terraform, Phase 7)
 ```
 
-## Not started
+## Lakehouse and later phases
 
-**Not started.** Table format, catalog, Spark, Airflow, CDC, observability, and the AWS Terraform modules are documented as proposed decisions. They are not running platform components.
+Bronze, Silver, and Gold are verified in the repository and are not drawn on this page yet. Airflow schedules, CDC, observability, and the AWS Terraform modules are not running platform components.
 
-- Medallion tables — proposed ADR D-012. Contracts themselves are approved (D-013)
+- Bronze, Silver, and Gold tables are verified in the repository. Spark writes Bronze and Silver. Trino reads. dbt-trino builds Gold. This page does not yet show those diagrams or the Phase 9 charts. Index: [Gold layer](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/gold-layer.md)
 - Daily batch, weekly batch, and streaming CDC stay separate. The PostgreSQL windowed extract is verified. Airflow schedules and CDC are not (D-007, D-008, D-014, all `proposed`)
 - AWS as Infrastructure as Code — Phase 7; local Compose remains the verification environment
 
