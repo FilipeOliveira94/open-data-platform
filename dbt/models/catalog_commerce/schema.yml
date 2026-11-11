@@ -1,0 +1,119 @@
+version: 2
+models:
+- name: dim_catalog_products
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          product_id: bigint
+          title: varchar
+          category: varchar
+          brand: varchar
+          price: double
+          dimensions_width: double
+          dimensions_height: double
+          dimensions_depth: double
+          created_at: timestamp
+          updated_at: timestamp
+  columns:
+  - name: product_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_catalog_reviews
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          product_id: bigint
+          category: varchar
+          review_position: integer
+          rating: integer
+          comment_length: bigint
+          reviewer_email: varchar
+          review_time: timestamp
+  columns:
+  - name: review_position
+    data_tests:
+    - not_null
+    - accepted_range:
+        arguments:
+          min_value: 1
+  - name: rating
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 5
+- name: mart_catalog_prices
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          category: varchar
+          product_count: bigint
+          min_price: double
+          median_price: double
+          max_price: double
+          products_missing_brand: bigint
+  - unique_combination:
+      arguments:
+        combination:
+        - category
+- name: mart_catalog_review_patterns
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          category: varchar
+          rating: integer
+          review_count: bigint
+          mean_comment_length: double
+          repeated_reviewer_email_share: decimal
+  - unique_combination:
+      arguments:
+        combination:
+        - category
+        - rating
+  columns:
+  - name: rating
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 5
+- name: fct_catalog_quality_findings
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          finding_id: varchar
+          issue_class: varchar
+          reason: varchar
+          source_dataset: varchar
+          business_key: varchar
+          field: varchar
+          detail: varchar
+  columns:
+  - name: finding_id
+    data_tests:
+    - not_null
+    - unique
+  - name: issue_class
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - contract_violation
+          - business_anomaly
+  - name: reason
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - null_violation
+          - type_mismatch
+          - duplicate_primary_key
+          - repeated_reviewer_email
