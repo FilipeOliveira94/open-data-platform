@@ -1,0 +1,149 @@
+version: 2
+models:
+- name: dim_customers
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          customer_unique_id: varchar
+          city: varchar
+          state_code: varchar
+          zip_prefix: varchar
+          municipality_id: bigint
+          municipality_name: varchar
+  columns:
+  - name: customer_unique_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_reviews
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          review_id: varchar
+          order_id: varchar
+          review_score: integer
+          review_comment_title: varchar
+          review_comment_message: varchar
+          has_comment: boolean
+          review_creation_date: timestamp
+          review_answer_timestamp: timestamp
+          answer_lag_days: decimal
+  - unique_combination:
+      arguments:
+        combination:
+        - review_id
+        - order_id
+  columns:
+  - name: review_id
+    data_tests:
+    - not_null
+  - name: order_id
+    data_tests:
+    - not_null
+  - name: review_score
+    data_tests:
+    - not_null
+    - accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 5
+- name: mart_customer_retention
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          customer_unique_id: varchar
+          first_delivered_purchase_date: date
+          last_delivered_purchase_date: date
+          delivered_order_count: bigint
+          is_repeat_buyer: boolean
+  columns:
+  - name: customer_unique_id
+    data_tests:
+    - unique
+  - name: delivered_order_count
+    data_tests:
+    - accepted_range:
+        arguments:
+          min_value: 1
+- name: mart_customer_geography
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          municipality_id: bigint
+          municipality_name: varchar
+          buyer_count: bigint
+          repeat_buyer_count: bigint
+          mean_review_score: double
+  - unique_combination:
+      arguments:
+        combination:
+        - municipality_id
+        - municipality_name
+- name: mart_review_drivers
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          delay_bucket: varchar
+          category_english: varchar
+          review_count: bigint
+          mean_score: double
+          comment_share: decimal
+          median_answer_lag_days: real
+  - unique_combination:
+      arguments:
+        combination:
+        - delay_bucket
+        - category_english
+  columns:
+  - name: delay_bucket
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - late
+          - on_time
+          - early
+          - unknown
+- name: fct_crm_quality_findings
+  data_tests:
+  - column_types:
+      arguments:
+        expected:
+          finding_id: varchar
+          issue_class: varchar
+          reason: varchar
+          source_dataset: varchar
+          business_key: varchar
+          field: varchar
+          detail: varchar
+  columns:
+  - name: finding_id
+    data_tests:
+    - not_null
+    - unique
+  - name: issue_class
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - contract_violation
+          - business_anomaly
+  - name: reason
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - null_violation
+          - type_mismatch
+          - duplicate_primary_key
+          - address_without_municipality
+          - zip_prefix_unknown
+          - review_without_order
