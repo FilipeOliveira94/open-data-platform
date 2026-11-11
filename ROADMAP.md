@@ -151,7 +151,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 - [ ] A table can be created, written and queried in the chosen local stack.
 - [ ] Queries and transforms are reproducible via documented commands.
-- [ ] Quality and reconciliation rules have tests.
+- [x] Quality and reconciliation rules have tests.
 - [ ] Documentation lists component versions and known limitations.
 - [ ] A live run result is recorded and compared to the Phase 2 contracts (P2-09).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P2-10).
@@ -166,7 +166,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P2-04 | Silver normalization and deduplication | P2-03 | Verified | Typed, deduplicated Silver tables; null/duplicate/invalid handling intentional |
 | P2-05 | Analytical model design (grain, keys, SCD) | P2-04 | Verified | Grain, keys, and update rules for facts, dims, and marts are in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Type 1 for P2-06. Type 2 applications are specified there and implemented only in P4-08 |
 | P2-06 | dbt project and initial Gold models | P2-05 | Verified | dbt-trino builds the facts, dims, and marts named in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Silver stays the Spark writer. Evidence: [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md) |
-| P2-07 | Data quality and reconciliation tests | P2-06 | Not started | dbt/Python tests cover key metrics vs source; failures are visible. Replace hardcoded `live_counts` snapshot sizes (current `odp-raw` / `run-001` pin, including DummyJSON 194 and growing `full_refresh` / `incremental_window` sources) with counts derived from Bronze/source for that run |
+| P2-07 | Data quality and reconciliation tests | P2-06 | Verified | dbt/Python tests cover key metrics vs source; failures are visible. Replace hardcoded `live_counts` snapshot sizes (current `odp-raw` / `run-001` pin, including DummyJSON 194 and growing `full_refresh` / `incremental_window` sources) with counts derived from Bronze/source for that run |
 | P2-08 | Spark lakehouse jar / Ivy cache | P2-03 | Verified | Persist or bake Iceberg/Hadoop/JDBC jars so each `docker compose run spark` does not re-download Maven artifacts; document the local cache path; keep pins unchanged. May run any time after P2-03; does not block P2-05 |
 | P2-09 | Live run, result, and consistency check | P2-01, P2-06, P2-07 | Not started | On the local stack, run the documented create/write/query path and the Bronze → Silver → Gold/dbt path for the approved models. Record component versions, row counts, and the quality-test result. Compare Gold metrics to the source or Silver counts named in the contracts. Record mismatches. Unit tests alone do not close this issue. Persist evidence in architecture docs / `docs/status-log.md` (not only `PROJECT_STATUS.md`) |
 | P2-10 | Phase 2 documentation and status | P2-09 | Not started | Document component versions, partitioning, file sizing, incremental strategy (vs current full-overwrite Bronze/Silver), known limitations, and the P2-09 result. `PROJECT_STATUS.md` cites that evidence |

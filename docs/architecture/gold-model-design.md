@@ -220,7 +220,7 @@ Shared calendar and `brazil_geography` first, then marketplace operations, custo
 
 ## Profile of the 2026-11-06 snapshot
 
-Olist CSVs in gitignored `data/raw/` and Silver in Trino `iceberg.silver`, bucket `odp-raw`, `execution_id=run-001`. Counts match `live_counts`. These figures describe that snapshot. They are not a growth contract.
+Olist CSVs in gitignored `data/raw/` and Silver in Trino `iceberg.silver`, bucket `odp-raw`, `execution_id=run-001`. These figures describe that snapshot. They are not a growth contract.
 
 | Check | Result |
 | --- | --- |

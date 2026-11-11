@@ -42,6 +42,17 @@ make stage-quarantine
 
 That replaces `iceberg.gold_staging.quarantine_findings`. Quality facts union those rows with Silver-derived `business_anomaly` reasons from the model design. Reprocessing quarantined source rows remains P3-07.
 
+## Quality and reconciliation
+
+Schema tests run with the Gold build. Reconciliation does not.
+
+- `column_types` compares `information_schema.columns` with a type-family prefix (`varchar`, `bigint`, `integer`, `double`, `decimal`, `real`, `timestamp`, `date`, `boolean`).
+- Grain columns use `not_null` and `unique` or `unique_combination`. Closed sets from the contracts and the model design use `accepted_values`. Numeric bounds use `accepted_range`. Integer scores use `accepted_range` because `accepted_values` quotes every entry as varchar and Trino will not compare that list with an integer column.
+- Orphan foreign keys stay in the tables (D-013). There is no relationship test that fails on them.
+- Singular tests under `dbt/tests/reconciliation/<domain>/` fail by returning rows. One directory matches each Gold schema, including `gold_shared`. Population checks compare Gold keys with Silver (or with the parent fact). Measure checks compare counts and sums. Money sums use an absolute tolerance of `0.01`, the same epsilon as the payment-mismatch finding, because Trino `double` sums of the same values can differ in the last digits. The tag is `reconciliation`. `make dbt-build` and `make live-gold` exclude that tag. `make dbt-test-reconciliation` runs the full set. One domain is `dbt test --select tag:reconciliation,tag:<domain>`. The intended cadence is daily. The scheduler itself is Phase 3.
+
+Bronze and Silver live checks are generated from the contracts and from `.local/bronze-source-counts.tsv`. See [Bronze](bronze-layer.md) and [Silver](silver-layer.md).
+
 ## Commands
 
 ```bash
@@ -51,6 +62,9 @@ make dbt-parse
 make dbt-build
 # or
 make live-gold
+
+# Separate from the medallion run. Intended cadence is daily.
+make dbt-test-reconciliation
 ```
 
 Profile: `dbt/profiles.yml` (localhost Trino on `TRINO_PORT`, default `8080`). Compose publishes that port for host-side dbt.
@@ -68,8 +82,6 @@ Against Silver from `odp-raw` / `execution_id=run-001` (same snapshot as the mod
 | `dim_zip_prefix` | 19_015 |
 | `dim_customers` | 96_096 |
 | Quarantine staged | 1_603 rows (legacy `order_reviews` sidecar under contract v1 keying) |
-
-Formal Bronze→Silver→Gold consistency close remains [P2-09](../../ROADMAP.md). Reconciliation tests are [P2-07](../../ROADMAP.md).
 
 ## Limitations
 
