@@ -14,4 +14,6 @@ alwaysApply: true
 - Put verified numbers, commands, and results in architecture docs / ADRs / `docs/status-log.md`. Do not cite `PROJECT_STATUS.md` as durable evidence from other docs — that ledger is rewritten and those links go stale.
 - Do not silently change architecture, dependencies or acceptance criteria.
 - Do not mark a task complete unless its acceptance criteria have been verified.
+- Record what was implemented and what the checks showed. Do not record pauses, retries, or other recovery steps that do not change how to operate the result.
+- An entry point that belongs to the issue and was not run is not verified. Name it and say why before treating the issue as done.
 - At the end of every task, report: objective, files changed, commands run, tests (passed and failed), acceptance criteria, limitations and the suggested next issue.

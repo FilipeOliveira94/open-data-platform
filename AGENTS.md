@@ -34,6 +34,10 @@ For each task:
 
 Do not mark a task complete unless its acceptance criteria have been verified.
 
+Record what was implemented and what the checks showed. Do not record pauses, retries, or other recovery steps that do not change how to operate the result.
+
+An entry point that belongs to the issue and was not run is not verified. Name it and say why before treating the issue as done.
+
 `PROJECT_STATUS.md` tracks the **current phase** (progress, acceptance, latest validation, active decision gates). Issue inventory lives in `ROADMAP.md`; full ADRs in `DECISIONS.md`; chronological archive in `docs/status-log.md`.
 
 Do **not** treat `PROJECT_STATUS.md` as durable evidence storage. Architecture docs, ADRs, and `docs/status-log.md` must carry the verified facts themselves. Other docs may point at the status log for chronology; they must not rely on `PROJECT_STATUS.md` as the only (or primary) citation, because that ledger is rewritten each phase.
