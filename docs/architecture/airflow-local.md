@@ -43,7 +43,7 @@ Do not print `airflow config get-value database sql_alchemy_conn`. That value co
 
 ## Task logs
 
-A finished task writes its log to MinIO. The Airflow containers also keep a spool on the `odp_airflow_logs` volume until the upload completes.
+A finished task writes its log to MinIO. The Airflow containers also keep a spool on the `odp_airflow_logs` volume until the upload completes. Ingestion CLIs log each stage with ``logging.info`` on stdout: the stage name, the dataset, the object key, and counts of records, bytes, and quarantine findings. Those lines do not include a record or a field value. Failures use stderr. Airflow records stdout as info and stderr as error, and stores both in the task log.
 
 The MinIO object remains after the three Airflow services stop and after a host reboot, as long as the MinIO volume `odp_minio_data` remains. `docker compose down -v` deletes that volume and the logs with it. A task killed before the upload finishes can lose that attempt.
 
@@ -145,3 +145,5 @@ The ingestion runs finished `success`. Each raw `execution_id` is that run's `ru
 The PostgreSQL extract window was `2026-10-17T00:00:00Z` inclusive to `2026-10-18T00:00:00Z` exclusive. `COUNT(*)` on `oltp` for that window was 1, 1, 1, and 2, the same counts as the raw JSON arrays. The five ingestion task logs did not contain the MinIO password, the Kaggle token, the Fernet key, or the JWT secret.
 
 `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 324 passed in 13.00s. The DAG contract tests were re-run after the `execution_id` default change: 29 passed.
+
+`ingest_demo_storefront` run `manual__2026-11-12T19:13:59.070074+00:00` finished `success`. The task log recorded the stage lines as `info`: `stage=generated` with `record_count=100` and `byte_count=16071`, then `stage=wrote` for `events.jsonl` with `finding_count=0`. `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` passed 330.

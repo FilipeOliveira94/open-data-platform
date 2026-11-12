@@ -12,7 +12,6 @@ import argparse
 import csv
 import io
 import os
-import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,6 +27,12 @@ from open_data_platform.ingestion.kaggle_download import (
     credentials_from_env,
     download_dataset_zip,
     extract_expected_members,
+)
+from open_data_platform.ingestion.pipeline_log import (
+    configure_cli_logging,
+    finding_count,
+    log_failure,
+    log_stage,
 )
 from open_data_platform.ingestion.quarantine import (
     InvalidRecordsError,
@@ -250,6 +255,15 @@ def ingest_olist_historical(
                 ingestion_ts=result.metadata.ingestion_ts,
                 body=sidecar,
             )
+            log_stage(
+                "wrote",
+                source_id=source.source_id,
+                dataset=spec.dataset,
+                object_key=result.key,
+                byte_count=len(body),
+                record_count=len(records),
+                finding_count=finding_count(sidecar),
+            )
             results.append(result)
     return tuple(results)
 
@@ -277,13 +291,20 @@ def run_olist_historical(
     credentials = credentials_from_env(settings)
     ts = datetime.now(UTC) if ingestion_ts is None else ingestion_ts
     results: list[RawWriteResult] = []
+    log_stage("ingest_started", execution_id=execution_id, source_count=2)
     for source, directory in ((ECOMMERCE, ecommerce), (FUNNEL, funnel)):
-        _fetch_one_source(
+        downloaded = _fetch_one_source(
             source,
             directory,
             credentials=credentials,
             force=force,
             transport=transport,
+        )
+        log_stage(
+            "fetch_finished",
+            source_id=source.source_id,
+            execution_id=execution_id,
+            downloaded=int(downloaded),
         )
         results.extend(
             ingest_olist_historical(
@@ -296,6 +317,11 @@ def run_olist_historical(
                 sources=(source,),
             )
         )
+    log_stage(
+        "ingest_finished",
+        execution_id=execution_id,
+        object_count=len(results),
+    )
     return tuple(results)
 
 
@@ -316,6 +342,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Download again even when the staged CSVs are already present.",
     )
     args = parser.parse_args(argv)
+    configure_cli_logging()
     try:
         _run_cli(
             execution_id=args.execution_id,
@@ -323,7 +350,7 @@ def main(argv: list[str] | None = None) -> int:
             force=args.force,
         )
     except (OlistIngestError, KaggleDownloadError, KeyError) as exc:
-        print(str(exc), file=sys.stderr)
+        log_failure(exc)
         return 1
     return 0
 

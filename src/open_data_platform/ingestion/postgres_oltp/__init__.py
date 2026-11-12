@@ -20,7 +20,6 @@ import argparse
 import json
 import os
 import re
-import sys
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -31,6 +30,12 @@ import psycopg
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.ingestion.paths import build_raw_object_key
+from open_data_platform.ingestion.pipeline_log import (
+    configure_cli_logging,
+    finding_count,
+    log_failure,
+    log_stage,
+)
 from open_data_platform.ingestion.quarantine import (
     prepare_quarantine,
     write_quarantine_object,
@@ -168,6 +173,7 @@ def seed_synthetic(
     """
     path = default_fixture_path() if fixture_path is None else fixture_path
     loaded = _load_fixture(path, contracts)
+    log_stage("seed_started", schema="oltp", dataset_count=len(DATASETS))
     try:
         by_dataset = _contracts_by_dataset(contracts)
         with connection.cursor() as cursor:
@@ -177,6 +183,10 @@ def seed_synthetic(
                 for row in loaded[dataset]:
                     cursor.execute(statement, row)
         connection.commit()
+        log_stage(
+            "seed_finished",
+            **{dataset: len(loaded[dataset]) for dataset in DATASETS},
+        )
     except psycopg.Error as exc:
         _rollback(connection)
         msg = "PostgreSQL seed failed"
@@ -208,6 +218,14 @@ def extract_postgres_oltp(
     written_at = _require_ingestion_ts(ingestion_ts)
     by_dataset = _contracts_by_dataset(contracts)
     results: list[RawWriteResult] = []
+    log_stage(
+        "extract_started",
+        source_id=SOURCE_ID,
+        execution_id=execution_id,
+        window_start=start.date().isoformat(),
+        window_end=end.date().isoformat(),
+        dataset_count=len(selected),
+    )
     for dataset in selected:
         contract = by_dataset[dataset]
         _require_extract_contract(contract)
@@ -239,7 +257,17 @@ def extract_postgres_oltp(
             )
         except ValueError as exc:
             raise PostgresOltpError(str(exc)) from exc
+        log_stage(
+            "wrote",
+            source_id=SOURCE_ID,
+            dataset=dataset,
+            object_key=result.key,
+            byte_count=len(body),
+            record_count=len(records),
+            finding_count=finding_count(sidecar),
+        )
         results.append(result)
+    log_stage("extract_finished", source_id=SOURCE_ID, object_count=len(results))
     return tuple(results)
 
 
@@ -276,6 +304,7 @@ def main(argv: list[str] | None = None) -> int:
         help="UTC ISO-8601 timestamp. The same value overwrites the same keys.",
     )
     args = parser.parse_args(argv)
+    configure_cli_logging()
     try:
         if args.command == "seed":
             _run_seed()
@@ -287,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
                 ingestion_ts=args.ingestion_ts,
             )
     except (PostgresOltpError, KeyError) as exc:
-        print(str(exc), file=sys.stderr)
+        log_failure(exc)
         return 1
     return 0
 

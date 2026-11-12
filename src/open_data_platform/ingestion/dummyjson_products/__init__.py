@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,6 +27,12 @@ from open_data_platform.ingestion.http import (
     RetryPolicy,
     Transport,
     get_with_retries,
+)
+from open_data_platform.ingestion.pipeline_log import (
+    configure_cli_logging,
+    finding_count,
+    log_failure,
+    log_stage,
 )
 from open_data_platform.ingestion.quarantine import (
     InvalidRecordsError,
@@ -161,6 +166,14 @@ def ingest_dummyjson_products(
     skip = 0
     seen_total: int | None = None
     results: list[RawWriteResult] = []
+    record_total = 0
+    log_stage(
+        "fetch_started",
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        page_limit=page_limit,
+    )
     while True:
         body = fetch_products_page(
             limit=page_limit,
@@ -213,11 +226,30 @@ def ingest_dummyjson_products(
             ingestion_ts=result.metadata.ingestion_ts,
             body=sidecar,
         )
+        record_total += len(page.records)
+        log_stage(
+            "wrote",
+            source_id=SOURCE_ID,
+            dataset=DATASET,
+            object_key=result.key,
+            byte_count=len(body),
+            record_count=len(page.records),
+            page_skip=skip,
+            finding_count=finding_count(sidecar),
+        )
         results.append(result)
         next_skip = skip + page_limit
         if next_skip >= seen_total:
             break
         skip = next_skip
+    log_stage(
+        "fetch_finished",
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        page_count=len(results),
+        record_count=record_total,
+        catalog_total=0 if seen_total is None else seen_total,
+    )
     return tuple(results)
 
 
@@ -244,6 +276,7 @@ def main(argv: list[str] | None = None) -> int:
         help="API origin. The client calls {base-url}/products.",
     )
     args = parser.parse_args(argv)
+    configure_cli_logging()
     try:
         _run_cli(
             execution_id=args.execution_id,
@@ -252,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
             base_url=args.base_url,
         )
     except (DummyJsonProductsError, KeyError) as exc:
-        print(str(exc), file=sys.stderr)
+        log_failure(exc)
         return 1
     return 0
 

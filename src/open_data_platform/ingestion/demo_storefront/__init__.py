@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -18,6 +17,12 @@ from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.records import (
     PayloadStructureError,
     load_jsonl_records,
+)
+from open_data_platform.ingestion.pipeline_log import (
+    configure_cli_logging,
+    finding_count,
+    log_failure,
+    log_stage,
 )
 from open_data_platform.ingestion.quarantine import (
     InvalidRecordsError,
@@ -102,6 +107,14 @@ def ingest_demo_storefront(
         count=count,
         event_time_start=event_time_start,
     )
+    log_stage(
+        "generated",
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        record_count=count,
+        byte_count=len(body),
+    )
     contract = _require_contract(contracts)
     records = _clickstream_records(body, contract)
     ts = datetime.now(UTC) if ingestion_ts is None else ingestion_ts
@@ -130,6 +143,15 @@ def ingest_demo_storefront(
         ingestion_ts=result.metadata.ingestion_ts,
         body=sidecar,
     )
+    log_stage(
+        "wrote",
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        object_key=result.key,
+        byte_count=len(body),
+        record_count=count,
+        finding_count=finding_count(sidecar),
+    )
     return result
 
 
@@ -154,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Timezone-aware ISO-8601 write time. The same value overwrites the key.",
     )
     args = parser.parse_args(argv)
+    configure_cli_logging()
     try:
         _run_cli(
             execution_id=args.execution_id,
@@ -163,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
             ingestion_ts=args.ingestion_ts,
         )
     except (DemoStorefrontError, KeyError) as exc:
-        print(str(exc), file=sys.stderr)
+        log_failure(exc)
         return 1
     return 0
 
