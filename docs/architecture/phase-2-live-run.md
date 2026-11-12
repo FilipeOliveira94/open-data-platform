@@ -1,6 +1,6 @@
 # P2-09 — Live run, result, and consistency check
 
-One local run of the documented Phase 2 path on 2026-11-11 (UTC-3). dbt's own log clock was UTC. The run overwrote Bronze, Silver, and Gold. It did not delete raw objects or Docker volumes. Earlier layer snapshots stay in [Bronze](bronze-layer.md), [Silver](silver-layer.md), and [Gold](gold-layer.md). Partitioning, file sizing, the incremental strategy, and the phase limitation write-up are P2-10.
+One local run of the documented Phase 2 path on 2026-11-11 (UTC-3). dbt's own log clock was UTC. The run overwrote Bronze, Silver, and Gold. It did not delete raw objects or Docker volumes. Earlier layer snapshots stay in [Bronze](bronze-layer.md), [Silver](silver-layer.md), and [Gold](gold-layer.md). Partitioning, file sizing, the incremental strategy, and the phase limitations are in [Phase 2 lakehouse](phase-2-lakehouse.md).
 
 ## Versions
 

@@ -2,7 +2,7 @@
 
 Near-source Iceberg tables built from the raw objects in [raw storage layout](raw-storage-layout.md). Decision context: [ADR-0012](../decisions/0012-medallion-layers.md) (still `proposed`) and [ADR-0020](../decisions/0020-raw-storage-layout.md). Silver typing, JSON expansion, and deduplication are documented in [silver layer](silver-layer.md). This layer does not replace the raw objects.
 
-**Write mode (P2-03):** `WriteMode.FULL_OVERWRITE` only — each run overwrites the whole Bronze table from every object under that dataset’s raw prefix. Placeholders for incremental MERGE / append live in `open_data_platform.lakehouse.write_mode` for later phases.
+**Write mode (P2-03):** `WriteMode.FULL_OVERWRITE` only — each run overwrites the whole Bronze table from every object under that dataset’s raw prefix. Placeholders for incremental MERGE / append live in `open_data_platform.lakehouse.write_mode` and fail if selected. The phase strategy is [Phase 2 lakehouse](phase-2-lakehouse.md).
 
 ## Table
 
@@ -93,4 +93,4 @@ The Spark image, Iceberg runtime, S3A jars, PostgreSQL JDBC driver, JDBC schema 
 - Logical contract types are not cast. Nested JSON stays compact text. Typing and expansion are in [silver layer](silver-layer.md).
 - Spark `--packages` pins are unchanged. Jars resolve into the host Ivy cache at `.local/spark-ivy` (P2-08); see [Spark Ivy cache](phase-2-spark-ivy-cache.md).
 - CI does not start Compose. Unit tests cover parsing, staging, and the SQL text.
-- D-012 stays `proposed`.
+- D-012 is `approved`. Medallion namespaces and Gold schemas are in [ADR-0012](../decisions/0012-medallion-layers.md).

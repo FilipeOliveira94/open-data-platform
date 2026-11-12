@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-11 (P2-09 live run verified; P2-10 is next) |
-| Current phase | Phase 2 — Lakehouse and analytics |
-| Phase status | In progress |
+| Last updated | 2026-11-11 (Phase 2 verified; P3-01 is next) |
+| Current phase | Phase 3 — Orchestration and data quality |
+| Phase status | Not started |
 
 **Status values:** not started · in progress · delivered · verified · blocked · withdrawn
 
@@ -22,52 +22,67 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P2-10** — Phase 2 documentation and status.
+**P3-01** — Airflow in local Compose. Not started.
 
-P2-09 recorded the live run in [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md). P2-10 documents partitioning, file sizing, the incremental strategy against full-overwrite Bronze/Silver, known limitations, and that result.
+Phase 2 is verified. Its index is [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md). The live result it cites is [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md).
 
 ## Next work
 
-1. **P2-10** — Write the phase documentation from the P2-09 evidence. Do not reopen the live run.
+1. **P3-01** — Add Airflow to local Compose. Pin the image. Document UI and CLI access. Keep business logic out of DAG bodies. D-006 stays `proposed` until that evidence exists.
 
 ---
 
-## Phase 2 progress
+## Phase 3 progress
 
 | ID | Title | Status | Evidence |
 | --- | --- | --- | --- |
-| P2-01 | Minimal Spark + Iceberg + catalog + query PoC | Verified | Two runs returned count 2. [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) |
-| P2-02 | Local catalog and query-engine choice | Verified | Spark and Trino both returned 2 on two runs. [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) |
-| P2-03 | Bronze layer from raw ingestion | Verified | Full `odp-raw` live. Trino 18/18 against that run's raw counts. [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md) |
-| P2-04 | Silver normalization and deduplication | Verified | Full Bronze→Silver live. Trino 22/22 (18 counts + 4 shape). Geolocation 1_000_163→738_332. [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md) |
-| P2-05 | Analytical model design (grain, keys, SCD) | Verified | [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md) |
-| P2-06 | dbt project and initial Gold models | Verified | `dbt build` PASS=55. On-time rate 0.932; late orders 6_534. [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md) |
-| P2-07 | Data quality and reconciliation tests | Verified | `dbt test` PASS=288. Unit tests 286 passed. `make dbt-build` excludes `tag:reconciliation`. [`docs/status-log.md`](docs/status-log.md) |
-| P2-08 | Spark lakehouse jar / Ivy cache | Verified | Host `.local/spark-ivy` → `/tmp/.ivy2`. Second warm: 6 already retrieved. [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md) |
-| P2-09 | Live run, result, and consistency check | Verified | Catalog probe count 2. Bronze 18/18. Silver 20/20 `ok`. `dbt build` PASS=287. Reconciliation PASS=56. Anchors match 2026-11-05 / 2026-11-06. [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md) |
-| P2-10 | Phase 2 documentation and status | Not started | — |
+| P3-01 | Airflow in local Compose | Not started | — |
+| P3-02 | Ingestion DAGs (thin wrappers) | Not started | — |
+| P3-03 | Transform / dbt DAGs | Not started | — |
+| P3-04 | Daily batch schedule (PostgreSQL) | Not started | — |
+| P3-05 | Weekly batch schedule (PostgreSQL) | Not started | — |
+| P3-06 | Idempotent backfill support | Not started | — |
+| P3-07 | Quality checks and quarantine | Not started | — |
+| P3-08 | Execution metadata and failure logging | Not started | — |
+| P3-09 | Orchestration success/failure tests | Not started | — |
+| P3-10 | Live run, result, and consistency check | Not started | — |
+| P3-11 | Phase 3 documentation and status | Not started | — |
 
-Acceptance detail: `ROADMAP.md` → Phase 2.
+Acceptance detail: `ROADMAP.md` → Phase 3.
 
-### Phase 2 acceptance
+### Phase 3 acceptance
 
-- [x] A table can be created, written and queried in the chosen local stack.
-- [x] Queries and transforms are reproducible via documented commands.
-- [x] Quality and reconciliation rules have tests.
-- [ ] Documentation lists component versions and known limitations.
-- [x] A live run result is recorded and compared to the Phase 2 contracts (P2-09).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P2-10).
+- [ ] DAGs have clear dependencies and verifiable failure behavior.
+- [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
+- [ ] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily).
+- [ ] Backfills do not corrupt data or create undue duplication.
+- [ ] Invalid records are identified and handled per documented rules.
+- [ ] Success and failure scenarios have tests or reproducible evidence.
+- [ ] A live run result is recorded and compared to the source windows (P3-10).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-11).
 
 ---
 
 ## Latest validation
 
+Phase 3 has no stack run. The check below closes P2-10. It does not start Phase 3.
+
 | | |
 | --- | --- |
 | Date | 2026-11-11 |
-| Environment | WSL2 / Ubuntu. PostgreSQL, MinIO, Spark, and Trino up. Full overwrite from `odp-raw` |
-| Checks | `make test-catalog-probe`; `make live-bronze`; `make live-silver`; `make live-gold`; `make dbt-test-reconciliation`; `uv run pytest tests/unit/infrastructure/test_make_lakehouse_env.py` |
-| Result | Probe count 2. Bronze 18/18. Silver 20/20 `ok`. `dbt build` PASS=287. Reconciliation PASS=56. Headline anchors match the 2026-11-05 / 2026-11-06 baseline. Detail: [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md) |
+| Environment | Documentation only. Compose was not started |
+| Checks | `rg` for the stale phrases named in the P2-10 plan, across `README.md`, `docs/architecture`, `PROJECT_STATUS.md`, and `ROADMAP.md`. A second `rg` for `phase-2-live-run.md` in the README, this ledger, and `docs/architecture/phase-2-lakehouse.md` |
+| Result | Hits are the verified issue id P2-10 in `ROADMAP.md` and in this ledger. No line in those paths still uses the outdated wording the plan named. `phase-2-live-run.md` is cited from the README, this ledger, and `docs/architecture/phase-2-lakehouse.md`. Detail: [`docs/status-log.md`](docs/status-log.md) (2026-11-11, P2-10) |
+
+---
+
+## Phase 2 baseline
+
+Phase 2 is **verified**. Index: [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md). Live result: [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md) (2026-11-11).
+
+Spark writes Bronze and Silver through the Iceberg JDBC catalog. Trino reads them. dbt-trino builds Gold. That run: catalog probe count 2, Bronze 18/18, Silver 20/20 `ok`, `dbt build` PASS=287, reconciliation PASS=56. Headline anchors match the 2026-11-05 / 2026-11-06 baseline. Bronze and Silver rebuild the whole table (`FULL_OVERWRITE`). Gold replaces each table. There is no Iceberg partition spec and no target file size. `INSERT OVERWRITE` leaves previous Parquet files (P5-07).
+
+Closed Phase 2 narrative: [`ROADMAP.md`](ROADMAP.md) (Phase 2), [`docs/status-log.md`](docs/status-log.md).
 
 ---
 
@@ -80,8 +95,6 @@ Five sources land raw objects: Olist e-commerce and marketing funnel, DummyJSON 
 Daily and weekly batch share `extract_postgres_oltp` (one-day and seven-day UTC-midnight windows). Airflow schedules are Phase 3. Streaming CDC is Phase 4 and does not replace batch.
 
 `order_reviews` contract v2 uses primary key `(review_id, order_id)`. The P1-10 matrix recorded 1_603 duplicate findings under contract v1 (`review_id` alone). A shorter DummyJSON rerun on the same `execution_id` does not delete later page keys it does not rewrite.
-
-Closed Phase 1 narrative: [`ROADMAP.md`](ROADMAP.md) (Phase 1), [`docs/status-log.md`](docs/status-log.md).
 
 ---
 
@@ -106,13 +119,11 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 
 | ID | Relevance | State |
 | --- | --- | --- |
-| D-003 | Parquet + Iceberg 1.12.0, format version 2. Spark writes, Trino reads | Approved |
-| D-004 | JDBC catalog on PostgreSQL plus Trino 484. Glue and Athena stay Phase 7 | Approved |
-| D-005 | Spark for Bronze/Silver; dbt-trino for Gold | Approved |
-| D-012 | Bronze / Silver / Gold; seven Gold schemas plus `gold_shared.dim_date` | Approved |
-| D-020 | Raw layout that Bronze will read (P2-03) | Approved |
-| D-013 | Contracts; no silent drops | Approved |
-| D-001 / D-002 | Compose + MinIO baseline | Approved |
+| D-006 | Airflow locally; image pin and DAG boundary are P3-01 | `proposed` |
+| D-007 | Daily and weekly windows. The extract exists (P1-06). Schedules do not | `proposed` |
+| D-014 | CDC does not replace daily or weekly batch | `proposed` |
+| D-005 | DAGs call Spark Bronze/Silver and dbt-trino Gold. They do not reimplement them | Approved |
+| D-013 | Invalid rows stay visible. Reprocessing quarantined source rows is P3-07 | Approved |
 
 ---
 
@@ -134,7 +145,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01–P2-09 verified) |
+| 2 | Lakehouse PoC, medallion, dbt | Verified |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
@@ -147,9 +158,8 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 ## Risks and limitations
 
-- P2-02 proved one table on the Iceberg JDBC catalog: Spark writes, Trino 484 reads. An overwrite leaves the previous Parquet files in the bucket. JDBC is not the Glue protocol. The Hadoop catalog remains the P2-01 probe only.
-- P2-03 stores Bronze contract fields as `STRING` on that same catalog. P2-04 Silver reads those tables, casts by contract type, and deduplicates per source module.
-- P2-06 Gold writes through Trino CTAS (`dbt-trino`). Quarantine findings are staged from MinIO JSONL into `gold_staging` before quality facts. The Spark load script names the staging object path. Finding values stay in that JSONL file.
+- D-006 and D-007 are still `proposed`. Adding Compose services in P3-01 does not approve them by itself.
+- A Phase 3 schedule would call the current full rebuild of Bronze, Silver, and Gold. That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
 - Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Exactly-once end-to-end will not be claimed without a written proof.
@@ -177,34 +187,6 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
 
-### 2026-11-11 — P2-09 verified
+### 2026-11-11 — P2-10 verified
 
-Local catalog probe, Bronze, Silver, Gold, and reconciliation completed. Bronze 18/18, Silver 20/20 `ok`, `dbt build` PASS=287, reconciliation PASS=56. Headline counts match the 2026-11-05 / 2026-11-06 baseline. Evidence: [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md). Next issue is P2-10.
-
-### 2026-11-11 — Site figure table
-
-The scaffold still has no charts. The roadmap growth scheme now lists ten figures for Phase 9: nine Superset charts and one JupyterLab image of the same on-time rate. P8-06 exports them. Detail: [`docs/status-log.md`](docs/status-log.md).
-
-### 2026-11-11 — Phase 8 exploration and BI inserted
-
-Phase 8 is JupyterLab (host) plus Apache Superset (Compose), both read-only through Trino, and may start after Phase 2. The platform report site is Phase 9 (P9-01–P9-07). The Phase 8 close pair is P8-06 then P8-07. D-017 stays `proposed` until the P8-01 PoC. No notebook, Superset service, or test was added.
-
-### 2026-11-11 — Log exposure fix
-
-Quarantine staging no longer inlines finding values in SQL. `make stage-quarantine` writes warehouse JSONL and loads it with Spark. Spark runners pass the JDBC password and S3 keys through a properties file. `tests/unit/infrastructure/test_spark_credentials.py` fails if another `docker/spark/*.sh` assigns those keys. The agent rule is `.cursor/rules/05-runtime-data-exposure.mdc`. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` passed 294. `make stage-quarantine` was not re-run on the live stack. Detail: [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md).
-
-### 2026-11-11 — P2-07 verified
-
-`dbt test` PASS=288 against the existing Gold tables. Bronze checks read `.local/bronze-source-counts.tsv` from the run. Silver checks return `ok` from the contract dedup policy. Money sums use a 0.01 tolerance. `dim_municipality` was dropped and rebuilt (5_571 rows) after missing Iceberg metadata. `mart_storefront_user_behavior` was rebuilt (5 rows). Unit tests on this tree: 286 passed. `make live-bronze` and `make live-silver` were not re-run. Reconciliation stays out of `make live-gold` (`dbt build --exclude tag:reconciliation`) and is run with `make dbt-test-reconciliation`. Detail: [`docs/status-log.md`](docs/status-log.md).
-
-### 2026-11-06 — P2-06 verified
-
-dbt-trino `1.11.0` builds 55 Gold tables from Silver. Quarantine staging wrote 1_603 sidecar rows. On-time rate 0.932; `mart_late_orders` 6_534. D-005 and D-012 approved. Detail: [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md).
-
-### 2026-11-06 — Gold schemas revised
-
-The model design now opens with seven business schemas: marketplace operations, customer CRM, seller acquisition, Brazil geography, catalog, storefront, and OLTP operations. On-time rate and `mart_late_orders` carry the delay analysis. Each schema has a quality-findings fact. Contract `governance.domain` stays the source family. Detail: [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md).
-
-### 2026-11-06 — P2-05 verified
-
-Gold grain, keys, refresh rules, and marts are in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). Payment rows have no refund status; cancellation after approval is the money-at-risk mart. Silver stays Spark. SCD Type 2 is a single Phase 4 issue, P4-08, and the phase still closes on P4-09 then P4-10. No dbt model was built in that issue.
+Phase 2 documentation is in [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md). It cites the 2026-11-11 live run. No Compose command was run for this issue. Next issue is P3-01.

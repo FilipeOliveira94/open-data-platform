@@ -1,38 +1,26 @@
 # Open Data Platform
 
-Reproducible open-source data platform: local development on Windows 11 + WSL2 + Docker Compose, with an AWS deployment path expressed later as Terraform Infrastructure as Code (Phase 7).
+A reproducible open-source data platform for local development on Windows 11, WSL2, and Docker Compose. The AWS path is Terraform Infrastructure as Code in Phase 7. This repository does not apply it.
 
-## Platform report
+The goal is to show a full batch path that can be rebuilt from a checkout: several sources land as auditable raw files, a Bronze / Silver / Gold lakehouse is built on open components, and Gold metrics are checked against Silver. Schedules, streaming, notebooks, and a public report come later.
 
-A short multi-page **platform report** (home, architecture, pipeline, operations, reference) lives under [`site/`](site/) as an Astro [Starlight](https://starlight.astro.build/) app with the [Catppuccin](https://starlight-themes.netlify.app/catppuccin/) theme. Content reflects **verified** work only; public hosting is **Phase 9**. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) remains the source of truth.
+## What it does today
 
-| | |
-| --- | --- |
-| Live report | *Not published yet* (Phase 9) |
-| Local preview | `cd site && npm ci && npm run dev` — see [`site/README.md`](site/README.md) (Node.js 22.22+) |
-| Scheme | See [`ROADMAP.md`](ROADMAP.md) → Platform report site |
-| Status | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) → Platform report site |
+Verified on the local stack. Counts and quality results from 2026-11-11 are in the [Phase 2 live run](docs/architecture/phase-2-live-run.md). Versions, partitioning, file sizing, the full-overwrite strategy, and limitations are in [Phase 2 lakehouse](docs/architecture/phase-2-lakehouse.md).
 
-When the report is published, the URL will also be set on the GitHub repository **About → Website** field.
+**Raw ingestion.** Five source families land in object storage. Every object carries `source_id`, `execution_id`, and `_ingestion_ts`. Invalid rows stay in the raw object. Findings go to a quarantine sidecar. The same execution overwrites an object. A new execution keeps the previous one. The sources are the Olist e-commerce and marketing-funnel datasets (CC BY-NC-SA 4.0, fetched locally, not vendored), DummyJSON products, a windowed PostgreSQL extract, a fictional storefront clickstream, and IBGE municipalities. Index: [Phase 1 ingestion](docs/architecture/phase-1-ingestion.md).
 
-**Phase 0** (foundation) is complete: Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, and CI. **Phase 1** (multi-source raw ingestion) is verified. Sources, object keys, repeatable runs, and the three update patterns are indexed in [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md). **Phase 2** has a verified Spark + Iceberg probe ([P2-01](docs/architecture/phase-2-spark-iceberg-poc.md)), a verified JDBC catalog plus Trino read ([P2-02](docs/architecture/phase-2-catalog-query.md)), verified Bronze tables ([P2-03](docs/architecture/bronze-layer.md)), verified Silver tables ([P2-04](docs/architecture/silver-layer.md)), a verified Gold model design ([P2-05](docs/architecture/gold-model-design.md)), verified Gold dbt models ([P2-06](docs/architecture/gold-layer.md)), and verified quality and reconciliation tests ([P2-07](docs/architecture/gold-layer.md)). The Phase 2 live close, Airflow schedules, and streaming CDC are later issues.
+**Lakehouse.** Spark writes Iceberg tables. Trino reads them. Bronze keeps the source payload and the ingestion metadata. Silver types the columns, expands nested JSON, and deduplicates. Gold is a dbt project on Trino. It covers marketplace delivery and late orders, customer reviews, seller acquisition, Brazil geography, a product catalog, storefront behavior, and a windowed OLTP extract. Quality tests compare Gold keys and sums with Silver. On 2026-11-11, Bronze matched that run's raw counts (18/18), Silver checks returned ok (20/20), and the Gold build and reconciliation tests passed with the same headline anchors as the 2026-11-05 / 2026-11-06 baseline.
 
-## Prerequisites
+**Refresh patterns.** Daily and weekly batch share the PostgreSQL windowed extract. Airflow does not schedule them yet. Streaming change capture is a separate later path and does not replace batch.
 
-- Windows 11 with WSL2 and an Ubuntu distro (or another Linux host)
-- Docker Desktop, running, with WSL integration enabled for that distro
-- [uv](https://docs.astral.sh/uv/) **0.13.1** (pinned in `pyproject.toml` and CI)
-- Docker Compose v2, included with Docker Desktop (`docker compose version`)
-- GNU Make (optional; every Make target below has the equivalent command)
-- Node.js 22.22+ only to preview the platform report under `site/`
+## What it does not do yet
 
-`uv sync` installs CPython 3.12 for this repository. Ubuntu's `python3` package may be another version. Use `uv run`, not system `python3`.
+Airflow schedules, backfills, Kafka, streaming CDC, Iceberg snapshot expiration, JupyterLab, Superset, an AWS `terraform apply`, and public hosting of the platform report. An early report scaffold under `site/` previews verified facts only. Local preview needs Node.js 22.22+: `cd site && npm ci && npm run dev`. See [`site/README.md`](site/README.md).
 
-## Install on a fresh machine
+## Reproduce it
 
-Run these from the Ubuntu terminal as a normal user. They do not require an existing checkout.
-
-### 1. uv 0.13.1
+Prerequisites: Windows 11 with WSL2 Ubuntu (or another Linux host), Docker Desktop with that distro integrated, [uv](https://docs.astral.sh/uv/) 0.13.1, and Docker Compose v2. GNU Make is optional. `uv sync` installs CPython 3.12 for this repository. Use `uv run`, not system `python3`.
 
 ```bash
 curl -LsSf https://astral.sh/uv/0.13.1/install.sh | sh
@@ -40,140 +28,56 @@ source "$HOME/.local/bin/env"
 uv --version
 ```
 
-`uv --version` must print `uv 0.13.1`. The installer adds `source "$HOME/.local/bin/env"` to `~/.bashrc`, which puts `~/.local/bin` on `PATH`. Open a new terminal if `uv` is not found.
+`uv --version` must print `uv 0.13.1`.
 
-If `curl` is missing: `sudo apt update && sudo apt install -y curl ca-certificates`.
-
-### 2. GNU Make (optional)
+From a checkout:
 
 ```bash
-sudo apt update
-sudo apt install -y make
-make --version
-```
-
-### 3. Docker Desktop and WSL
-
-1. Install [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
-2. Start Docker Desktop and leave it running. The engine is the `docker-desktop` WSL distro; it stops when the app quits.
-3. In Docker Desktop: **Settings → Resources → WSL integration**. Enable the Ubuntu distro, then **Apply & restart**.
-4. In Ubuntu, confirm both the client and the server answer:
-
-```bash
-docker version
-docker compose version
-```
-
-## Quick start
-
-```bash
-# 1) Toolchain — downloads CPython 3.12 and installs the lockfile into .venv
 uv sync
-
-# 2) Optional local overrides (never commit .env)
 cp .env.example .env
 
-# 3) Lint and unit tests (no services required)
 uv run ruff check src tests
 uv run pytest tests/unit
-# or: make lint && make test
 
-# 4) Local services
 docker compose up -d
-docker compose ps
-# or: make up
-
-# 5) PostgreSQL reachability
 docker compose exec postgres pg_isready -U odp -d odp
-
-# 6) MinIO write/read smoke
-set -a && source .env.example && set +a
-uv run pytest tests/integration/infrastructure/test_minio_smoke.py
-# or: make test-minio
-
-# 7) Stop services (volumes retained)
-docker compose down
-# or: make down
 ```
 
-## Make targets
+`cp .env.example .env` is optional. Do not commit `.env`. `docker compose up` starts PostgreSQL 16 and MinIO. Spark and Trino are not in that command. The lakehouse targets start them.
 
-| Target | Purpose |
-| --- | --- |
-| `make setup` / `make sync` | Install package and locked deps via `uv` |
-| `make lint` | Ruff check |
-| `make test` | Unit tests only |
-| `make up` / `make down` | Start/stop Compose stack (PostgreSQL and MinIO only) |
-| `make test-minio` | Live MinIO put/get smoke |
-| `make test-iceberg-poc` | P2-01 Iceberg probe (MinIO must be healthy; profile `lakehouse`) |
-| `make test-catalog-probe` | P2-02 JDBC catalog probe: Spark write, Trino read (PostgreSQL and MinIO must be healthy) |
-| `make spark-ivy-warm` | P2-08 download pinned Spark lakehouse jars into `.local/spark-ivy` |
-| `make live-bronze` | P2-03 full-data Bronze live run from `ODP_RAW_BUCKET` (`odp-raw`), Spark write, Trino counts |
-| `make live-silver` | P2-04 full-data Silver live run from Bronze, Spark write, Trino counts |
-| `make live-gold` | Stage quarantine sidecars, then build Gold models and schema tests |
-| `make dbt-test-reconciliation` | Gold reconciliation tests against Silver or the parent fact |
+Raw objects must already be in the raw bucket (default `odp-raw`). Fetch and load steps are under [`docs/sources/`](docs/sources/). Unit tests do not need those files or the public APIs.
 
-## Local services (Phase 0)
-
-| Service | Image pin | Ports (default) |
-| --- | --- | --- |
-| PostgreSQL 16 | `postgres:16.15-bookworm` | `5432` |
-| MinIO | `coollabsio/minio:RELEASE.2025-10-15T17-29-55Z` | API `9000`, console `9001` |
-
-**MinIO image note:** MinIO Inc. removed official public container images in favor of commercial **AIStor**. The community MinIO server remains **AGPLv3**, so community-built images are acceptable for local use. Phase 0 pins [`coollabsio/minio`](https://hub.docker.com/r/coollabsio/minio) at upstream release `RELEASE.2025-10-15T17-29-55Z` (see ADR-0002).
-
-Default credentials are placeholders in `.env.example` for local use only.
-
-## Lakehouse probe (P2-01)
-
-Spark is not part of `docker compose up`. The `lakehouse` profile provides one Spark runtime and Trino. Profile `up` leaves Spark idle; a probe or a Bronze load passes its script to `docker compose run`. Versions, the Hadoop-catalog limitation, and the 2026-10-28 result are in [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md).
-
-```bash
-docker compose up -d minio
-make test-iceberg-poc
-```
-
-The catalog in this probe is the Iceberg Hadoop catalog on MinIO. The durable local catalog is the JDBC catalog from P2-02.
-
-## Catalog and Trino (P2-02)
-
-Spark writes `catalog_probe.probe` through the Iceberg JDBC catalog on the Compose PostgreSQL database `iceberg`. Trino `484` reads it. Neither service starts with `docker compose up`. Versions, the command, and the 2026-10-29 result are in [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md).
+Rebuild the lakehouse from that bucket:
 
 ```bash
 make test-catalog-probe
+make live-bronze
+make live-silver
+make live-gold
+make dbt-test-reconciliation
 ```
 
-## Bronze and Silver (P2-03 / P2-04)
+The first Spark target stores jars in `.local/spark-ivy`. Later targets reuse them. `make live-gold` builds Gold and its schema tests. Reconciliation is the separate last command. The stack stays up for several minutes. The recorded result of this path is the [2026-11-11 live run](docs/architecture/phase-2-live-run.md).
 
-`make live-bronze` promotes every contract from `ODP_RAW_BUCKET` (default `odp-raw`) into Iceberg Bronze tables and checks Trino counts. `make live-silver` types, expands DummyJSON nested JSON, and deduplicates into Silver. Synthetic fixtures under `lakehouse.fixtures` are for unit tests only. Grain and columns: [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md), [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md).
+Stop services and keep volumes:
 
-Spark `--packages` resolve into the host Ivy cache at `.local/spark-ivy` (mounted at `/tmp/.ivy2`). Warm once with `make spark-ivy-warm` after a fresh clone: [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md).
+```bash
+docker compose --profile lakehouse stop
+docker compose down
+```
 
-## CI
+GitHub Actions runs the same lint and unit tests on Python 3.12. It does not start Compose and it does not deploy cloud resources.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the same lint and unit-test commands on Python 3.12. It does **not** deploy cloud resources or start Compose.
-
-## Documentation
+## Where the detail lives
 
 | Document | Role |
 | --- | --- |
-| [`AGENTS.md`](AGENTS.md) | Agent and contributor operating contract |
-| [`ROADMAP.md`](ROADMAP.md) | Issue-level scope and acceptance criteria (phases 0–9) |
-| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Current-phase status ledger (verified work + next steps) |
-| [`docs/status-log.md`](docs/status-log.md) | Chronological status archive |
+| [Phase 1 ingestion](docs/architecture/phase-1-ingestion.md) | Sources, raw keys, repeatable runs, update patterns |
+| [Phase 2 lakehouse](docs/architecture/phase-2-lakehouse.md) | Versions, partitioning, file sizing, overwrite strategy, limitations |
+| [Phase 2 live run](docs/architecture/phase-2-live-run.md) | 2026-11-11 counts and quality results |
+| [Data contracts](docs/architecture/data-contracts.md) | Fields, keys, and null rules |
+| [`ROADMAP.md`](ROADMAP.md) | Issue scope and acceptance criteria |
+| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Current-phase ledger |
 | [`DECISIONS.md`](DECISIONS.md) | Architecture decision index |
-| [`docs/decisions/`](docs/decisions/) | ADR detail |
-| [`docs/architecture/phase-1-ingestion.md`](docs/architecture/phase-1-ingestion.md) | Phase 1 source index, raw keys, repeatable runs, update patterns |
-| [`docs/architecture/phase-2-spark-iceberg-poc.md`](docs/architecture/phase-2-spark-iceberg-poc.md) | P2-01 Spark + Iceberg probe: pins, command, result, limitations |
-| [`docs/architecture/phase-2-catalog-query.md`](docs/architecture/phase-2-catalog-query.md) | P2-02 JDBC catalog and Trino: pins, command, result, limitations |
-| [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md) | P2-03 Bronze tables: grain, columns, command, result |
-| [`docs/architecture/silver-layer.md`](docs/architecture/silver-layer.md) | P2-04 Silver tables: typing, JSON expansion, dedup |
-| [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md) | P2-05 Gold grain, keys, SCD rules, and mart definitions |
-| [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md) | P2-06 dbt-trino Gold tables, commands, and verification |
-| [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md) | P2-08 host Ivy cache for Spark `--packages` |
-| [`docs/sources/`](docs/sources/) | Per-source license, access, and commands |
-| [`docs/architecture/`](docs/architecture/) | Raw layout and data contracts |
 
-## Not in the verified platform yet
-
-Airflow schedules, Kafka, streaming CDC, Kubernetes, JupyterLab and Superset (Phase 8), the AWS Terraform path (Phase 7), and public hosting of the platform report (Phase 9). P2-01 covers one Iceberg table on the Hadoop catalog. P2-02 covers the same shape of table on the JDBC catalog, read by Trino. P2-03 covers Bronze tables on that catalog. P2-04 covers typed Silver tables per source. The `site/` scaffold previews verified facts locally.
+Contributors and agents follow [`AGENTS.md`](AGENTS.md).

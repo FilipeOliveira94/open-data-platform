@@ -2,7 +2,7 @@
 
 Typed, deduplicated Iceberg tables built from [Bronze](bronze-layer.md). Decision context: [ADR-0012](../decisions/0012-medallion-layers.md) (still `proposed` until Gold exists). Bronze stays string-typed and keeps duplicate keys. This layer does not replace Bronze or raw objects.
 
-**Write mode (P2-04):** `WriteMode.FULL_OVERWRITE` only — each live run rebuilds the whole Silver table (`DROP` + `CREATE` + `INSERT OVERWRITE`). Placeholders for `INCREMENTAL_MERGE` and `APPEND_ONLY` exist in `open_data_platform.lakehouse.write_mode` and fail if selected. Incremental/CDC commit paths are later work (P2-10 docs, P3 backfills, P4 CDC).
+**Write mode (P2-04):** `WriteMode.FULL_OVERWRITE` only — each live run rebuilds the whole Silver table (`DROP` + `CREATE` + `INSERT OVERWRITE`). Placeholders for `INCREMENTAL_MERGE` and `APPEND_ONLY` exist in `open_data_platform.lakehouse.write_mode` and fail if selected. Those commit paths are not implemented. The strategy is [Phase 2 lakehouse](phase-2-lakehouse.md). Schedules and backfills are Phase 3. CDC is Phase 4.
 
 ## Split by source
 
@@ -108,4 +108,4 @@ Same Spark, Iceberg, JDBC, and Trino pins as [catalog and query](phase-2-catalog
 - `INSERT OVERWRITE` / table recreate leaves previous Parquet files in the bucket (P5-07).
 - CI does not start Compose. Unit tests cover SQL text, policies, and expansions.
 - D-012 is `approved` after Gold tables exist ([Gold layer](gold-layer.md)). Grain and mart rules are in [Gold model design](gold-model-design.md). Gold reads these Silver tables via dbt-trino. A later port of this Silver SQL into dbt is a note in that design, not a change to this writer.
-- Broader quality and reconciliation tests are P2-07; orchestration is Phase 3.
+- Quality and reconciliation tests are in [Gold layer](gold-layer.md). The 2026-11-11 run is [Phase 2 live run](phase-2-live-run.md). Orchestration is Phase 3.

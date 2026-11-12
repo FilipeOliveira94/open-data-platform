@@ -51,7 +51,7 @@ The current metadata location after those runs is `s3a://odp-warehouse/catalog/c
 - `INSERT OVERWRITE` adds a snapshot and leaves the previous Parquet files in the bucket.
 - The JDBC catalog is not the Glue protocol. A future Iceberg change to the JDBC metadata tables can break the pair. Both sides are pinned to schema `V1`.
 - `spark-sql` still logs Hive `ObjectStore` warnings from its session catalog. No Hive Metastore was added.
-- Each Spark run downloads the pinned jars from Maven Central. The container is removed afterwards, so the Ivy cache is not kept.
+- Pinned jars resolve from the host Ivy cache at `.local/spark-ivy`, mounted at `/tmp/.ivy2` (P2-08). See [Spark Ivy cache](phase-2-spark-ivy-cache.md). A cold cache downloads them once.
 - CI does not start Compose. The unit test checks the probe files only.
 - Trino stays up after the target. It is not part of `docker compose up`. Stop it with `docker compose --profile lakehouse stop trino` when it is no longer needed. That command does not remove volumes.
 - P2-03 writes Bronze tables through this catalog. The Hadoop catalog stays the P2-01 probe. See [`bronze-layer.md`](bronze-layer.md).

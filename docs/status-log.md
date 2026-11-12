@@ -4,6 +4,19 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-11 — P2-10 phase documentation
+
+Phase 2 is verified. [`docs/architecture/phase-2-lakehouse.md`](architecture/phase-2-lakehouse.md) lists the 2026-11-11 component versions, states that Bronze, Silver, and Gold have no Iceberg partition spec, states that no target file size is configured, and contrasts `WriteMode.FULL_OVERWRITE` (and dbt table replace) with the PostgreSQL `incremental_window` extract. Placeholders `INCREMENTAL_MERGE` and `APPEND_ONLY` still fail if selected. The page cites [`docs/architecture/phase-2-live-run.md`](architecture/phase-2-live-run.md) and does not copy the 55 Gold row counts. `README.md` now leads with what the platform does, what it does not do, and the reproduce path. Stale sentences updated: Bronze D-012 is `approved`; Silver quality points at Gold and the live run; the catalog note points at the Ivy cache. No Compose command was run. No application code changed.
+
+Text check, from the repository root. Both commands exited 0.
+
+```text
+rg -n "P2-10|later issues|D-012 stays|downloads the pinned jars|Broader quality" README.md docs/architecture PROJECT_STATUS.md ROADMAP.md
+rg -n "phase-2-live-run.md" README.md PROJECT_STATUS.md docs/architecture/phase-2-lakehouse.md
+```
+
+The first command printed eight lines, all for the issue id `P2-10`: `ROADMAP.md` lines 175, 190, 192, and 491, and `PROJECT_STATUS.md` lines 68, 74, 75, and 190. `README.md` and `docs/architecture` printed nothing. The phrases `later issues`, `D-012 stays`, `downloads the pinned jars`, and `Broader quality` did not appear. The second command printed nine lines: `docs/architecture/phase-2-lakehouse.md` lines 20 and 77, `PROJECT_STATUS.md` lines 27, 74, 75, and 81, and `README.md` lines 9, 60, and 77. Next issue is P3-01. Phase 3 was not started.
+
 ### 2026-11-11 — P2-09 live run
 
 On the local stack, `make test-catalog-probe` printed Spark `2` and Trino `"2"` in 17.7 s. `make live-bronze` matched 18/18 raw counts in 359 s, including geolocation 1_000_163, customers 99_441, DummyJSON 194, and postgres_oltp 3/3/3/5. `make live-silver` returned 20/20 `ok` in 344 s. Silver anchors: geolocation 738_332, DummyJSON 194, postgres_oltp 2/2/2/3, clickstream null `product_id` 16. `make live-gold` printed quarantine `1603` and `dbt build` PASS=287 WARN=0 ERROR=0 SKIP=0 TOTAL=287 in 53.7 s (55 tables + 232 schema tests). `make dbt-test-reconciliation` PASS=56 WARN=0 ERROR=0 SKIP=0 TOTAL=56 in 558 s. On-time 89_936 / 96_470, late orders 6_534, `dim_customers` 96_096, `dim_zip_prefix` 19_015, `dim_date` 3_774, `dim_municipality` 5_571. Those anchors match the 2026-11-05 / 2026-11-06 notes. The Silver checker count is 20 statements after P2-07; the 2026-11-05 note said 22/22. Every Spark submit reported 6 jars already retrieved. `ensure_spark_ivy` is one Makefile line so the sourced `.env` stays in the shell that runs the command. Detail: [`docs/architecture/phase-2-live-run.md`](architecture/phase-2-live-run.md). Partitioning, file sizing, and the phase limitation write-up remain P2-10.
@@ -15,6 +28,10 @@ The site scaffold still has no charts. Architecture and Pipeline no longer call 
 ### 2026-11-11 — Phase 8 is exploration and BI; the site moves to Phase 9
 
 `ROADMAP.md` inserts Phase 8 before the platform report. Phase 8 is JupyterLab on the host and Apache Superset in Compose, both read-only through Trino, and may start after Phase 2 in parallel with Phases 3–7. Issues are P8-01 through P8-05, then the close pair P8-06 (live run, result, and consistency check) and P8-07 (phase documentation and status). The report site is Phase 9 (P9-01–P9-07); its close pair is P9-06 then P9-07. D-017 records the selection and stays `proposed` until the P8-01 PoC against Trino 484. No notebook, image, or Compose service was added. Earlier log lines that call Phase 8 the site mean what is now Phase 9.
+
+### 2026-11-11 — Quarantine and Spark credential exposure
+
+Quarantine staging no longer inlines finding values in SQL. `make stage-quarantine` writes warehouse JSONL and loads it with Spark. Spark runners pass the JDBC password and S3 keys through a properties file. `tests/unit/infrastructure/test_spark_credentials.py` fails if another `docker/spark/*.sh` assigns those keys. The agent rule is `.cursor/rules/05-runtime-data-exposure.mdc`. `uv run ruff check src tests` passed. `uv run ruff format --check src tests` passed. `uv run pytest tests/unit` passed 294. `make stage-quarantine` was not re-run on the live stack. Detail: [`docs/architecture/gold-layer.md`](architecture/gold-layer.md). This entry was archived from the Phase 2 ledger when P2-10 trimmed it.
 
 ### 2026-11-11 — P2-07 quality and reconciliation tests
 
