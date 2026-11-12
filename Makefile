@@ -15,9 +15,11 @@ DBT_PROFILES_DIR ?= dbt
 SPARK_IVY_DIR ?= .local/spark-ivy
 
 # Spark image runs as uid 185; the bind mount must be writable by that user.
+# One line: a newline in this macro starts a new Make shell and drops the
+# environment sourced in the same recipe. chmod may fail on jars created by
+# uid 185; those files stay readable and must not abort `set -e`.
 define ensure_spark_ivy
-	mkdir -p "$(SPARK_IVY_DIR)/cache" "$(SPARK_IVY_DIR)/jars" "$(SPARK_IVY_DIR)/local"
-	chmod -R a+rwX "$(SPARK_IVY_DIR)"
+	mkdir -p "$(SPARK_IVY_DIR)/cache" "$(SPARK_IVY_DIR)/jars" "$(SPARK_IVY_DIR)/local"; chmod -R a+rwX "$(SPARK_IVY_DIR)" || true
 endef
 
 help: ## Show available targets

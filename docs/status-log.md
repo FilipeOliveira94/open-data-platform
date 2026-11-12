@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-11 — P2-09 live run
+
+On the local stack, `make test-catalog-probe` printed Spark `2` and Trino `"2"` in 17.7 s. `make live-bronze` matched 18/18 raw counts in 359 s, including geolocation 1_000_163, customers 99_441, DummyJSON 194, and postgres_oltp 3/3/3/5. `make live-silver` returned 20/20 `ok` in 344 s. Silver anchors: geolocation 738_332, DummyJSON 194, postgres_oltp 2/2/2/3, clickstream null `product_id` 16. `make live-gold` printed quarantine `1603` and `dbt build` PASS=287 WARN=0 ERROR=0 SKIP=0 TOTAL=287 in 53.7 s (55 tables + 232 schema tests). `make dbt-test-reconciliation` PASS=56 WARN=0 ERROR=0 SKIP=0 TOTAL=56 in 558 s. On-time 89_936 / 96_470, late orders 6_534, `dim_customers` 96_096, `dim_zip_prefix` 19_015, `dim_date` 3_774, `dim_municipality` 5_571. Those anchors match the 2026-11-05 / 2026-11-06 notes. The Silver checker count is 20 statements after P2-07; the 2026-11-05 note said 22/22. Every Spark submit reported 6 jars already retrieved. `ensure_spark_ivy` is one Makefile line so the sourced `.env` stays in the shell that runs the command. Detail: [`docs/architecture/phase-2-live-run.md`](architecture/phase-2-live-run.md). Partitioning, file sizing, and the phase limitation write-up remain P2-10.
+
 ### 2026-11-11 — Site figures
 
 The site scaffold still has no charts. Architecture and Pipeline no longer call the verified lakehouse "not started". `ROADMAP.md` now lists ten figures: nine Superset charts, one per question already in the Gold model, and one JupyterLab image of the same on-time query. P8-04 draws them. P8-06 exports static images and a caption manifest. Phase 9 publishes them on Home, Architecture, and Pipeline. No image file was added.

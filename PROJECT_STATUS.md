@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-11 (Phase 8 roadmap insert; P2-07 still the latest verified issue) |
+| Last updated | 2026-11-11 (P2-09 live run verified; P2-10 is next) |
 | Current phase | Phase 2 — Lakehouse and analytics |
 | Phase status | In progress |
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P2-09** — Live run, result, and consistency check.
+**P2-10** — Phase 2 documentation and status.
 
-P2-07 verified dbt and Python quality and reconciliation tests ([`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md)). Silver stays the Spark writer. The phase closes on P2-09, then P2-10.
+P2-09 recorded the live run in [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md). P2-10 documents partitioning, file sizing, the incremental strategy against full-overwrite Bronze/Silver, known limitations, and that result.
 
 ## Next work
 
-1. **P2-09** — On the local stack, record component versions, row counts, the quality-test result, and Gold metrics against the source or Silver counts for that run. Unit tests do not close this issue.
+1. **P2-10** — Write the phase documentation from the P2-09 evidence. Do not reopen the live run.
 
 ---
 
@@ -44,7 +44,7 @@ P2-07 verified dbt and Python quality and reconciliation tests ([`docs/architect
 | P2-06 | dbt project and initial Gold models | Verified | `dbt build` PASS=55. On-time rate 0.932; late orders 6_534. [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md) |
 | P2-07 | Data quality and reconciliation tests | Verified | `dbt test` PASS=288. Unit tests 286 passed. `make dbt-build` excludes `tag:reconciliation`. [`docs/status-log.md`](docs/status-log.md) |
 | P2-08 | Spark lakehouse jar / Ivy cache | Verified | Host `.local/spark-ivy` → `/tmp/.ivy2`. Second warm: 6 already retrieved. [`docs/architecture/phase-2-spark-ivy-cache.md`](docs/architecture/phase-2-spark-ivy-cache.md) |
-| P2-09 | Live run, result, and consistency check | Not started | — |
+| P2-09 | Live run, result, and consistency check | Verified | Catalog probe count 2. Bronze 18/18. Silver 20/20 `ok`. `dbt build` PASS=287. Reconciliation PASS=56. Anchors match 2026-11-05 / 2026-11-06. [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md) |
 | P2-10 | Phase 2 documentation and status | Not started | — |
 
 Acceptance detail: `ROADMAP.md` → Phase 2.
@@ -52,10 +52,10 @@ Acceptance detail: `ROADMAP.md` → Phase 2.
 ### Phase 2 acceptance
 
 - [x] A table can be created, written and queried in the chosen local stack.
-- [ ] Queries and transforms are reproducible via documented commands.
+- [x] Queries and transforms are reproducible via documented commands.
 - [x] Quality and reconciliation rules have tests.
 - [ ] Documentation lists component versions and known limitations.
-- [ ] A live run result is recorded and compared to the Phase 2 contracts (P2-09).
+- [x] A live run result is recorded and compared to the Phase 2 contracts (P2-09).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P2-10).
 
 ---
@@ -65,9 +65,9 @@ Acceptance detail: `ROADMAP.md` → Phase 2.
 | | |
 | --- | --- |
 | Date | 2026-11-11 |
-| Environment | WSL2 / Ubuntu. PostgreSQL, MinIO, Trino healthy; Gold from `odp-raw` / `run-001` present |
-| Checks | `uv run dbt test --project-dir dbt --profiles-dir dbt` (before the schema split); review re-run: `uv run ruff check src tests`; `uv run ruff format --check src tests`; `uv run pytest tests/unit`; `dbt ls` |
-| Result | `dbt test` PASS=288 WARN=0 ERROR=0 TOTAL=288 (570.63s). Review re-run: Ruff passed; unit tests 286 passed; `dbt ls` 56 reconciliation and 232 other tests. Detail: [`docs/status-log.md`](docs/status-log.md) |
+| Environment | WSL2 / Ubuntu. PostgreSQL, MinIO, Spark, and Trino up. Full overwrite from `odp-raw` |
+| Checks | `make test-catalog-probe`; `make live-bronze`; `make live-silver`; `make live-gold`; `make dbt-test-reconciliation`; `uv run pytest tests/unit/infrastructure/test_make_lakehouse_env.py` |
+| Result | Probe count 2. Bronze 18/18. Silver 20/20 `ok`. `dbt build` PASS=287. Reconciliation PASS=56. Headline anchors match the 2026-11-05 / 2026-11-06 baseline. Detail: [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md) |
 
 ---
 
@@ -134,7 +134,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
-| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01–P2-08 verified) |
+| 2 | Lakehouse PoC, medallion, dbt | In progress (P2-01–P2-09 verified) |
 | 3 | Airflow daily/weekly, backfills, quality | Not started |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
@@ -176,6 +176,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-11 — P2-09 verified
+
+Local catalog probe, Bronze, Silver, Gold, and reconciliation completed. Bronze 18/18, Silver 20/20 `ok`, `dbt build` PASS=287, reconciliation PASS=56. Headline counts match the 2026-11-05 / 2026-11-06 baseline. Evidence: [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md). Next issue is P2-10.
 
 ### 2026-11-11 — Site figure table
 

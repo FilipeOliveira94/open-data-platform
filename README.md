@@ -110,6 +110,8 @@ docker compose down
 | `make spark-ivy-warm` | P2-08 download pinned Spark lakehouse jars into `.local/spark-ivy` |
 | `make live-bronze` | P2-03 full-data Bronze live run from `ODP_RAW_BUCKET` (`odp-raw`), Spark write, Trino counts |
 | `make live-silver` | P2-04 full-data Silver live run from Bronze, Spark write, Trino counts |
+| `make live-gold` | Stage quarantine sidecars, then build Gold models and schema tests |
+| `make dbt-test-reconciliation` | Gold reconciliation tests against Silver or the parent fact |
 
 ## Local services (Phase 0)
 
