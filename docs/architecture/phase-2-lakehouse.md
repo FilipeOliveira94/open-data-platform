@@ -89,7 +89,7 @@ Headline anchors match the 2026-11-05 / 2026-11-06 baseline, including Silver ge
 ## Limitations
 
 - Bronze and Silver implement full overwrite only. The other write modes fail if selected.
-- Iceberg tables are unpartitioned. File size is the engine default. `INSERT OVERWRITE` and Gold table replace leave previous Parquet files in the bucket until P5-07.
+- Iceberg tables are unpartitioned. File size is the engine default. A per-table partition spec for Silver and Gold is listed under Candidates, not issues, in [`ROADMAP.md`](../../ROADMAP.md). It is not scheduled. `INSERT OVERWRITE` and Gold table replace leave previous Parquet files in the bucket until P5-07.
 - Exactly-once end-to-end is not claimed.
 - The JDBC catalog is not the Glue protocol. Both sides are pinned to schema `V1`.
 - The Hadoop catalog is a single-writer probe. Bronze, Silver, and Gold do not use it.

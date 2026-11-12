@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-11 — README and partition candidate
+
+The README opens with the path from a published number back to the source: several sources, idempotent overwrite, a new raw execution kept beside the previous one, contracts, business-domain Gold, and reconciliation. Bronze and Silver stay full replacements. Status is the next section. Core features are one table row each, with state, phase, and core stack, and a labeled note under each row. Setup stays in collapsed sections. Iceberg partitions for Silver and Gold are a candidate in `ROADMAP.md`, not an issue. No stack command was run.
+
 ### 2026-11-11 — P2-10 phase documentation
 
 Phase 2 is verified. [`docs/architecture/phase-2-lakehouse.md`](architecture/phase-2-lakehouse.md) lists the 2026-11-11 component versions, states that Bronze, Silver, and Gold have no Iceberg partition spec, states that no target file size is configured, and contrasts `WriteMode.FULL_OVERWRITE` (and dbt table replace) with the PostgreSQL `incremental_window` extract. Placeholders `INCREMENTAL_MERGE` and `APPEND_ONLY` still fail if selected. The page cites [`docs/architecture/phase-2-live-run.md`](architecture/phase-2-live-run.md) and does not copy the 55 Gold row counts. `README.md` now leads with what the platform does, what it does not do, and the reproduce path. Stale sentences updated: Bronze D-012 is `approved`; Silver quality points at Gold and the live run; the catalog note points at the Ivy cache. No Compose command was run. No application code changed.

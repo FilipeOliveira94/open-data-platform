@@ -187,6 +187,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
 
+### 2026-11-11 — README and partition candidate
+
+The README opens with the path from a published number back to the source. Core features are one row each, with state, phase, and core stack. Iceberg partitions for Silver and Gold are a candidate in [`ROADMAP.md`](ROADMAP.md), not an issue. No stack command was run.
+
 ### 2026-11-11 — P2-10 verified
 
 Phase 2 documentation is in [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md). It cites the 2026-11-11 live run. No Compose command was run for this issue. Next issue is P3-01.
