@@ -30,7 +30,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-003 | Table format | Parquet + Apache Iceberg | Parquet files, Iceberg `1.12.0`, `format-version` 2. Spark `3.5.8-java17` writes. Trino `trinodb/trino:484` reads | `approved` | [ADR-0003](docs/decisions/0003-table-format-parquet-iceberg.md) |
 | D-004 | Table catalog / SQL | Iceberg JDBC on Compose PostgreSQL + Trino; Glue Catalog + Athena (AWS) | JDBC catalog, database `iceberg`, schema V1, name `local`; Trino `trinodb/trino:484`; Spark `3.5.8-java17` writes. Glue and Athena are still Phase 7 | `approved` | [ADR-0004](docs/decisions/0004-table-catalog-and-sql-engines.md) |
 | D-005 | Compute / transform | Apache Spark; dbt for Gold | Spark for Bronze/Silver; dbt-trino `1.11.0` (dbt Core `1.12.6`) for Gold on Trino `484` | `approved` | [ADR-0005](docs/decisions/0005-compute-and-transform.md) |
-| D-006 | Orchestration | Apache Airflow (OSS) locally; MWAA / Step Functions as AWS counterparts | — | `proposed` | [ADR-0006](docs/decisions/0006-orchestration.md) |
+| D-006 | Orchestration | Apache Airflow (OSS) locally; MWAA / Step Functions as AWS counterparts | `apache/airflow:3.4.0-python3.12`, LocalExecutor, profile `orchestration`, metadata database `airflow`, task logs in MinIO `odp-airflow-logs`. MWAA is still Phase 7 | `approved` | [ADR-0006](docs/decisions/0006-orchestration.md) |
 | D-007 | Daily / weekly batch | Windowed PostgreSQL extract; Airflow daily and weekly schedules | — | `proposed` | [ADR-0007](docs/decisions/0007-daily-weekly-batch.md) |
 | D-008 | Streaming CDC | PostgreSQL logical replication, Debezium, Kafka, Spark Structured Streaming | — | `proposed` | [ADR-0008](docs/decisions/0008-streaming-cdc.md) |
 | D-009 | Observability | Prometheus + Grafana locally; CloudWatch (+ optional Datadog/New Relic) on AWS | — | `proposed` | [ADR-0009](docs/decisions/0009-observability.md) |
@@ -61,6 +61,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-11-12 | D-006 approved: Airflow 3.4.0 LocalExecutor on the Compose `orchestration` profile. Task logs in MinIO. Celery and Flower are not a follow-up. Evidence in [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | 2026-11-11 | D-017 selects JupyterLab + Superset for Phase 8. State stays `proposed` until the P8-01 Trino 484 PoC. QuickSight stays the AWS counterpart |
 | 2026-11-06 | D-005 and D-012 approved: Spark remains Bronze/Silver; dbt-trino builds Gold (P2-06). Evidence in [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md) |
 | 2026-10-29 | D-003 approved: Parquet + Iceberg 1.12.0, format version 2, after Spark and Trino both used that table. D-004 approved: Iceberg JDBC catalog on PostgreSQL database `iceberg` plus Trino 484. Glue and Athena stay the AWS counterparts (Phase 7) |

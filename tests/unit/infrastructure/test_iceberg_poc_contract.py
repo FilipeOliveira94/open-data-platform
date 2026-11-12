@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[3]
 PROBE_SQL = ROOT / "docker" / "spark" / "poc_probe.sql"
 RUN_SCRIPT = ROOT / "docker" / "spark" / "run_poc.sh"
@@ -52,5 +54,6 @@ def test_spark_service_is_lakehouse_profile_only() -> None:
     assert "run_poc.sh" not in spark
     assert "spark:3.5.8\n" not in compose
     assert "java11" not in compose.lower()
-    postgres = compose.split("minio:", 1)[0]
-    assert "profiles:" not in postgres
+    services = yaml.safe_load(compose)["services"]
+    assert "profiles" not in services["postgres"]
+    assert "profiles" not in services["minio"]

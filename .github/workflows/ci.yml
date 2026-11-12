@@ -28,7 +28,7 @@ jobs:
         run: uv sync --frozen
 
       - name: Ruff
-        run: uv run ruff check src tests
+        run: uv run ruff check src tests airflow docker/airflow
 
       - name: Pytest (unit)
         run: uv run pytest tests/unit

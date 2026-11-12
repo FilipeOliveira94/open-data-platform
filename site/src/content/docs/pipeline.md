@@ -1,6 +1,6 @@
 ---
 title: Pipeline
-description: Verified raw ingestion, the verified lakehouse, and the orchestration and CDC work that is not started.
+description: Verified raw ingestion, the verified lakehouse, and the schedules and CDC work that is not started.
 ---
 
 Phase 1 raw ingestion is **verified**. Bronze, Silver, and Gold are **verified** in the repository and are not charted on this page yet. Airflow schedules and streaming CDC are **not started**.

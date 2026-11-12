@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold up airflow-up down ps logs clean
 DBT ?= $(UV) run dbt
 DBT_PROJECT_DIR ?= dbt
 DBT_PROFILES_DIR ?= dbt
@@ -32,11 +32,11 @@ sync: ## Sync dependencies from uv.lock
 	$(UV) sync
 
 lint: ## Run Ruff linter
-	$(RUFF) check src tests
+	$(RUFF) check src tests airflow docker/airflow
 
 format: ## Format with Ruff
-	$(RUFF) format src tests
-	$(RUFF) check --fix src tests
+	$(RUFF) format src tests airflow docker/airflow
+	$(RUFF) check --fix src tests airflow docker/airflow
 
 test: ## Run unit tests (no Compose services required)
 	$(PYTEST) tests/unit
@@ -224,6 +224,16 @@ live-gold: stage-quarantine dbt-build ## Stage quarantine sidecars then build Go
 up: ## Start PostgreSQL and MinIO
 	$(COMPOSE) up -d
 	$(COMPOSE) ps
+
+airflow-up: ## Create the Airflow log bucket and start the orchestration profile
+	@set -euo pipefail; \
+	set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) up -d --wait postgres minio; \
+	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_AIRFLOW_LOG_BUCKET"])'; \
+	$(COMPOSE) --profile orchestration up -d --wait airflow-apiserver airflow-scheduler airflow-dag-processor
 
 down: ## Stop Compose services (keeps volumes)
 	$(COMPOSE) down

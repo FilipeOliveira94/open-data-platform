@@ -4,6 +4,20 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-12 — P3-01 Airflow in local Compose
+
+Airflow `apache/airflow:3.4.0-python3.12` runs on the Compose profile `orchestration` with LocalExecutor. Processes: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-scheduler`, `airflow-dag-processor`. Metadata database `airflow` on PostgreSQL 16. Host UI port 8081. `docker compose up` does not start the profile. `docker compose config --services` listed `minio` and `postgres`.
+
+`make airflow-up` reached healthy api-server, scheduler, and dag processor. `airflow version` printed `3.4.0`. Health: `metadatabase`, `scheduler`, and `dag_processor` healthy; `triggerer` down because this profile has no triggerer. `airflow dags list` showed `platform_health`.
+
+`EmptyOperator` does not produce a task log on Airflow 3.4. The smoke task is a `BashOperator` that prints `platform_health ready`. Manual run `manual__2026-11-12T15:04:09.043021+00:00`, task `ready`, state `success`, pid 303, duration 3.704131 seconds. MinIO object `task-logs/dag_id=platform_health/run_id=manual__2026-11-12T15:04:09.043021+00:00/task_id=ready/attempt=1.log`, 5502 bytes. The body contained the fixed line and did not contain the MinIO password, the Fernet key, or the JWT secret.
+
+Stopping the three Airflow services left PostgreSQL and MinIO up and the object still listed. A second `airflow-init` printed `Database migration done!` and `airflow already exists in the db`. The UI login page loaded at `http://localhost:8081/auth/login/`.
+
+`docker compose --profile orchestration stop` with no service names also stopped PostgreSQL and MinIO. Spark and Trino stayed up. PostgreSQL and MinIO were started again; the log object was still in the bucket. The documented stop command names the three Airflow services.
+
+D-006 is `approved`. CeleryExecutor, Redis, and Flower are not a planned follow-up. D-007 stays `proposed`. `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 304 passed in 14.03s. Detail: [`docs/architecture/airflow-local.md`](architecture/airflow-local.md).
+
 ### 2026-11-11 — README and partition candidate
 
 The README opens with the path from a published number back to the source: several sources, idempotent overwrite, a new raw execution kept beside the previous one, contracts, business-domain Gold, and reconciliation. Bronze and Silver stay full replacements. Status is the next section. Core features are one table row each, with state, phase, and core stack, and a labeled note under each row. Setup stays in collapsed sections. Iceberg partitions for Silver and Gold are a candidate in `ROADMAP.md`, not an issue. No stack command was run.

@@ -40,6 +40,9 @@ dbt/logs/
 dbt/dbt_packages/
 dbt/package-lock.yml
 
+# Airflow local spool. Durable task logs are objects in MinIO, not this directory.
+airflow/logs/
+
 # IDE / OS
 .idea/
 .vscode/

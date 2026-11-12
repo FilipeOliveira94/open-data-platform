@@ -40,7 +40,7 @@ The platform must demonstrate **three distinct ways** to refresh data from the t
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
 | 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Verified |
-| 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Not started |
+| 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | In progress (P3-01 verified) |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified | Not started |
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
@@ -218,7 +218,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
-| P3-01 | Airflow in local Compose | Phase 2 | Not started | Airflow runs locally; pinned images; documented UI/CLI access; business logic stays out of DAG bodies |
+| P3-01 | Airflow in local Compose | Phase 2 | Verified | Airflow runs locally; pinned images; documented UI/CLI access; business logic stays out of DAG bodies. Evidence: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-02 | Ingestion DAGs (thin wrappers) | P3-01, Phase 1 | Not started | DAGs call package entrypoints; retries/timeouts configured; no duplicated business logic |
 | P3-03 | Transform / dbt DAGs | P3-01, Phase 2 | Not started | Orchestrates Bronze→Silver→Gold/dbt with clear task dependencies |
 | P3-04 | Daily batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Airflow DAG with daily schedule passes watermark/window into P1-06 extract; documented cadence, catchup policy and idempotency; manual trigger proves one successful daily-shaped run |

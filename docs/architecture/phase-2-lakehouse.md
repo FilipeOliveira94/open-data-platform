@@ -96,7 +96,7 @@ Headline anchors match the 2026-11-05 / 2026-11-06 baseline, including Silver ge
 - `chmod` on `.local/spark-ivy` can print `Permission denied` for jars owned by the Spark user. The recipe continues. The 2026-11-11 submits reported 6 jars already retrieved.
 - CI does not start Compose.
 - Olist files are CC BY-NC-SA 4.0 and are not vendored.
-- Airflow, CDC, and AWS apply are later phases. D-006 and D-007 stay `proposed`.
+- Airflow schedules, CDC, and AWS apply are later work. D-006 was approved in P3-01. D-007 stays `proposed`.
 
 ## Out of scope
 

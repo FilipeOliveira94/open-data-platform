@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-11 (Phase 2 verified; P3-01 is next) |
+| Last updated | 2026-11-12 (P3-01 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
-| Phase status | Not started |
+| Phase status | In progress |
 
 **Status values:** not started · in progress · delivered · verified · blocked · withdrawn
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-01** — Airflow in local Compose. Not started.
+**P3-02** — Ingestion DAGs as thin wrappers over package entrypoints. Not started.
 
-Phase 2 is verified. Its index is [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md). The live result it cites is [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md).
+P3-01 is verified. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-01** — Add Airflow to local Compose. Pin the image. Document UI and CLI access. Keep business logic out of DAG bodies. D-006 stays `proposed` until that evidence exists.
+1. **P3-02** — Ingestion DAGs call package entrypoints. Retries and timeouts are configured there. No duplicated business logic.
 
 ---
 
@@ -36,7 +36,7 @@ Phase 2 is verified. Its index is [`docs/architecture/phase-2-lakehouse.md`](doc
 
 | ID | Title | Status | Evidence |
 | --- | --- | --- | --- |
-| P3-01 | Airflow in local Compose | Not started | — |
+| P3-01 | Airflow in local Compose | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-02 | Ingestion DAGs (thin wrappers) | Not started | — |
 | P3-03 | Transform / dbt DAGs | Not started | — |
 | P3-04 | Daily batch schedule (PostgreSQL) | Not started | — |
@@ -65,14 +65,12 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 ## Latest validation
 
-Phase 3 has no stack run. The check below closes P2-10. It does not start Phase 3.
-
 | | |
 | --- | --- |
-| Date | 2026-11-11 |
-| Environment | Documentation only. Compose was not started |
-| Checks | `rg` for the stale phrases named in the P2-10 plan, across `README.md`, `docs/architecture`, `PROJECT_STATUS.md`, and `ROADMAP.md`. A second `rg` for `phase-2-live-run.md` in the README, this ledger, and `docs/architecture/phase-2-lakehouse.md` |
-| Result | Hits are the verified issue id P2-10 in `ROADMAP.md` and in this ledger. No line in those paths still uses the outdated wording the plan named. `phase-2-live-run.md` is cited from the README, this ledger, and `docs/architecture/phase-2-lakehouse.md`. Detail: [`docs/status-log.md`](docs/status-log.md) (2026-11-11, P2-10) |
+| Date | 2026-11-12 |
+| Environment | Local Compose. PostgreSQL, MinIO, Spark, and Trino were already up. Airflow joined on the `orchestration` profile |
+| Checks | `make airflow-up`; `airflow version`; `GET /api/v2/monitor/health`; `airflow dags list`; one manual `platform_health` run; MinIO object list before and after stopping the three Airflow services; second `airflow-init` |
+| Result | Version `3.4.0`. Scheduler, dag processor, and metadata database healthy. Triggerer down, as designed. One task log object in `odp-airflow-logs`, still present after the Airflow stop. Second migrate completed and the admin user already existed. `uv run pytest tests/unit` → 304 passed in 14.03s. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 
 ---
 
@@ -119,7 +117,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 
 | ID | Relevance | State |
 | --- | --- | --- |
-| D-006 | Airflow locally; image pin and DAG boundary are P3-01 | `proposed` |
+| D-006 | Airflow 3.4 LocalExecutor; task logs in MinIO; Celery and Flower are not a follow-up | `approved` |
 | D-007 | Daily and weekly windows. The extract exists (P1-06). Schedules do not | `proposed` |
 | D-014 | CDC does not replace daily or weekly batch | `proposed` |
 | D-005 | DAGs call Spark Bronze/Silver and dbt-trino Gold. They do not reimplement them | Approved |
@@ -146,7 +144,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | Not started |
+| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-01 verified) |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
@@ -158,7 +156,8 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 ## Risks and limitations
 
-- D-006 and D-007 are still `proposed`. Adding Compose services in P3-01 does not approve them by itself.
+- D-006 is `approved`. D-007 is still `proposed`. The daily and weekly schedules are not built.
+- `docker compose --profile orchestration stop` with no service names also stops PostgreSQL and MinIO. Stop the three Airflow services by name. Spark and Trino are on the `lakehouse` profile and stay up.
 - A Phase 3 schedule would call the current full rebuild of Bronze, Silver, and Gold. That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
 - Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
@@ -186,6 +185,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-12 — P3-01 verified
+
+Airflow `3.4.0` (`apache/airflow:3.4.0-python3.12`) runs on the `orchestration` profile with LocalExecutor. `platform_health` wrote one task log to MinIO, and the object remained after the Airflow services stopped. D-006 is `approved`. Celery and Flower are not a follow-up. Next issue is P3-02. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md).
 
 ### 2026-11-11 — README and partition candidate
 

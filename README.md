@@ -17,7 +17,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 
 | Field | Now |
 | --- | --- |
-| Current phase | Phase 3 — Orchestration and data quality. Not started |
+| Current phase | Phase 3 — Orchestration and data quality. In progress |
 | Objective | Airflow for the daily and weekly PostgreSQL windows, plus backfills and quarantine |
 | In place | Phases 0–2. Lakehouse run on [2026-11-11](docs/architecture/phase-2-live-run.md) |
 | Ledger | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) · scope in [`ROADMAP.md`](ROADMAP.md) |
