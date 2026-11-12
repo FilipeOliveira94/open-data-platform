@@ -14,7 +14,9 @@ The host port is 8081 because Trino already publishes 8080. Inside the network t
 
 Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-scheduler`, and `airflow-dag-processor`. There is no Redis, Celery worker, Flower, or triggerer. Celery and Flower are not a later issue. The revisit condition is a written requirement for self-hosted multi-node workers. Amazon MWAA stays the optional AWS counterpart and is not built here.
 
-Daily schedules, weekly schedules, backfill, and DAGs that call the package are later Phase 3 issues. The only DAG in this issue is `platform_health`: one `BashOperator` that prints `platform_health ready`, no schedule, paused until someone triggers it. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
+`platform_health` is the P3-01 smoke DAG: one `BashOperator` that prints `platform_health ready`, with no schedule. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
+
+P3-02 adds the ingestion wrappers. They have no schedule. P3-04 and P3-05 set the daily and weekly schedules on the PostgreSQL extract. Phase 4 sets the CDC schedule. Backfill and transform DAGs stay later Phase 3 issues.
 
 ## Start
 
@@ -59,6 +61,55 @@ The health payload reports `triggerer` as `down`. This profile does not run a tr
 
 Airflow skips masking for a secret shorter than 5 characters. The local placeholder `odp` is shorter, so each CLI call prints that warning. The metadata-database URL in the migrate log is still redacted.
 
+## Ingestion wrappers (P3-02)
+
+The scheduler image stays `apache/airflow:3.4.0-python3.12`. That image already imports `boto3` 1.43.117, `psycopg` 3.3.6, and `yaml` 6.0.3. The package is not installed into `site-packages`. Compose mounts `src/`, `config/`, `pyproject.toml`, `tests/fixtures`, and `data/raw` under `/opt/odp/repo` and sets `PYTHONPATH=/opt/odp/repo/src`. Contract, fixture, and Olist root discovery walk parents of `__file__` and reach `/opt/odp/repo`. The whole repository is not mounted, so `.env` and `.git` stay on the host.
+
+There is one PostgreSQL server, the Compose service `postgres`. It holds three databases. `airflow-db-create` is a one-shot `psql` client of that server, not a second server.
+
+| Database | Role |
+| --- | --- |
+| `odp` | OLTP extract and seed (`POSTGRES_DB`) |
+| `airflow` | Airflow metadata (`AIRFLOW_DB`) |
+| `iceberg` | Iceberg JDBC catalog (`ICEBERG_CATALOG_DB`) |
+
+Inside the Airflow containers, `POSTGRES_HOST` is `postgres` and `POSTGRES_PORT` is `5432`. That port is the Compose network port. `MINIO_ENDPOINT_URL` is `http://minio:9000`. The host `.env` values `localhost` and the published Postgres port are not copied into these containers. The metadata URL still uses database `airflow`. `AIRFLOW__CORE__DAG_RUN_CONF_OVERRIDES_PARAMS` is `True`, which is also the image default, so `airflow dags trigger -c` JSON overrides DAG params.
+
+Kaggle credentials are the container variables `KAGGLE_API_TOKEN`, `KAGGLE_USERNAME`, and `KAGGLE_KEY`. They are not task arguments.
+
+Each ingestion task runs `python` with an argument vector and `cwd=/opt/odp/repo`. There is no shell. Retries are 2, the delay is 2 minutes, and the execution timeout is 30 minutes. `schedule` is `None` and `catchup` is false. `airflow/dags/ingest_common.py` holds the task defaults and is listed in `.airflowignore`.
+
+`execution_id` defaults to the Airflow `run_id`. A new run keeps the previous raw object. Passing `execution_id` in the trigger conf overwrites the keys of that id. The storefront `seed`, `count`, and `event_time_start` stay the documented generator inputs. The PostgreSQL window bounds stay required and are not calculated here.
+
+| DAG | Entrypoint |
+| --- | --- |
+| `platform_env` | `python /opt/odp/check_ingest_env.py` with steps `imports`, `contracts`, `minio_raw`, `minio_write`, `postgres_oltp` |
+| `ingest_olist` | `python -m open_data_platform.ingestion.olist` |
+| `ingest_dummyjson_products` | `python -m open_data_platform.ingestion.dummyjson_products` |
+| `ingest_ibge_localidades` | `python -m open_data_platform.ingestion.ibge_localidades` |
+| `ingest_demo_storefront` | `python -m open_data_platform.ingestion.demo_storefront` |
+| `ingest_postgres_oltp` | `python -m open_data_platform.ingestion.postgres_oltp extract` |
+| `seed_postgres_oltp` | `python -m open_data_platform.ingestion.postgres_oltp seed` |
+
+`imports` runs first. The other four `platform_env` tasks run in parallel. `minio_raw` heads `ODP_RAW_BUCKET` and does not create it. `minio_write` puts, reads, and deletes `airflow-env/ready.txt` in `MINIO_SMOKE_BUCKET`. `postgres_oltp` checks `current_database()` and that schema `oltp` exists. It does not seed. Output names the database, the bucket, and the contract count. It does not print passwords or object bodies.
+
+`ingest_postgres_oltp` passes `window_start` and `window_end` through. It does not calculate a daily or weekly window. `seed_postgres_oltp` truncates `oltp.sellers`, `oltp.customers`, `oltp.orders`, and `oltp.order_items`, then loads `tests/fixtures/postgres_oltp/synthetic.json`. It is not upstream of the extract DAG.
+
+`execution_id` defaults to the Airflow `run_id`. A new run keeps the previous raw object. A trigger conf that sets `execution_id` overwrites the keys of that id.
+
+```bash
+docker compose --profile orchestration exec -T airflow-scheduler \
+  airflow dags trigger platform_env
+docker compose --profile orchestration exec -T airflow-scheduler \
+  airflow dags trigger -c '{"seed":7,"count":100,"event_time_start":"2026-10-18T00:00:00Z"}' \
+  ingest_demo_storefront
+docker compose --profile orchestration exec -T airflow-scheduler \
+  airflow dags trigger -c '{"window_start":"2026-10-17T00:00:00Z","window_end":"2026-10-18T00:00:00Z"}' \
+  ingest_postgres_oltp
+docker compose --profile orchestration exec -T airflow-scheduler \
+  airflow dags trigger seed_postgres_oltp
+```
+
 ## Verification (2026-11-12)
 
 `make airflow-up` brought `airflow-apiserver`, `airflow-scheduler`, and `airflow-dag-processor` to healthy. `airflow version` printed `3.4.0`. `docker compose config --services` without the profile listed `minio` and `postgres`.
@@ -74,3 +125,23 @@ That object was 5502 bytes and contained the fixed line. It did not contain the 
 A second `airflow-init` printed `Database migration done!` and `airflow already exists in the db`. The UI login page loaded at `http://localhost:8081/auth/login/`.
 
 An earlier `docker compose --profile orchestration stop` with no service names also stopped PostgreSQL and MinIO. Spark and Trino stayed up. PostgreSQL and MinIO were started again before the log check above. The object was still in the bucket after that MinIO restart.
+
+## Verification (2026-11-12, P3-02)
+
+Staged Olist CSVs were already present (9 ecommerce files and 2 funnel files). `seed_postgres_oltp` run `manual__2026-11-12T17:12:21.152531+00:00` finished `success`. After it, `oltp` held sellers 5, customers 2, orders 2, and order items 2. The `updated_at` span matched the synthetic fixture: sellers `2026-10-16T23:00:00Z` to `2026-10-24T00:00:00Z`, customers `2026-10-17T09:00:00Z` to `2026-10-20T09:00:00Z`, orders `2026-10-17T10:00:00Z` to `2026-10-19T10:00:00Z`, and order items `2026-10-17T11:00:00Z` to `2026-10-19T11:00:00Z`.
+
+`platform_env` run `manual__2026-11-12T17:06:20.317037+00:00` finished `success`. Tasks `imports`, `contracts`, `minio_raw`, `minio_write`, and `postgres_oltp` finished `success`. The smoke object `airflow-env/ready.txt` was absent after `minio_write`.
+
+The ingestion runs finished `success`. Each raw `execution_id` is that run's `run_id`. No quarantine object was written for these runs.
+
+| DAG | Run | Landing |
+| --- | --- | --- |
+| `ingest_demo_storefront` | `manual__2026-11-12T17:07:18.562508+00:00` | `events.jsonl`, 100 lines |
+| `ingest_postgres_oltp` | `manual__2026-11-12T17:07:21.830105+00:00` | customers 1, order items 1, orders 1, sellers 2 |
+| `ingest_dummyjson_products` | `manual__2026-11-12T17:07:25.326561+00:00` | 7 pages, 194 products |
+| `ingest_ibge_localidades` | `manual__2026-11-12T17:07:28.755226+00:00` | `municipios.json`, 5_571 rows |
+| `ingest_olist` | `manual__2026-11-12T17:07:32.636801+00:00` | 11 CSV objects |
+
+The PostgreSQL extract window was `2026-10-17T00:00:00Z` inclusive to `2026-10-18T00:00:00Z` exclusive. `COUNT(*)` on `oltp` for that window was 1, 1, 1, and 2, the same counts as the raw JSON arrays. The five ingestion task logs did not contain the MinIO password, the Kaggle token, the Fernet key, or the JWT secret.
+
+`uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 324 passed in 13.00s. The DAG contract tests were re-run after the `execution_id` default change: 29 passed.

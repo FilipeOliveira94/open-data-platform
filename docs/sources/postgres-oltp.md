@@ -48,4 +48,6 @@ uv run python -m open_data_platform.ingestion.postgres_oltp extract \
 
 Connection settings are `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. The raw bucket is `ODP_RAW_BUCKET`. A weekly window is the same command with `--window-end` seven days after `--window-start`.
 
-Airflow schedules and catchup are Phase 3. CDC is Phase 4. The Gold schema is `oltp_operations`, specified in [Gold model design](../architecture/gold-model-design.md). Those keys stay apart from the historical Olist facts. SCD Type 2 for these tables is P4-08.
+`seed_postgres_oltp` runs `seed`. `ingest_postgres_oltp` runs `extract` and passes the window bounds through. The seed DAG is not upstream of the extract. On 2026-11-12 `seed_postgres_oltp` run `manual__2026-11-12T17:12:21.152531+00:00` finished `success` and left sellers 5, customers 2, orders 2, and order items 2, with the fixture `updated_at` span. The extract run `manual__2026-11-12T17:07:21.830105+00:00` wrote customers 1, order items 1, orders 1, and sellers 2 for `2026-10-17` to `2026-10-18`, matching `COUNT(*)` on `oltp`. Schedules and catchup are P3-04 and P3-05. Detail: [Local Airflow](../architecture/airflow-local.md).
+
+CDC is Phase 4. The Gold schema is `oltp_operations`, specified in [Gold model design](../architecture/gold-model-design.md). Those keys stay apart from the historical Olist facts. SCD Type 2 for these tables is P4-08.

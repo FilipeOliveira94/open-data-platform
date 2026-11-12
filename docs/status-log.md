@@ -4,6 +4,16 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-12 — P3-02 ingestion DAG wrappers
+
+Airflow DAGs call the Phase 1 ingestion CLIs with `python -m` and an argument vector. The stock image `apache/airflow:3.4.0-python3.12` already imports `boto3` 1.43.117, `psycopg` 3.3.6, and `yaml` 6.0.3, so no custom image was built. Compose mounts `src/`, `config/`, `pyproject.toml`, `tests/fixtures`, and `data/raw` at `/opt/odp/repo` and sets `PYTHONPATH=/opt/odp/repo/src`. Inside those containers `POSTGRES_HOST=postgres`, `POSTGRES_PORT=5432`, `POSTGRES_DB=odp`, and `MINIO_ENDPOINT_URL=http://minio:9000`. Metadata stays on database `airflow`. `airflow-db-create` remains a client of the same PostgreSQL server.
+
+DAGs: `platform_env`, `ingest_olist`, `ingest_dummyjson_products`, `ingest_ibge_localidades`, `ingest_demo_storefront`, `ingest_postgres_oltp`, and `seed_postgres_oltp`, plus the existing `platform_health`. Each wrapper uses retries 2, a 2-minute delay, and a 30-minute execution timeout. `schedule=None`. `execution_id` defaults to the Airflow `run_id`. `seed_postgres_oltp` is not upstream of the extract. `ingest_postgres_oltp` passes window bounds through and does not calculate a daily or weekly window. P3-04, P3-05, and Phase 4 set the schedules.
+
+`seed_postgres_oltp` run `manual__2026-11-12T17:12:21.152531+00:00` finished `success` and left sellers 5, customers 2, orders 2, and order items 2, with the fixture `updated_at` span. `platform_env` run `manual__2026-11-12T17:06:20.317037+00:00` finished `success` on all five tasks. Ingestion runs, all `success`, with the run id as `execution_id`: storefront `events.jsonl` 100 lines; PostgreSQL window `2026-10-17` to `2026-10-18` customers 1, order items 1, orders 1, sellers 2, matching `COUNT(*)` on `oltp`; DummyJSON 7 pages and 194 products; IBGE `municipios.json` 5_571 rows; Olist 11 CSV objects from the staged files. No quarantine object was written for these runs. The five ingestion task logs did not contain the MinIO password, the Kaggle token, the Fernet key, or the JWT secret.
+
+`uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 324 passed in 13.00s. Detail: [`docs/architecture/airflow-local.md`](architecture/airflow-local.md).
+
 ### 2026-11-12 — P3-01 Airflow in local Compose
 
 Airflow `apache/airflow:3.4.0-python3.12` runs on the Compose profile `orchestration` with LocalExecutor. Processes: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-scheduler`, `airflow-dag-processor`. Metadata database `airflow` on PostgreSQL 16. Host UI port 8081. `docker compose up` does not start the profile. `docker compose config --services` listed `minio` and `postgres`.

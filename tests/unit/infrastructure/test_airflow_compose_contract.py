@@ -72,6 +72,30 @@ def test_airflow_profile_pins_local_executor_and_minio_logs() -> None:
     assert "triggerer" not in commands
     scheduler = services["airflow-scheduler"]["environment"]
     assert scheduler["AIRFLOW__CORE__LOAD_EXAMPLES"] == "false"
+    assert scheduler["AIRFLOW__CORE__DAG_RUN_CONF_OVERRIDES_PARAMS"] == "True"
+    assert scheduler["PYTHONPATH"] == "/opt/odp/repo/src"
+    assert scheduler["MINIO_ENDPOINT_URL"] == "http://minio:9000"
+    assert scheduler["POSTGRES_HOST"] == "postgres"
+    assert scheduler["POSTGRES_PORT"] == "5432"
+    assert scheduler["POSTGRES_DB"] == "${POSTGRES_DB:-odp}"
+    assert scheduler["ODP_RAW_BUCKET"] == "${ODP_RAW_BUCKET:-odp-raw}"
+    assert scheduler["MINIO_SMOKE_BUCKET"] == "${MINIO_SMOKE_BUCKET:-odp-smoke}"
+    assert scheduler["AIRFLOW_DB"] == "${AIRFLOW_DB:-airflow}"
+    assert scheduler["ICEBERG_CATALOG_DB"] == "${ICEBERG_CATALOG_DB:-iceberg}"
+    assert scheduler["KAGGLE_API_TOKEN"] == "${KAGGLE_API_TOKEN:-}"
+    assert scheduler["KAGGLE_USERNAME"] == "${KAGGLE_USERNAME:-}"
+    assert scheduler["KAGGLE_KEY"] == "${KAGGLE_KEY:-}"
+    volumes = services["airflow-scheduler"]["volumes"]
+    assert "./src:/opt/odp/repo/src:ro" in volumes
+    assert "./config:/opt/odp/repo/config:ro" in volumes
+    assert "./pyproject.toml:/opt/odp/repo/pyproject.toml:ro" in volumes
+    assert "./tests/fixtures:/opt/odp/repo/tests/fixtures:ro" in volumes
+    assert "./data/raw:/opt/odp/repo/data/raw:ro" in volumes
+    assert (
+        "./docker/airflow/check_ingest_env.py:/opt/odp/check_ingest_env.py:ro"
+        in volumes
+    )
+    assert "./:/opt/odp/repo" not in " ".join(str(item) for item in volumes)
     assert scheduler["AIRFLOW__LOGGING__REMOTE_LOGGING"] == "True"
     assert (
         scheduler["AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER"]

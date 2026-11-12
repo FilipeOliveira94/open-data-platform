@@ -219,7 +219,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | ID | Title | Depends on | Status | Acceptance |
 | --- | --- | --- | --- | --- |
 | P3-01 | Airflow in local Compose | Phase 2 | Verified | Airflow runs locally; pinned images; documented UI/CLI access; business logic stays out of DAG bodies. Evidence: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-02 | Ingestion DAGs (thin wrappers) | P3-01, Phase 1 | Not started | DAGs call package entrypoints; retries/timeouts configured; no duplicated business logic |
+| P3-02 | Ingestion DAGs (thin wrappers) | P3-01, Phase 1 | Verified | DAGs call package entrypoints; retries/timeouts configured; no duplicated business logic. Evidence: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-03 | Transform / dbt DAGs | P3-01, Phase 2 | Not started | Orchestrates Bronze→Silver→Gold/dbt with clear task dependencies |
 | P3-04 | Daily batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Airflow DAG with daily schedule passes watermark/window into P1-06 extract; documented cadence, catchup policy and idempotency; manual trigger proves one successful daily-shaped run |
 | P3-05 | Weekly batch schedule (PostgreSQL) | P3-02, P1-06 | Not started | Distinct weekly schedule (separate DAG or explicit weekly timetable); purpose/grain vs daily documented; watermark/window for a week; manual trigger proves one successful weekly-shaped run |

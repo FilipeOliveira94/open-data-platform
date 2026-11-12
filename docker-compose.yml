@@ -20,6 +20,7 @@ x-airflow-env: &airflow-env
   AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-m2MF2P1kdm3qHPyXKJ7j0N5IGxBOswtdV9umW9-n6FA=}
   AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
   AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__CORE__DAG_RUN_CONF_OVERRIDES_PARAMS: "True"
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
   AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-local-dev-jwt}
   AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW_JWT_ISSUER:-airflow}
@@ -36,6 +37,21 @@ x-airflow-env: &airflow-env
   ODP_AIRFLOW_LOG_BUCKET: ${ODP_AIRFLOW_LOG_BUCKET:-odp-airflow-logs}
   POSTGRES_USER: ${POSTGRES_USER:-odp}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
+  # Ingestion CLIs. Host is the Compose service, not the host .env localhost.
+  # POSTGRES_PORT is the in-network port, not the published host port.
+  # Metadata stays on AIRFLOW_DB. The extract uses POSTGRES_DB.
+  PYTHONPATH: /opt/odp/repo/src
+  ODP_RAW_BUCKET: ${ODP_RAW_BUCKET:-odp-raw}
+  MINIO_SMOKE_BUCKET: ${MINIO_SMOKE_BUCKET:-odp-smoke}
+  MINIO_ENDPOINT_URL: http://minio:9000
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:-odp}
+  AIRFLOW_DB: ${AIRFLOW_DB:-airflow}
+  ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
+  KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
+  KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+  KAGGLE_KEY: ${KAGGLE_KEY:-}
 
 x-airflow-common: &airflow-common
   image: apache/airflow:3.4.0-python3.12
@@ -44,6 +60,14 @@ x-airflow-common: &airflow-common
   volumes:
     - ./airflow/dags:/opt/airflow/dags:ro
     - ./docker/airflow/ensure_log_bucket.py:/opt/odp/ensure_log_bucket.py:ro
+    # Parents of the mounted package include config/contracts, pyproject.toml,
+    # and tests/fixtures. A site-packages install would hide those files.
+    - ./src:/opt/odp/repo/src:ro
+    - ./config:/opt/odp/repo/config:ro
+    - ./pyproject.toml:/opt/odp/repo/pyproject.toml:ro
+    - ./tests/fixtures:/opt/odp/repo/tests/fixtures:ro
+    - ./data/raw:/opt/odp/repo/data/raw:ro
+    - ./docker/airflow/check_ingest_env.py:/opt/odp/check_ingest_env.py:ro
     - odp_airflow_logs:/opt/airflow/logs
 
 services:

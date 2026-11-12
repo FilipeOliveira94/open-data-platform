@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-12 (P3-01 verified) |
+| Last updated | 2026-11-12 (P3-02 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,13 +22,15 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-02** — Ingestion DAGs as thin wrappers over package entrypoints. Not started.
+**P3-03** — Transform / dbt DAGs. Not started.
+
+P3-02 is verified. Ingestion DAGs call the package CLIs. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 P3-01 is verified. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-02** — Ingestion DAGs call package entrypoints. Retries and timeouts are configured there. No duplicated business logic.
+1. **P3-03** — Transform / dbt DAGs. Orchestrate Bronze, Silver, and Gold with clear task dependencies. The DAGs call the existing entrypoints.
 
 ---
 
@@ -37,7 +39,7 @@ P3-01 is verified. Local Airflow is [`docs/architecture/airflow-local.md`](docs/
 | ID | Title | Status | Evidence |
 | --- | --- | --- | --- |
 | P3-01 | Airflow in local Compose | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-02 | Ingestion DAGs (thin wrappers) | Not started | — |
+| P3-02 | Ingestion DAGs (thin wrappers) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-03 | Transform / dbt DAGs | Not started | — |
 | P3-04 | Daily batch schedule (PostgreSQL) | Not started | — |
 | P3-05 | Weekly batch schedule (PostgreSQL) | Not started | — |
@@ -68,9 +70,9 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 | | |
 | --- | --- |
 | Date | 2026-11-12 |
-| Environment | Local Compose. PostgreSQL, MinIO, Spark, and Trino were already up. Airflow joined on the `orchestration` profile |
-| Checks | `make airflow-up`; `airflow version`; `GET /api/v2/monitor/health`; `airflow dags list`; one manual `platform_health` run; MinIO object list before and after stopping the three Airflow services; second `airflow-init` |
-| Result | Version `3.4.0`. Scheduler, dag processor, and metadata database healthy. Triggerer down, as designed. One task log object in `odp-airflow-logs`, still present after the Airflow stop. Second migrate completed and the admin user already existed. `uv run pytest tests/unit` → 304 passed in 14.03s. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
+| Environment | Local Compose. PostgreSQL, MinIO, Spark, Trino, and Airflow were already up |
+| Checks | `platform_env`, the five ingestion DAGs, and `seed_postgres_oltp`. Raw object counts compared with the PostgreSQL window. OLTP counts and `updated_at` span compared with the synthetic fixture after seed |
+| Result | All seven runs `success`. Storefront 100 lines. PostgreSQL window 1/1/1/2, matching `oltp`. DummyJSON 194 products. IBGE 5_571 municipalities. Olist 11 CSV objects. Seed left sellers 5, customers 2, orders 2, and order items 2. No quarantine objects for these runs. `uv run pytest tests/unit` → 324 passed in 13.00s. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 
 ---
 
@@ -144,7 +146,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-01 verified) |
+| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-02 verified) |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
@@ -185,6 +187,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-12 — P3-02 verified
+
+Ingestion DAGs call the Phase 1 CLIs. `execution_id` defaults to the Airflow run id. `platform_env`, the five ingestion runs, and `seed_postgres_oltp` finished `success`. The PostgreSQL window matched `oltp` (1/1/1/2). Storefront 100 lines, DummyJSON 194 products, IBGE 5_571 municipalities, Olist 11 CSV objects. Seed left sellers 5, customers 2, orders 2, and order items 2. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Next issue is P3-03.
 
 ### 2026-11-12 — P3-01 verified
 
