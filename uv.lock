@@ -523,8 +523,11 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [
+dbt = [
+    { name = "dbt-core" },
     { name = "dbt-trino" },
+]
+dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -537,8 +540,11 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+dbt = [
+    { name = "dbt-core", specifier = "==1.12.6" },
+    { name = "dbt-trino", specifier = "==1.11.0" },
+]
 dev = [
-    { name = "dbt-trino", specifier = ">=1.11.0,<1.12" },
     { name = "pytest", specifier = ">=8.3.0,<9" },
     { name = "ruff", specifier = ">=0.9.0,<1" },
 ]

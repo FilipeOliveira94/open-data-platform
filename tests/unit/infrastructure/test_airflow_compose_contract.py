@@ -16,7 +16,9 @@ MAKEFILE = ROOT / "Makefile"
 DAG = ROOT / "airflow" / "dags" / "platform_health.py"
 BUCKET_SCRIPT = ROOT / "docker" / "airflow" / "ensure_log_bucket.py"
 
-AIRFLOW_IMAGE = "apache/airflow:3.4.0-python3.12"
+AIRFLOW_BASE_IMAGE = "apache/airflow:3.4.0-python3.12"
+RUNTIME_IMAGE = "odp-runtime:airflow3.4.0-spark3.5.8"
+DOCKERFILE = ROOT / "docker" / "runtime" / "Dockerfile"
 FERNET_PLACEHOLDER = "m2MF2P1kdm3qHPyXKJ7j0N5IGxBOswtdV9umW9-n6FA="
 PLANTED_SECRET = "planted-secret-value"
 
@@ -51,14 +53,16 @@ def test_default_compose_is_postgres_and_minio() -> None:
 def test_airflow_profile_pins_local_executor_and_minio_logs() -> None:
     text = _compose_text()
     services = _services()
-    assert text.count(f"image: {AIRFLOW_IMAGE}") == 1
+    assert text.count(f"x-runtime-image: &runtime-image {RUNTIME_IMAGE}") == 1
+    assert f"FROM {AIRFLOW_BASE_IMAGE}\n" in DOCKERFILE.read_text(encoding="utf-8")
     for name in (
         "airflow-init",
         "airflow-apiserver",
         "airflow-scheduler",
         "airflow-dag-processor",
     ):
-        assert services[name]["image"] == AIRFLOW_IMAGE
+        assert services[name]["image"] == RUNTIME_IMAGE
+        assert services[name]["build"] == {"context": "./docker/runtime"}
         assert services[name]["profiles"] == ["orchestration"]
         executor = services[name]["environment"]["AIRFLOW__CORE__EXECUTOR"]
         assert executor == "LocalExecutor"
@@ -91,6 +95,11 @@ def test_airflow_profile_pins_local_executor_and_minio_logs() -> None:
     assert "./pyproject.toml:/opt/odp/repo/pyproject.toml:ro" in volumes
     assert "./tests/fixtures:/opt/odp/repo/tests/fixtures:ro" in volumes
     assert "./data/raw:/opt/odp/repo/data/raw:ro" in volumes
+    assert "./dbt:/opt/odp/repo/dbt:ro" in volumes
+    assert "./docker/spark:/opt/odp/spark:ro" in volumes
+    assert "odp_lakehouse_work:/opt/odp/work" in volumes
+    assert scheduler["ODP_TRINO_HOST"] == "trino"
+    assert scheduler["ODP_WAREHOUSE_BUCKET"] == "${ODP_WAREHOUSE_BUCKET:-odp-warehouse}"
     assert (
         "./docker/airflow/check_ingest_env.py:/opt/odp/check_ingest_env.py:ro"
         in volumes
@@ -125,7 +134,7 @@ def test_env_example_matches_the_local_placeholders() -> None:
     makefile = MAKEFILE.read_text(encoding="utf-8")
     assert "airflow-up:" in makefile
     assert "ODP_AIRFLOW_LOG_BUCKET" in makefile
-    assert "--profile orchestration up -d --wait" in makefile
+    assert "--profile orchestration up -d --build --wait" in makefile
 
 
 def test_health_dag_has_no_schedule_and_no_package_logic() -> None:

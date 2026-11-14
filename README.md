@@ -151,6 +151,8 @@ make dbt-test-reconciliation
 - `make live-gold` builds Gold and its schema tests
 - Reconciliation is the last command, on purpose
 - Spark and Trino start with these targets
+- Spark and dbt run in one runtime image (`docker/runtime`), shared with Airflow
+- dbt is not installed on the host
 - They are not part of `docker compose up`
 - The first Spark target stores jars in `.local/spark-ivy`
 - The recorded result is the [2026-11-11 live run](docs/architecture/phase-2-live-run.md)

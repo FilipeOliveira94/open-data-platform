@@ -17,13 +17,13 @@ Spark writes the Iceberg JDBC catalog on the Compose PostgreSQL database `iceber
 
 ## Versions
 
-Observed on the 2026-11-11 local run and recorded in [P2-09 live run](phase-2-live-run.md). The same pins are in the probe, catalog, and Gold notes.
+Observed on the 2026-11-11 local run and recorded in [P2-09 live run](phase-2-live-run.md). The same pins are in the probe, catalog, and Gold notes. P2-09 ran Spark in `spark:3.5.8-java17` and dbt on the host. P3-03 moved both into one runtime image with the same versions. The Make targets keep their names and call the `medallion_build` module in that image.
 
 | Piece | Version |
 | --- | --- |
 | PostgreSQL image | `postgres:16.15-bookworm` |
 | MinIO image | `coollabsio/minio:RELEASE.2025-10-15T17-29-55Z` |
-| Spark image | `spark:3.5.8-java17` |
+| Spark image | `spark:3.5.8-java17`. Since P3-03 the same Spark `3.5.8` and JRE are copied into the runtime image `odp-runtime:airflow3.4.0-spark3.5.8`, which also holds dbt ([Local Airflow](airflow-local.md)) |
 | Iceberg runtime | `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0` |
 | Hadoop AWS | `org.apache.hadoop:hadoop-aws:3.3.4` |
 | AWS SDK bundle | `com.amazonaws:aws-java-sdk-bundle:1.12.262` |

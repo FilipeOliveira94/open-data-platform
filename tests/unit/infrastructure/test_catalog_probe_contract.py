@@ -73,9 +73,9 @@ def test_compose_pins_trino_on_the_lakehouse_profile() -> None:
     compose = COMPOSE.read_text(encoding="utf-8")
     assert f"image: {TRINO_IMAGE}" in compose
     assert "spark-catalog:" not in compose
-    assert compose.count("image: spark:3.5.8-java17") == 1
+    assert "image: spark:3.5.8-java17" not in compose
     assert compose.count("profiles: [lakehouse]") == 2
-    assert "exec sleep infinity" in compose
+    assert 'command: ["sleep", "infinity"]' in compose
     hadoop_script = HADOOP_SCRIPT.read_text(encoding="utf-8")
     assert "spark.sql.catalog.local.type=hadoop" in hadoop_script
 
@@ -84,6 +84,6 @@ def test_make_target_queries_trino_after_spark() -> None:
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "test-catalog-probe:" in text
     assert TRINO_COUNT in text
-    assert "spark /opt/odp/run_catalog_probe.sh" in text
+    assert "spark /opt/odp/spark/run_catalog_probe.sh" in text
     assert "spark-catalog" not in text
     assert "ICEBERG_CATALOG_DB=iceberg" in ENV_EXAMPLE.read_text(encoding="utf-8")

@@ -5,6 +5,7 @@
 # The JDBC catalog_name stored in iceberg_tables is the Spark catalog name "local".
 # Trino must use that same name.
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 : "${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}"
 : "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
@@ -25,13 +26,18 @@ esac
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/credentials.sh"
 SECRET_PROPS="$(odp_write_secret_properties jdbc)"
 
-# The official Spark image ships Hadoop 3.3.4 client jars without S3A.
+# The Spark 3.5.8 distribution ships Hadoop 3.3.4 client jars without S3A.
 # hadoop-aws 3.3.4 declares aws-java-sdk-bundle 1.12.262.
 # The PostgreSQL driver is not in the image. Iceberg loads it through DriverManager.
 packages="org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0"
 packages="${packages},org.apache.hadoop:hadoop-aws:3.3.4"
 packages="${packages},com.amazonaws:aws-java-sdk-bundle:1.12.262"
 packages="${packages},org.postgresql:postgresql:42.7.14"
+
+# spark-sql writes derby.log, metastore_db, and spark-warehouse to the current
+# directory. The runtime image user cannot write the mounted repo, so use the
+# container scratch directory (the earlier Spark image used its work-dir).
+cd "${TMPDIR:-/tmp}"
 
 exec /opt/spark/bin/spark-sql \
   --master "local[*]" \
@@ -57,4 +63,4 @@ exec /opt/spark/bin/spark-sql \
   --conf "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider" \
   --conf "spark.hadoop.fs.s3a.endpoint.region=${MINIO_REGION}" \
   --conf "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem" \
-  -f /opt/odp/catalog_probe.sql
+  -f "${SCRIPT_DIR}/catalog_probe.sql"

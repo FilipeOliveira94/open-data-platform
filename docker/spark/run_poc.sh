@@ -2,6 +2,7 @@
 # One-shot Spark SQL probe. Credentials come from the container environment.
 # S3 keys are a properties file, not --conf values.
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 : "${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}"
 : "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
@@ -12,8 +13,13 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/credentials.sh"
 SECRET_PROPS="$(odp_write_secret_properties s3)"
 
-# The official Spark image ships Hadoop 3.3.4 client jars without S3A.
+# The Spark 3.5.8 distribution ships Hadoop 3.3.4 client jars without S3A.
 # hadoop-aws 3.3.4 declares aws-java-sdk-bundle 1.12.262.
+# spark-sql writes derby.log, metastore_db, and spark-warehouse to the current
+# directory. The runtime image user cannot write the mounted repo, so use the
+# container scratch directory (the earlier Spark image used its work-dir).
+cd "${TMPDIR:-/tmp}"
+
 exec /opt/spark/bin/spark-sql \
   --master "local[*]" \
   --packages "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262" \
@@ -34,4 +40,4 @@ exec /opt/spark/bin/spark-sql \
   --conf "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider" \
   --conf "spark.hadoop.fs.s3a.endpoint.region=${MINIO_REGION}" \
   --conf "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem" \
-  -f /opt/odp/poc_probe.sql
+  -f "${SCRIPT_DIR}/poc_probe.sql"

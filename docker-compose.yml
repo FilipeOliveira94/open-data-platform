@@ -7,13 +7,44 @@
 #
 # Spark and Trino are opt-in via the "lakehouse" profile (P2-01, P2-02, and P2-03).
 # Airflow is opt-in via the "orchestration" profile (P3-01).
+# One runtime image (docker/runtime, P3-03) runs Airflow, Spark, and dbt.
+# The Airflow services and the `spark` service use it. There is no second
+# Spark or dbt install.
 # `docker compose up -d` starts PostgreSQL and MinIO only.
 # `docker compose --profile lakehouse up` starts Trino and an idle Spark process.
-# It does not run a SQL script. Pass the script to `docker compose run`.
+# It does not run a SQL script. Pass a script or a medallion_build step to `docker compose run`.
 # `make airflow-up` creates the log bucket and starts Airflow.
 # LocalExecutor only: no Redis, Celery worker, Flower, or triggerer (D-006).
 
+x-runtime-image: &runtime-image odp-runtime:airflow3.4.0-spark3.5.8
+
+x-runtime-build: &runtime-build
+  context: ./docker/runtime
+
+# Variables the medallion_build steps, Spark scripts, and dbt read. Hosts are the
+# Compose services. POSTGRES_PORT is the in-network port.
+x-lakehouse-env: &lakehouse-env
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  MINIO_REGION: ${MINIO_REGION:-us-east-1}
+  MINIO_ENDPOINT_URL: http://minio:9000
+  ODP_RAW_BUCKET: ${ODP_RAW_BUCKET:-odp-raw}
+  ODP_WAREHOUSE_BUCKET: ${ODP_WAREHOUSE_BUCKET:-odp-warehouse}
+  POSTGRES_USER: ${POSTGRES_USER:-odp}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:-odp}
+  ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
+  PYTHONPATH: /opt/odp/repo/src
+  ODP_REPO: /opt/odp/repo
+  ODP_SPARK_DIR: /opt/odp/spark
+  ODP_WORK_ROOT: /opt/odp/work
+  ODP_TRINO_HOST: trino
+  ODP_TRINO_PORT: "8080"
+
 x-airflow-env: &airflow-env
+  <<: *lakehouse-env
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
   AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://${POSTGRES_USER:-odp}:${POSTGRES_PASSWORD:-odp}@postgres:5432/${AIRFLOW_DB:-airflow}
@@ -31,30 +62,18 @@ x-airflow-env: &airflow-env
   AIRFLOW__LOGGING__ENCRYPT_S3_LOGS: "False"
   AIRFLOW_CONN_MINIO_LOGS: '{"conn_type":"aws","login":"${MINIO_ROOT_USER:-minioadmin}","password":"${MINIO_ROOT_PASSWORD:-minioadmin}","extra":{"endpoint_url":"http://minio:9000","region_name":"${MINIO_REGION:-us-east-1}","config_kwargs":{"s3":{"addressing_style":"path"}}}}'
   AIRFLOW_UID: ${AIRFLOW_UID:-50000}
-  MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-  MINIO_REGION: ${MINIO_REGION:-us-east-1}
   ODP_AIRFLOW_LOG_BUCKET: ${ODP_AIRFLOW_LOG_BUCKET:-odp-airflow-logs}
-  POSTGRES_USER: ${POSTGRES_USER:-odp}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
   # Ingestion CLIs. Host is the Compose service, not the host .env localhost.
-  # POSTGRES_PORT is the in-network port, not the published host port.
   # Metadata stays on AIRFLOW_DB. The extract uses POSTGRES_DB.
-  PYTHONPATH: /opt/odp/repo/src
-  ODP_RAW_BUCKET: ${ODP_RAW_BUCKET:-odp-raw}
   MINIO_SMOKE_BUCKET: ${MINIO_SMOKE_BUCKET:-odp-smoke}
-  MINIO_ENDPOINT_URL: http://minio:9000
-  POSTGRES_HOST: postgres
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: ${POSTGRES_DB:-odp}
   AIRFLOW_DB: ${AIRFLOW_DB:-airflow}
-  ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
   KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
   KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
   KAGGLE_KEY: ${KAGGLE_KEY:-}
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:3.4.0-python3.12
+  image: *runtime-image
+  build: *runtime-build
   environment: *airflow-env
   user: "${AIRFLOW_UID:-50000}:0"
   volumes:
@@ -67,6 +86,10 @@ x-airflow-common: &airflow-common
     - ./pyproject.toml:/opt/odp/repo/pyproject.toml:ro
     - ./tests/fixtures:/opt/odp/repo/tests/fixtures:ro
     - ./data/raw:/opt/odp/repo/data/raw:ro
+    - ./dbt:/opt/odp/repo/dbt:ro
+    - ./docker/spark:/opt/odp/spark:ro
+    - ./.local/spark-ivy:/tmp/.ivy2
+    - odp_lakehouse_work:/opt/odp/work
     - ./docker/airflow/check_ingest_env.py:/opt/odp/check_ingest_env.py:ro
     - odp_airflow_logs:/opt/airflow/logs
 
@@ -112,36 +135,35 @@ services:
       retries: 10
       start_period: 10s
 
-  # Stable Spark runtime. The default command sleeps, so profile `up` does
-  # not execute SQL. Pass a script from ./docker/spark:
-  #   docker compose --profile lakehouse run --rm -T spark /opt/odp/run_poc.sh
-  #   docker compose --profile lakehouse run --rm -T spark /opt/odp/run_catalog_probe.sh
-  #   docker compose --profile lakehouse run --rm -T \
-  #     -e ODP_SPARK_SQL=/tmp/bronze.sql spark /opt/odp/run_bronze.sh
-  #     -e ODP_SPARK_SQL=/tmp/silver.sql spark /opt/odp/run_silver.sh
+  # Medallion build container on the shared runtime image. The default command
+  # sleeps, so profile `up` does not execute SQL. Make runs one medallion_build step
+  # per `compose run` (Makefile `medallion_step`) or a probe script:
+  #   docker compose --profile lakehouse run --rm -T spark /opt/odp/spark/run_poc.sh
   spark:
-    image: spark:3.5.8-java17
+    image: *runtime-image
+    build: *runtime-build
     profiles: [lakehouse]
+    user: "${AIRFLOW_UID:-50000}:0"
     depends_on:
       minio:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_REGION: ${MINIO_REGION:-us-east-1}
-      ODP_WAREHOUSE_BUCKET: ${ODP_WAREHOUSE_BUCKET:-odp-warehouse}
-      POSTGRES_USER: ${POSTGRES_USER:-odp}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
-      ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
-      HOME: /tmp
+    environment: *lakehouse-env
     volumes:
-      - ./docker/spark:/opt/odp:ro
+      - ./src:/opt/odp/repo/src:ro
+      - ./config:/opt/odp/repo/config:ro
+      - ./pyproject.toml:/opt/odp/repo/pyproject.toml:ro
+      - ./tests/fixtures:/opt/odp/repo/tests/fixtures:ro
+      - ./data/raw:/opt/odp/repo/data/raw:ro
+      - ./dbt:/opt/odp/repo/dbt:ro
+      - ./docker/spark:/opt/odp/spark:ro
       # Host Ivy cache for --packages (P2-08). Survives `compose run --rm`.
       - ./.local/spark-ivy:/tmp/.ivy2
-    entrypoint: ["/bin/bash"]
-    command: ["-c", "exec sleep infinity"]
+      - odp_lakehouse_work:/opt/odp/work
+    working_dir: /opt/odp/repo
+    entrypoint: ["/usr/bin/env"]
+    command: ["sleep", "infinity"]
 
   # Read-only query side of the P2-02 probe. Start after a Spark script
   # has created the JDBC tables. The image sizes the JVM from the memory
@@ -298,3 +320,5 @@ volumes:
   odp_postgres_data:
   odp_minio_data:
   odp_airflow_logs:
+  # Rendered SQL, Bronze counts, and dbt target/logs per run label.
+  odp_lakehouse_work:

@@ -45,12 +45,19 @@ def test_run_script_pins_iceberg_and_reads_credentials_from_env() -> None:
 
 def test_spark_service_is_lakehouse_profile_only() -> None:
     compose = COMPOSE.read_text(encoding="utf-8")
-    assert f"image: {SPARK_IMAGE}" in compose
-    assert compose.count(f"image: {SPARK_IMAGE}") == 1
+    # Spark 3.5.8 is copied from the official image into the runtime image.
+    # No service runs the Spark image itself.
+    assert f"image: {SPARK_IMAGE}" not in compose
+    dockerfile = (ROOT / "docker" / "runtime" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    assert f"FROM {SPARK_IMAGE}@sha256:" in dockerfile
+    assert dockerfile.count("FROM ") == 2
     assert "profiles: [lakehouse]" in compose
     spark = compose.split("  spark:", 1)[1].split("  trino:", 1)[0]
-    assert 'entrypoint: ["/bin/bash"]' in spark
-    assert "exec sleep infinity" in spark
+    assert "image: *runtime-image" in spark
+    assert 'entrypoint: ["/usr/bin/env"]' in spark
+    assert 'command: ["sleep", "infinity"]' in spark
     assert "run_poc.sh" not in spark
     assert "spark:3.5.8\n" not in compose
     assert "java11" not in compose.lower()

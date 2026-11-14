@@ -7,8 +7,9 @@ open_data_platform:
       type: trino
       method: none
       user: odp
-      host: localhost
-      port: 8080
+      # dbt runs in the runtime image on the Compose network (P3-03).
+      host: "{{ env_var('ODP_TRINO_HOST', 'trino') }}"
+      port: "{{ env_var('ODP_TRINO_PORT', '8080') | int }}"
       database: iceberg
       schema: gold_shared
       threads: 4

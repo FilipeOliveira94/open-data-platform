@@ -1,5 +1,5 @@
 # Copy to dbt/profiles.yml (gitignored) or set DBT_PROFILES_DIR.
-# Values match .env.example placeholders for the local Compose Trino.
+# Values match the Compose Trino service seen from the runtime image.
 open_data_platform:
   target: local
   outputs:
@@ -7,8 +7,9 @@ open_data_platform:
       type: trino
       method: none
       user: "{{ env_var('TRINO_USER', 'odp') }}"
-      host: "{{ env_var('TRINO_HOST', 'localhost') }}"
-      port: "{{ env_var('TRINO_PORT', '8080') | int }}"
+      # dbt runs in the runtime image on the Compose network (P3-03).
+      host: "{{ env_var('ODP_TRINO_HOST', 'trino') }}"
+      port: "{{ env_var('ODP_TRINO_PORT', '8080') | int }}"
       database: iceberg
       schema: gold_shared
       threads: 4

@@ -213,9 +213,14 @@ def test_reconciliation_sql_covers_every_gold_model() -> None:
 def test_reconciliation_is_outside_the_gold_build() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     project = (ROOT / "dbt" / "dbt_project.yml").read_text(encoding="utf-8")
-    assert "--exclude tag:reconciliation" in makefile
+    runner = (
+        ROOT / "src" / "open_data_platform" / "lakehouse" / "medallion_build.py"
+    ).read_text(encoding="utf-8")
+    assert '"--exclude", "tag:reconciliation"' in runner
+    assert '"--select", "tag:reconciliation"' in runner
     assert "dbt-test-reconciliation:" in makefile
-    assert "--select tag:reconciliation" in makefile
+    assert "$(call medallion_step,dbt-build)" in makefile
+    assert "$(call medallion_step,dbt-reconcile)" in makefile
     assert "live-gold: stage-quarantine dbt-build" in makefile
     for domain in (
         "gold_shared",

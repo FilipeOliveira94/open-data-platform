@@ -2,7 +2,7 @@
 # Load Silver tables through the Iceberg JDBC catalog from Bronze.
 # Credentials come from the container environment.
 # The JDBC password and S3 keys are a properties file, not --conf values.
-# The SQL file is mounted by the caller; set ODP_SPARK_SQL to that path.
+# The caller sets ODP_SPARK_SQL to the SQL file path.
 # Table locations are set in that SQL. The catalog warehouse stays /catalog.
 set -euo pipefail
 
@@ -14,7 +14,7 @@ set -euo pipefail
 : "${ICEBERG_CATALOG_DB:?ICEBERG_CATALOG_DB is required}"
 : "${MINIO_REGION:=us-east-1}"
 
-SQL_FILE="${ODP_SPARK_SQL:-/opt/odp/silver.sql}"
+SQL_FILE="${ODP_SPARK_SQL:?ODP_SPARK_SQL is required}"
 if [[ ! -f "${SQL_FILE}" ]]; then
   echo "SQL file is not mounted at ${SQL_FILE}" >&2
   exit 1
@@ -35,6 +35,11 @@ packages="org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0"
 packages="${packages},org.apache.hadoop:hadoop-aws:3.3.4"
 packages="${packages},com.amazonaws:aws-java-sdk-bundle:1.12.262"
 packages="${packages},org.postgresql:postgresql:42.7.14"
+
+# spark-sql writes derby.log, metastore_db, and spark-warehouse to the current
+# directory. The runtime image user cannot write the mounted repo, so use the
+# container scratch directory (the earlier Spark image used its work-dir).
+cd "${TMPDIR:-/tmp}"
 
 exec /opt/spark/bin/spark-sql \
   --master "local[*]" \

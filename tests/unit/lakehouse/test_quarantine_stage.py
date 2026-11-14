@@ -124,9 +124,7 @@ def test_make_stage_quarantine_loads_through_spark() -> None:
         "\ndbt-parse:",
         maxsplit=1,
     )[0]
-    assert "--sql-out .local/quarantine-sql" in block
-    assert "ODP_SPARK_SQL=/tmp/quarantine.sql" in block
-    assert "spark /opt/odp/run_bronze.sh" in block
+    assert "$(call medallion_step,stage-quarantine)" in block
     assert "trino" not in block
 
 

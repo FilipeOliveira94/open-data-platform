@@ -17,7 +17,12 @@ dependencies = [
 dev = [
     "pytest>=8.3.0,<9",
     "ruff>=0.9.0,<1",
-    "dbt-trino>=1.11.0,<1.12",
+]
+# Installed only into the runtime image venv (docker/runtime). Not synced
+# on the host. docker/runtime/dbt-requirements.txt is exported from this lock.
+dbt = [
+    "dbt-core==1.12.6",
+    "dbt-trino==1.11.0",
 ]
 
 [build-system]

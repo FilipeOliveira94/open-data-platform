@@ -28,7 +28,7 @@ def test_bronze_run_script_reuses_the_jdbc_catalog() -> None:
     assert "spark.sql.catalog.local.jdbc.init-catalog-tables=true" in script
     assert "s3a://${ODP_WAREHOUSE_BUCKET}/catalog" in script
     assert "spark.sql.caseSensitive=true" in script
-    assert 'SQL_FILE="${ODP_SPARK_SQL:-/opt/odp/bronze.sql}"' in script
+    assert 'SQL_FILE="${ODP_SPARK_SQL:?ODP_SPARK_SQL is required}"' in script
     assert '-f "${SQL_FILE}"' in script
     assert "type=hadoop" not in script
     assert "minioadmin" not in script
@@ -40,7 +40,8 @@ def test_compose_keeps_bronze_on_the_shared_spark_runtime() -> None:
     compose = COMPOSE.read_text(encoding="utf-8")
     assert "spark-bronze:" not in compose
     assert compose.count("profiles: [lakehouse]") == 2
-    assert "./docker/spark:/opt/odp:ro" in compose
+    assert "./docker/spark:/opt/odp/spark:ro" in compose
+    assert "./docker/spark:/opt/odp:ro" not in compose
     assert "docker compose config --services" not in compose
 
 
@@ -52,13 +53,9 @@ def test_make_live_bronze_uses_odp_raw_not_a_fixture_bucket() -> None:
         "\nlive-silver:",
         maxsplit=1,
     )[0]
-    assert "--all" in bronze_block
-    assert "--print-live-checks" in bronze_block
-    assert "--counts-out .local/bronze-source-counts.tsv" in bronze_block
-    assert "--counts-file .local/bronze-source-counts.tsv" in bronze_block
-    assert "spark /opt/odp/run_bronze.sh" in bronze_block
-    assert "ODP_SPARK_SQL=/tmp/bronze.sql" in bronze_block
-    assert ".local/bronze-sql" in bronze_block
+    assert "$(call medallion_step,bronze);" in bronze_block
+    assert "$(call medallion_step,bronze-checks)" in bronze_block
+    assert "uv run python" not in bronze_block
     assert "odp-bronze-live" not in bronze_block
     assert "--prepare-unit-fixtures" not in bronze_block
     assert "--prepare-live-fixtures" not in bronze_block
@@ -66,5 +63,6 @@ def test_make_live_bronze_uses_odp_raw_not_a_fixture_bucket() -> None:
         "\nup:",
         maxsplit=1,
     )[0]
-    assert "--all" in silver_block
+    assert "$(call medallion_step,silver);" in silver_block
+    assert "$(call medallion_step,silver-checks)" in silver_block
     assert "odp-bronze-live" not in silver_block

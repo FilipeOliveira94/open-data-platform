@@ -6,15 +6,19 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold up airflow-up down ps logs clean
-DBT ?= $(UV) run dbt
-DBT_PROJECT_DIR ?= dbt
-DBT_PROFILES_DIR ?= dbt
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold runtime-build up airflow-up down ps logs clean
+
+# One medallion step in the shared runtime image (Spark + dbt, P3-03).
+# Make and the Airflow transform DAGs call the same medallion_build module.
+define medallion_step
+$(COMPOSE) --profile lakehouse run --rm -T spark python -m open_data_platform.lakehouse.medallion_build $(1) --run-label make
+endef
 
 # Host path mounted at /tmp/.ivy2 in the Spark service (P2-08).
 SPARK_IVY_DIR ?= .local/spark-ivy
 
-# Spark image runs as uid 185; the bind mount must be writable by that user.
+# The runtime image runs as uid 50000 (earlier Spark image: uid 185); the bind
+# mount must be writable by that user.
 # One line: a newline in this macro starts a new Make shell and drops the
 # environment sourced in the same recipe. chmod may fail on jars created by
 # uid 185; those files stay readable and must not abort `set -e`.
@@ -57,7 +61,7 @@ test-iceberg-poc: ## Create the warehouse bucket and run the Iceberg probe
 	set +a; \
 	$(ensure_spark_ivy); \
 	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
-	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/run_poc.sh
+	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/spark/run_poc.sh
 
 test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehouse)
 	@set -a; \
@@ -75,7 +79,7 @@ test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehous
 	if [ "$$exists" != "1" ]; then \
 		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
 	fi; \
-	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/run_catalog_probe.sh; \
+	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/spark/run_catalog_probe.sh; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(COMPOSE) --profile lakehouse exec -T trino trino --execute "SELECT COUNT(*) AS row_count FROM iceberg.catalog_probe.probe"
 
@@ -86,89 +90,31 @@ spark-ivy-warm: ## Download pinned Spark lakehouse jars into .local/spark-ivy (P
 	set +a; \
 	$(ensure_spark_ivy); \
 	$(COMPOSE) up -d --wait postgres minio; \
-	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/warm_ivy.sh
+	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/spark/warm_ivy.sh
 
-live-bronze: ## Full-data Bronze live run from ODP_RAW_BUCKET (default odp-raw)
+live-bronze: ## Full-data Bronze from ODP_RAW_BUCKET, then Trino count checks (runtime image)
 	@set -e; \
 	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
-	mkdir -p .local; \
 	$(ensure_spark_ivy); \
-	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
-	case "$$db" in \
-		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
-	esac; \
 	$(COMPOSE) up -d --wait postgres minio; \
-	exists=$$($(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'"); \
-	if [ "$$exists" != "1" ]; then \
-		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
-	fi; \
-	rm -rf .local/bronze-sql; \
-	$(UV) run python -m open_data_platform.lakehouse.bronze --all --sql-out .local/bronze-sql --counts-out .local/bronze-source-counts.tsv; \
-	for sql in .local/bronze-sql/*.sql; do \
-		echo "Spark Bronze: $$sql"; \
-		$(COMPOSE) --profile lakehouse run --rm -T \
-			-v "$(CURDIR)/$$sql:/tmp/bronze.sql:ro" \
-			-e ODP_SPARK_SQL=/tmp/bronze.sql \
-			spark /opt/odp/run_bronze.sh; \
-	done; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(UV) run python -m open_data_platform.lakehouse.bronze --print-live-checks --counts-file .local/bronze-source-counts.tsv > .local/bronze-checks.tsv; \
-	while IFS=$$(printf '\t') read -r expected sql; do \
-		out=$$($(COMPOSE) --profile lakehouse exec -T trino trino --execute "$$sql" </dev/null); \
-		got=$$(printf '%s\n' "$$out" | awk 'NF { line = $$0 } END { gsub(/[" \r]/, "", line); print line }'); \
-		if [ "$$got" != "$$expected" ]; then \
-			echo "Bronze live check failed" >&2; \
-			echo "$$sql" >&2; \
-			echo "expected $$expected" >&2; \
-			printf '%s\n' "$$out" >&2; \
-			exit 1; \
-		fi; \
-		echo "$$sql -> $$got"; \
-	done < .local/bronze-checks.tsv
+	$(call medallion_step,bronze); \
+	$(call medallion_step,bronze-checks)
 
-live-silver: ## Full-data Silver live run from existing Bronze tables
+live-silver: ## Full-data Silver from existing Bronze tables, then Trino checks (runtime image)
 	@set -e; \
 	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
-	mkdir -p .local; \
 	$(ensure_spark_ivy); \
-	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
-	case "$$db" in \
-		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
-	esac; \
 	$(COMPOSE) up -d --wait postgres minio; \
-	exists=$$($(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'"); \
-	if [ "$$exists" != "1" ]; then \
-		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
-	fi; \
-	rm -rf .local/silver-sql; \
-	$(UV) run python -m open_data_platform.lakehouse.silver --all --sql-out .local/silver-sql; \
-	for sql in .local/silver-sql/*.sql; do \
-		echo "Spark Silver: $$sql"; \
-		$(COMPOSE) --profile lakehouse run --rm -T \
-			-v "$(CURDIR)/$$sql:/tmp/silver.sql:ro" \
-			-e ODP_SPARK_SQL=/tmp/silver.sql \
-			spark /opt/odp/run_silver.sh; \
-	done; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(UV) run python -m open_data_platform.lakehouse.silver --print-live-checks > .local/silver-checks.tsv; \
-	while IFS=$$(printf '\t') read -r expected sql; do \
-		out=$$($(COMPOSE) --profile lakehouse exec -T trino trino --execute "$$sql" </dev/null); \
-		got=$$(printf '%s\n' "$$out" | awk 'NF { line = $$0 } END { gsub(/[" \r]/, "", line); print line }'); \
-		if [ "$$got" != "$$expected" ]; then \
-			echo "Silver live check failed" >&2; \
-			echo "$$sql" >&2; \
-			echo "expected $$expected" >&2; \
-			printf '%s\n' "$$out" >&2; \
-			exit 1; \
-		fi; \
-		echo "$$sql -> $$got"; \
-	done < .local/silver-checks.tsv
+	$(call medallion_step,silver); \
+	$(call medallion_step,silver-checks)
 
 stage-quarantine: ## Stage MinIO quarantine JSONL into iceberg.gold_staging.quarantine_findings
 	@set -e; \
@@ -176,50 +122,41 @@ stage-quarantine: ## Stage MinIO quarantine JSONL into iceberg.gold_staging.quar
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
-	mkdir -p .local; \
 	$(ensure_spark_ivy); \
-	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
-	case "$$db" in \
-		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
-	esac; \
 	$(COMPOSE) up -d --wait postgres minio; \
-	exists=$$($(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'"); \
-	if [ "$$exists" != "1" ]; then \
-		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
-	fi; \
-	rm -rf .local/quarantine-sql; \
-	$(UV) run python -m open_data_platform.lakehouse.quarantine_stage --sql-out .local/quarantine-sql; \
-	echo "Spark quarantine staging"; \
-	$(COMPOSE) --profile lakehouse run --rm -T \
-		-v "$(CURDIR)/.local/quarantine-sql/quarantine_findings.sql:/tmp/quarantine.sql:ro" \
-		-e ODP_SPARK_SQL=/tmp/quarantine.sql \
-		spark /opt/odp/run_bronze.sh
+	$(call medallion_step,stage-quarantine)
 
-dbt-parse: ## Parse the Gold dbt project (Trino profile required)
-	@set -a; \
+dbt-parse: ## Parse the Gold dbt project in the runtime image
+	@set -e; \
+	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(DBT) parse --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR)
+	$(call medallion_step,dbt-parse)
 
 dbt-build: ## Build Gold models and schema tests (excludes reconciliation)
-	@set -a; \
+	@set -e; \
+	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(DBT) build --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR) --exclude tag:reconciliation
+	$(call medallion_step,dbt-build)
 
-dbt-test-reconciliation: ## Run reconciliation tests (separate from live-gold; daily cadence)
-	@set -a; \
+dbt-test-reconciliation: ## Run reconciliation tests (separate from live-gold)
+	@set -e; \
+	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
 	[ -f .env ] && . ./.env; \
 	set +a; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(DBT) test --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR) --select tag:reconciliation
+	$(call medallion_step,dbt-reconcile)
 
 live-gold: stage-quarantine dbt-build ## Stage quarantine sidecars then build Gold models
+
+runtime-build: ## Build the shared runtime image (Airflow + Spark + dbt)
+	$(COMPOSE) --profile lakehouse build spark
 
 up: ## Start PostgreSQL and MinIO
 	$(COMPOSE) up -d
@@ -233,7 +170,7 @@ airflow-up: ## Create the Airflow log bucket and start the orchestration profile
 	set +a; \
 	$(COMPOSE) up -d --wait postgres minio; \
 	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_AIRFLOW_LOG_BUCKET"])'; \
-	$(COMPOSE) --profile orchestration up -d --wait airflow-apiserver airflow-scheduler airflow-dag-processor
+	$(COMPOSE) --profile orchestration up -d --build --wait airflow-apiserver airflow-scheduler airflow-dag-processor
 
 down: ## Stop Compose services (keeps volumes)
 	$(COMPOSE) down

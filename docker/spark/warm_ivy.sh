@@ -10,6 +10,11 @@ packages="${packages},org.apache.hadoop:hadoop-aws:3.3.4"
 packages="${packages},com.amazonaws:aws-java-sdk-bundle:1.12.262"
 packages="${packages},org.postgresql:postgresql:42.7.14"
 
+# spark-sql writes derby.log, metastore_db, and spark-warehouse to the current
+# directory. The runtime image user cannot write the mounted repo, so use the
+# container scratch directory (the earlier Spark image used its work-dir).
+cd "${TMPDIR:-/tmp}"
+
 exec /opt/spark/bin/spark-sql \
   --master "local[1]" \
   --packages "${packages}" \

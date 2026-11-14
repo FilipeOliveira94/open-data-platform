@@ -7,16 +7,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 
+_MODULE = "open_data_platform.lakehouse.medallion_build"
+
 # Marker that must sit in the same recipe shell as `. ./.env`.
 _SOURCED_WORK = {
     "test-iceberg-poc": "run_poc.sh",
     "test-catalog-probe": "run_catalog_probe.sh",
     "spark-ivy-warm": "warm_ivy.sh",
-    "live-bronze": "open_data_platform.lakehouse.bronze",
-    "live-silver": "open_data_platform.lakehouse.silver",
-    "stage-quarantine": "open_data_platform.lakehouse.quarantine_stage",
-    "dbt-build": "dbt build",
-    "dbt-test-reconciliation": "tag:reconciliation",
+    "live-bronze": f"{_MODULE} bronze-checks",
+    "live-silver": f"{_MODULE} silver-checks",
+    "stage-quarantine": f"{_MODULE} stage-quarantine",
+    "dbt-build": f"{_MODULE} dbt-build",
+    "dbt-test-reconciliation": f"{_MODULE} dbt-reconcile",
 }
 
 

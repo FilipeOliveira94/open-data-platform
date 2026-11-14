@@ -4,7 +4,7 @@ P3-01 runs Apache Airflow on the Compose `orchestration` profile. `docker compos
 
 | | |
 | --- | --- |
-| Image | `apache/airflow:3.4.0-python3.12` |
+| Image | `odp-runtime:airflow3.4.0-spark3.5.8`, built from `docker/runtime` on `apache/airflow:3.4.0-python3.12` (P3-03). P3-01 and P3-02 ran the upstream image directly |
 | Executor | `LocalExecutor` |
 | Metadata database | `airflow` on the Compose PostgreSQL 16. Not `odp` and not `iceberg` |
 | UI | `http://localhost:8081` (`AIRFLOW_PORT`) |
@@ -63,7 +63,7 @@ Airflow skips masking for a secret shorter than 5 characters. The local placehol
 
 ## Ingestion wrappers (P3-02)
 
-The scheduler image stays `apache/airflow:3.4.0-python3.12`. That image already imports `boto3` 1.43.117, `psycopg` 3.3.6, and `yaml` 6.0.3. The package is not installed into `site-packages`. Compose mounts `src/`, `config/`, `pyproject.toml`, `tests/fixtures`, and `data/raw` under `/opt/odp/repo` and sets `PYTHONPATH=/opt/odp/repo/src`. Contract, fixture, and Olist root discovery walk parents of `__file__` and reach `/opt/odp/repo`. The whole repository is not mounted, so `.env` and `.git` stay on the host.
+P3-02 ran the upstream `apache/airflow:3.4.0-python3.12` image. Since P3-03 the services run the runtime image built on it; the Airflow Python environment is unchanged. That image already imports `boto3` 1.43.117, `psycopg` 3.3.6, and `yaml` 6.0.3. The package is not installed into `site-packages`. Compose mounts `src/`, `config/`, `pyproject.toml`, `tests/fixtures`, and `data/raw` under `/opt/odp/repo` and sets `PYTHONPATH=/opt/odp/repo/src`. Contract, fixture, and Olist root discovery walk parents of `__file__` and reach `/opt/odp/repo`. The whole repository is not mounted, so `.env` and `.git` stay on the host.
 
 There is one PostgreSQL server, the Compose service `postgres`. It holds three databases. `airflow-db-create` is a one-shot `psql` client of that server, not a second server.
 
@@ -147,3 +147,39 @@ The PostgreSQL extract window was `2026-10-17T00:00:00Z` inclusive to `2026-10-1
 `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 324 passed in 13.00s. The DAG contract tests were re-run after the `execution_id` default change: 29 passed.
 
 `ingest_demo_storefront` run `manual__2026-11-12T19:13:59.070074+00:00` finished `success`. The task log recorded the stage lines as `info`: `stage=generated` with `record_count=100` and `byte_count=16071`, then `stage=wrote` for `events.jsonl` with `finding_count=0`. `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` passed 330.
+
+## Transform DAGs (P3-03)
+
+### One runtime image
+
+`docker/runtime/Dockerfile` builds `odp-runtime:airflow3.4.0-spark3.5.8`. The Airflow services and the lakehouse `spark` service run it. There is no other Spark or dbt install.
+
+| Piece | Source |
+| --- | --- |
+| Airflow `3.4.0` | `apache/airflow:3.4.0-python3.12`, unchanged |
+| Spark `3.5.8` and Temurin JRE `17.0.20` | Copied from `spark:3.5.8-java17@sha256:5363cd7d…` (`/opt/spark`, `/opt/java/openjdk`). That image is a build stage only. No service runs it |
+| dbt Core `1.12.6`, dbt-trino `1.11.0` | Venv `/opt/dbt-venv`, installed with `--require-hashes` from `docker/runtime/dbt-requirements.txt` |
+
+`dbt-requirements.txt` is `uv export --only-group dbt` from `uv.lock`. The `dbt` group is not in `default-groups`, so `uv sync` does not install dbt on the host. Before P3-03, Make ran Spark in `spark:3.5.8-java17` and dbt on the host through `uv run dbt`. The decision record is the addendum in [ADR-0005](../decisions/0005-compute-and-transform.md).
+
+`make runtime-build` builds the image. `make airflow-up` builds it when it is missing or stale. `docker compose run` builds it when it is missing.
+
+### Medallion build steps
+
+`python -m open_data_platform.lakehouse.medallion_build <step> --run-label <label>` is the one entrypoint. Make passes `--run-label make`. Airflow passes the run id. Rendered SQL, the Bronze raw counts, and dbt `target/` and logs go to the named volume `odp_lakehouse_work` at `/opt/odp/work/<label>`.
+
+| Step | What it calls |
+| --- | --- |
+| `bronze` | Creates the catalog database if missing, `lakehouse.bronze --all`, then `run_bronze.sh` once per SQL file |
+| `bronze-checks` | `bronze_count_checks` on the counts the `bronze` step wrote, through Trino |
+| `silver` | `lakehouse.silver --all`, then `run_silver.sh` once per SQL file |
+| `silver-checks` | `silver.live_checks()` through Trino |
+| `stage-quarantine` | `lakehouse.quarantine_stage`, then `run_bronze.sh` on that SQL |
+| `dbt-parse` / `dbt-build` / `dbt-reconcile` | `dbt parse`, `dbt build --exclude tag:reconciliation`, `dbt test --select tag:reconciliation` |
+
+`medallion_build` runs each process with an argument vector and no shell. Credentials stay in the container environment. Trino checks use the HTTP protocol at `ODP_TRINO_HOST:ODP_TRINO_PORT` (`trino:8080`). A mismatch prints the statement, the expected value, and the result, then fails the step.
+
+`spark-sql` writes `derby.log` and `metastore_db` to its working directory. The runtime user cannot write the mounted repository, so each Spark script changes to `${TMPDIR:-/tmp}` first.
+
+`tests/unit/lakehouse/test_medallion_build.py` covers the steps without Compose.
+
