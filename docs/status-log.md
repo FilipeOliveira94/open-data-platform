@@ -4,6 +4,12 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-14 — Phase 3 renumbering after the P3-03 review
+
+The review of P3-03 (commits `7bb3653`..`bb03f6b`) produced eight findings. They are filed in `ROADMAP.md` Phase 3; no code changed. Findings 1 and 2 go to P3-04: `reconcile_gold` must not run while a `transform_lakehouse` dbt build runs, every DAG is created paused, and `run_python_args` kills the child process group on timeout or exception. P3-04 now depends on P3-03. Findings 3, 4, 6, and 8 go to the new P3-10, Orchestration runtime hardening: Spark driver memory and cores capped inside the Airflow runtime, Airflow in its own uv group, retention for `odp_lakehouse_work`, and `ODP_TRINO_*` and dbt profile examples. Finding 5 goes to P3-12: `make` targets and Airflow DAGs must not run concurrently against the same Iceberg tables and Ivy cache. Finding 7 goes to P3-08: Trino error fields and a total timeout on `nextUri` polling.
+
+The Phase 3 close pair moves from P3-10/P3-11 to P3-11/P3-12. The live run depends on P3-08, P3-09, and P3-10. Entries before this one that say P3-10/P3-11 mean the close pair. ADR-0006 Related issues is `P3-01`–`P3-12`. Documentation only; no tests were run.
+
 ### 2026-11-13 — P3-03 transform and reconciliation DAGs
 
 One runtime image, `odp-runtime:airflow3.4.0-spark3.5.8` (`docker/runtime`), runs Airflow `3.4.0`, Spark `3.5.8` with Temurin JRE `17.0.20` copied from the digest-pinned `spark:3.5.8-java17`, and dbt Core `1.12.6` with dbt-trino `1.11.0` in `/opt/dbt-venv`. The Airflow services and the lakehouse `spark` service use it. No service runs `spark:3.5.8-java17`, and the host no longer installs dbt (`uv.lock` group `dbt`, exported with hashes to `docker/runtime/dbt-requirements.txt`). ADR-0005 addendum approved after the DAG runs. D-006 names the new image.

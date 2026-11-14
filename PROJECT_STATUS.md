@@ -45,8 +45,9 @@ P3-03 is verified. `transform_lakehouse` rebuilds Bronze, Silver, and Gold. `rec
 | P3-07 | Quality checks and quarantine | Not started | — |
 | P3-08 | Execution metadata and failure logging | Not started | — |
 | P3-09 | Orchestration success/failure tests | Not started | — |
-| P3-10 | Live run, result, and consistency check | Not started | — |
-| P3-11 | Phase 3 documentation and status | Not started | — |
+| P3-10 | Orchestration runtime hardening | Not started | — |
+| P3-11 | Live run, result, and consistency check | Not started | — |
+| P3-12 | Phase 3 documentation and status | Not started | — |
 
 Acceptance detail: `ROADMAP.md` → Phase 3.
 
@@ -58,8 +59,8 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [ ] Backfills do not corrupt data or create undue duplication.
 - [ ] Invalid records are identified and handled per documented rules.
 - [ ] Success and failure scenarios have tests or reproducible evidence.
-- [ ] A live run result is recorded and compared to the source windows (P3-10).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-11).
+- [ ] A live run result is recorded and compared to the source windows (P3-11).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-12).
 
 ---
 

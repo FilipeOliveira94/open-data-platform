@@ -7,7 +7,7 @@
 | Date decided | 2026-11-12 |
 | Owner | Platform architect |
 | Index ID | D-006 |
-| Related issues | Phase 3 (`P3-01`–`P3-11`), Phase 7 AWS counterparts |
+| Related issues | Phase 3 (`P3-01`–`P3-12`), Phase 7 AWS counterparts |
 | Supersedes | — |
 | Superseded by | — |
 
