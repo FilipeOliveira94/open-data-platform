@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-14 (agent rules consolidated into `AGENTS.md`; P3-04 Next work matches the 2026-11-14 criteria) |
+| Last updated | 2026-11-14 (agent rules consolidated into `AGENTS.md`, git policy in `AGENTS.md` §13; P3-04 Next work matches the 2026-11-14 criteria) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 

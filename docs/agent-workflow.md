@@ -21,7 +21,7 @@ Return:
 5. Risks, assumptions and compatibility concerns.
 6. Exact commands to run.
 7. Expected files to create or modify.
-8. Which items of the AGENTS.md "Issue close checklist" this issue will touch.
+8. Which items of the AGENTS.md §12 "Issue Close Checklist" this issue will touch, and which §8 "Runtime data exposure" rules it touches.
 
 Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Wait for my approval before editing.
 ```
@@ -39,6 +39,7 @@ Implement only the plan we just agreed on.
 - Do not run destructive commands, deploy cloud resources, or incur cloud costs without my explicit approval.
 - Run the relevant checks and report the actual output.
 - Update documentation and PROJECT_STATUS.md only for work that has actually been verified.
+- Do not commit; the close step commits.
 
 At the end, report changed files, checks run, results, acceptance criteria met and not met, limitations, and the next recommended task.
 ```
@@ -52,8 +53,8 @@ Review the current diff against the agreed plan and acceptance criteria. Do not 
 - Check for unrelated changes, secrets, generated files, weak tests, configuration drift and undocumented behavior.
 - Run the relevant validation commands and report their actual output.
 - Identify acceptance criteria that are not met or not verified.
-- Apply the AGENTS.md "Issue close checklist".
-- Make one local Conventional Commit on main. Never push.
+- Apply the AGENTS.md §12 "Issue Close Checklist".
+- Make one local Conventional Commit on main. Never push (AGENTS.md §13 Git).
 
 Return a concise completion report, the commit SHA, and the next smallest useful task.
 ```
@@ -62,4 +63,4 @@ Return a concise completion report, the commit SHA, and the next smallest useful
 
 ## Fallback to another tool (e.g. Cursor)
 
-Paste the same three prompts into the other tool. Point it at `AGENTS.md`; do not keep that tool's own rule files in the repository, so the rules have one source.
+Paste the same three prompts into the other tool. Point it at `AGENTS.md`; do not keep that tool's own rule files in the repository, so the rules have one source. The git policy is in AGENTS.md §13, so the other tool gets it too.

@@ -151,4 +151,9 @@ Before the closing commit of an issue, check each item and update only what the 
 
 Prompts for planning, implementing and closing an issue are in `docs/agent-workflow.md`.
 
+## 13. Git
+
+- Commit locally only. Never run `git push`; Filipe reviews and pushes.
+- Use Conventional Commits directly on `main`.
+
 AGENTS.md is the single source; CLAUDE.md imports it.

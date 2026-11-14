@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-14 — Review fixes for the AGENTS.md consolidation
+
+The git policy (local Conventional Commits on `main`, never push) moved from `CLAUDE.md` into `AGENTS.md` §13 Git, so tools that read only `AGENTS.md` get it; `CLAUDE.md` now holds only `@AGENTS.md`. The entry below that says `CLAUDE.md` adds the git policy describes the state before this change. `ROADMAP.md` (verified status) and `DECISIONS.md` (Implemented column) now say evidence is recorded in the architecture doc or ADR and in `docs/status-log.md`, and `PROJECT_STATUS.md` summarizes it, matching `AGENTS.md` §3. `docs/agent-workflow.md`: the plan prompt also asks which §8 Runtime data exposure rules the issue touches, the implement prompt says not to commit, and the prompts cite §12 "Issue Close Checklist" by its heading. Documentation only. `uv run ruff check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 348 passed.
+
 ### 2026-11-14 — Agent rules consolidated into AGENTS.md
 
 The way the project is implemented changed: it moved from Cursor with `.cursor/rules/*.mdc` rules to Claude Code via T3, with a root `CLAUDE.md` that imports `AGENTS.md` and adds the git policy (local Conventional Commits on `main`, no push). `.cursor/rules/` (`00`–`05`) was removed after a line-by-line check against `AGENTS.md`. Rules that were only in the `.mdc` files moved into `AGENTS.md`: the local→AWS mapping (MinIO→S3, catalog→Glue, Trino→Athena), the Runtime data exposure subsection (no values in SQL, mode-600 secrets, `spark.redaction.regex`, exception and `print` content, dbt `store_failures`, the planted-value test and `test_spark_credentials.py`), "do not silently change architecture, dependencies or acceptance criteria", "do not drop invalid records silently", "do not leave versions floating", "check the roadmap item", "plan before editing files for non-trivial work", "do not rebuild cumulative tables in `PROJECT_STATUS.md`", and "validate compatibility before adopting a combination". `AGENTS.md` gained an Issue close checklist.
