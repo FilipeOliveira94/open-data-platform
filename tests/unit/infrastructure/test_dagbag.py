@@ -25,6 +25,7 @@ EXPECTED_DAGS = {
     "ingest_postgres_oltp",
     "seed_postgres_oltp",
     "transform_lakehouse",
+    "reconcile_gold",
 }
 
 MEDALLION_BUILD = "open_data_platform.lakehouse.medallion_build"
@@ -121,8 +122,24 @@ def test_transform_runs_bronze_silver_gold_in_order(dagbag) -> None:
     assert all("reconcile" not in " ".join(_vector(t)) for t in dag.tasks)
 
 
+def test_reconcile_gold_is_weekly_and_separate(dagbag) -> None:
+    dag = dagbag.dags["reconcile_gold"]
+    assert dag.schedule == "@weekly"
+    assert dag.max_active_runs == 1
+    assert dag.task_ids == ["dbt_reconcile"]
+    vector = _vector(dag.get_task("dbt_reconcile"))
+    assert vector == [
+        "-m",
+        MEDALLION_BUILD,
+        "dbt-reconcile",
+        "--run-label",
+        "{{ run_id }}",
+    ]
+
+
 def test_medallion_build_steps_exist(dagbag) -> None:
     from open_data_platform.lakehouse.medallion_build import STEPS
 
-    for task in dagbag.dags["transform_lakehouse"].tasks:
-        assert _vector(task)[2] in STEPS
+    for dag_id in ("transform_lakehouse", "reconcile_gold"):
+        for task in dagbag.dags[dag_id].tasks:
+            assert _vector(task)[2] in STEPS

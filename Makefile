@@ -144,7 +144,7 @@ dbt-build: ## Build Gold models and schema tests (excludes reconciliation)
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(call medallion_step,dbt-build)
 
-dbt-test-reconciliation: ## Run reconciliation tests (separate from live-gold)
+dbt-test-reconciliation: ## Run reconciliation tests (separate from live-gold; weekly reconcile_gold DAG)
 	@set -e; \
 	set -a; \
 	[ -f .env.example ] && . ./.env.example; \

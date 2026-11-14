@@ -22,6 +22,7 @@ DAG_FILES = {
     "ingest_common.py",
     ".airflowignore",
     "transform_lakehouse.py",
+    "reconcile_gold.py",
     *ENTRYPOINTS,
 }
 

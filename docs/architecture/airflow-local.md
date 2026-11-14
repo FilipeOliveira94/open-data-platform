@@ -16,7 +16,7 @@ Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-sch
 
 `platform_health` is the P3-01 smoke DAG: one `BashOperator` that prints `platform_health ready`, with no schedule. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
 
-P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule). P3-04 and P3-05 set the daily and weekly schedules on the PostgreSQL extract. Phase 4 sets the CDC schedule. Backfill DAGs stay a later Phase 3 issue.
+P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 and P3-05 set the daily and weekly schedules on the PostgreSQL extract. Phase 4 sets the CDC schedule. Backfill DAGs stay a later Phase 3 issue.
 
 ## Start
 
@@ -188,8 +188,11 @@ The PostgreSQL extract window was `2026-10-17T00:00:00Z` inclusive to `2026-10-1
 | DAG | Schedule | Tasks |
 | --- | --- | --- |
 | `transform_lakehouse` | None | `bronze` → `bronze_checks` → `silver` → `silver_checks` → `stage_quarantine` → `dbt_build` |
+| `reconcile_gold` | `@weekly` | `dbt_reconcile` |
 
-The tasks use the P3-02 `DEFAULT_ARGS` from `ingest_common.py`: 2 retries, a 2-minute delay, and a 30-minute execution timeout. The DAG sets `max_active_runs=1` and `catchup=False`. `transform_lakehouse` is linear. All Spark steps share one Ivy cache and one container, so two Spark steps do not run at the same time. Quarantine staging does not read Bronze or Silver. It runs after `silver_checks` only for that reason.
+The tasks use the P3-02 `DEFAULT_ARGS` from `ingest_common.py`: 2 retries, a 2-minute delay, and a 30-minute execution timeout. Both DAGs set `max_active_runs=1` and `catchup=False`. `transform_lakehouse` is linear. All Spark steps share one Ivy cache and one container, so two Spark steps do not run at the same time. Quarantine staging does not read Bronze or Silver. It runs after `silver_checks` only for that reason.
+
+`reconcile_gold` is unpaused at creation. With `catchup=False`, the scheduler starts the latest finished weekly interval when the DAG first appears. It does not wait for `transform_lakehouse`. A reconciliation run that overlaps a rebuild can read a table that is being replaced.
 
 Trino (profile `lakehouse`) must be up for the check steps and dbt:
 
@@ -197,7 +200,9 @@ Trino (profile `lakehouse`) must be up for the check steps and dbt:
 docker compose --profile lakehouse up -d --wait trino
 docker compose --profile orchestration exec -T airflow-scheduler \
   airflow dags trigger transform_lakehouse
+docker compose --profile orchestration exec -T airflow-scheduler \
+  airflow dags trigger reconcile_gold
 ```
 
-`tests/unit/infrastructure/test_dagbag.py` loads `airflow/dags` with the pinned Airflow in a `DagBag`. It checks zero import errors, the nine DAG ids, the task order, the shared retries and timeout, and the entrypoint of each task. Success, retry, and failed-run behavior on a live scheduler is P3-09.
+`tests/unit/infrastructure/test_dagbag.py` loads `airflow/dags` with the pinned Airflow in a `DagBag`. It checks zero import errors, the ten DAG ids, the task order, the shared retries and timeout, and the entrypoint of each task. Success, retry, and failed-run behavior on a live scheduler is P3-09.
 

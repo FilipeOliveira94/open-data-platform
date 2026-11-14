@@ -65,7 +65,7 @@ make dbt-build
 # or
 make live-gold
 
-# Separate from the medallion run. Intended cadence is daily.
+# Separate from the medallion run. Airflow runs it weekly (reconcile_gold).
 make dbt-test-reconciliation
 ```
 
