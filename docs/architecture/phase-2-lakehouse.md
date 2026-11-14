@@ -17,7 +17,7 @@ Spark writes the Iceberg JDBC catalog on the Compose PostgreSQL database `iceber
 
 ## Versions
 
-Observed on the 2026-11-11 local run and recorded in [P2-09 live run](phase-2-live-run.md). The same pins are in the probe, catalog, and Gold notes. P2-09 ran Spark in `spark:3.5.8-java17` and dbt on the host. P3-03 moved both into one runtime image with the same versions. The Make targets keep their names and call the `medallion_build` module in that image.
+Observed on the 2026-11-11 local run and recorded in [P2-09 live run](phase-2-live-run.md). The same pins are in the probe, catalog, and Gold notes. P2-09 ran Spark in `spark:3.5.8-java17` and dbt on the host. P3-03 moved both into one runtime image with the same versions. The Make targets keep their names and call the same `medallion_build` module as the Airflow DAGs.
 
 | Piece | Version |
 | --- | --- |

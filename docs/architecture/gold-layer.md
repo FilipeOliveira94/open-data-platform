@@ -69,7 +69,7 @@ make live-gold
 make dbt-test-reconciliation
 ```
 
-Since P3-03 dbt runs only in the shared runtime image (`docker/runtime`). The Make targets call `python -m open_data_platform.lakehouse.medallion_build dbt-parse|dbt-build|dbt-reconcile` in the `spark` service. The profile `dbt/profiles.yml` reaches Trino at `ODP_TRINO_HOST:ODP_TRINO_PORT` (default `trino:8080`) on the Compose network. dbt `target/` and logs go to the `odp_lakehouse_work` volume under the run label. The host does not install dbt. Before P3-03, dbt ran on the host through `uv run dbt` against `localhost:8080`; the 2026-11-06 result below used that path.
+Since P3-03 dbt runs only in the shared runtime image (`docker/runtime`). The Make targets call `python -m open_data_platform.lakehouse.medallion_build dbt-parse|dbt-build|dbt-reconcile` in the `spark` service. Airflow calls the same module. The profile `dbt/profiles.yml` reaches Trino at `ODP_TRINO_HOST:ODP_TRINO_PORT` (default `trino:8080`) on the Compose network. dbt `target/` and logs go to the `odp_lakehouse_work` volume under the run label. The host does not install dbt. Before P3-03, dbt ran on the host through `uv run dbt` against `localhost:8080`; the 2026-11-06 result below used that path.
 
 ## Verification (2026-11-06)
 

@@ -21,6 +21,7 @@ DAG_FILES = {
     "platform_env.py",
     "ingest_common.py",
     ".airflowignore",
+    "transform_lakehouse.py",
     *ENTRYPOINTS,
 }
 
@@ -29,7 +30,7 @@ def _text(name: str) -> str:
     return (DAG_DIR / name).read_text(encoding="utf-8")
 
 
-def test_dag_directory_matches_the_p3_02_set() -> None:
+def test_dag_directory_matches_the_p3_02_and_p3_03_set() -> None:
     names = {path.name for path in DAG_DIR.iterdir() if path.name != "__pycache__"}
     assert names == DAG_FILES
 

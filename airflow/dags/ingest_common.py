@@ -1,4 +1,4 @@
-"""Task defaults for thin ingestion wrappers.
+"""Task defaults for thin DAG wrappers (ingestion and transform).
 
 ``run_python_args`` executes ``python`` with an argument vector. The
 arguments are not passed through a shell. This module is not a DAG.
