@@ -1,3 +1,5 @@
+> **Historical document (added 2026-11-14).** This is the original project-idea document, discussed with another AI model, and the basis of the repository structure. It is kept as history and is not a current source of rules: [`AGENTS.md`](../AGENTS.md) is. Its Next work and checklists no longer apply; [`PROJECT_STATUS.md`](../PROJECT_STATUS.md) is the source for current work. Previously `docs/project-context-for-cursor.md`. The way the project is implemented has changed: it moved from Cursor with `.cursor/rules/*.mdc` rules to Claude Code via T3, with `CLAUDE.md` importing `AGENTS.md`. The content below is unchanged.
+
 # Open Data Platform --- Contexto do Projeto para Cursor Agent
 
 > Documento-base consolidado a partir das decisões e orientações

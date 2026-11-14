@@ -6,7 +6,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | --- | --- |
 | Owns | Decision index and status |
 | Detail | [`docs/decisions/`](docs/decisions/) (one ADR per decision) |
-| Related | `PROJECT_STATUS.md`, `ROADMAP.md`, `docs/project-context-for-cursor.md`, `AGENTS.md` |
+| Related | `PROJECT_STATUS.md`, `ROADMAP.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md` |
 
 **How to use:** skim the table for direction and implementation status; open the ADR for *why*. **Proposed** is the planned stack; **Implemented** is what is verified in the repository (update when evidence lands in `PROJECT_STATUS.md` / `docs/status-log.md`).
 

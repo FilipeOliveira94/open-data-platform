@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-13 (P3-03 verified) |
+| Last updated | 2026-11-14 (agent rules consolidated into `AGENTS.md`; P3-04 Next work matches the 2026-11-14 criteria) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -28,7 +28,7 @@ P3-03 is verified. `transform_lakehouse` rebuilds Bronze, Silver, and Gold. `rec
 
 ## Next work
 
-1. **P3-04** — Daily batch schedule. A daily DAG passes a one-day window into the P1-06 extract. Document cadence, catchup, and idempotency. Prove one daily-shaped run.
+1. **P3-04** — Daily batch schedule. A daily DAG passes a one-day window into the P1-06 extract. Document cadence, catchup, and idempotency. Prove one daily-shaped run. `reconcile_gold` must not run while a `transform_lakehouse` `dbt_build` runs. Every DAG is created paused (`is_paused_upon_creation=True`); a DagBag test covers both. On timeout or exception `run_python_args` kills the whole child process group, with a unit test that no child survives. Acceptance: `ROADMAP.md` → P3-04.
 
 ---
 
@@ -188,6 +188,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-14 — Agent rules consolidated
+
+The Cursor rules are now in `AGENTS.md`, which `CLAUDE.md` imports. `docs/agent-workflow.md` holds the plan, implement, and close prompts. The genesis document is `docs/project-genesis.md`. No issue status changed. Detail: [`docs/status-log.md`](docs/status-log.md).
 
 ### 2026-11-13 — P3-03 verified
 
