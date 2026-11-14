@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-12 (P3-02 verified) |
+| Last updated | 2026-11-13 (P3-03 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,15 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-03** — Transform / dbt DAGs. Not started.
+**P3-04** — Daily batch schedule (PostgreSQL). Not started.
 
-P3-02 is verified. Ingestion DAGs call the package CLIs. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
-
-P3-01 is verified. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
+P3-03 is verified. `transform_lakehouse` rebuilds Bronze, Silver, and Gold. `reconcile_gold` runs the reconciliation tests weekly. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-03** — Transform / dbt DAGs. Orchestrate Bronze, Silver, and Gold with clear task dependencies. The DAGs call the existing entrypoints.
+1. **P3-04** — Daily batch schedule. A daily DAG passes a one-day window into the P1-06 extract. Document cadence, catchup, and idempotency. Prove one daily-shaped run.
 
 ---
 
@@ -40,7 +38,7 @@ P3-01 is verified. Local Airflow is [`docs/architecture/airflow-local.md`](docs/
 | --- | --- | --- | --- |
 | P3-01 | Airflow in local Compose | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-02 | Ingestion DAGs (thin wrappers) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-03 | Transform / dbt DAGs | Not started | — |
+| P3-03 | Transform / dbt DAGs | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-04 | Daily batch schedule (PostgreSQL) | Not started | — |
 | P3-05 | Weekly batch schedule (PostgreSQL) | Not started | — |
 | P3-06 | Idempotent backfill support | Not started | — |
@@ -69,10 +67,10 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | | |
 | --- | --- |
-| Date | 2026-11-12 |
-| Environment | Local Compose. PostgreSQL, MinIO, Spark, Trino, and Airflow were already up |
-| Checks | `platform_env`, the five ingestion DAGs, and `seed_postgres_oltp`. Raw object counts compared with the PostgreSQL window. OLTP counts and `updated_at` span compared with the synthetic fixture after seed |
-| Result | All seven runs `success`. Storefront 100 lines. PostgreSQL window 1/1/1/2, matching `oltp`. DummyJSON 194 products. IBGE 5_571 municipalities. Olist 11 CSV objects. Seed left sellers 5, customers 2, orders 2, and order items 2. No quarantine objects for these runs. `uv run pytest tests/unit` → 324 passed in 13.00s. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
+| Date | 2026-11-13 |
+| Environment | Local Compose. PostgreSQL, MinIO, Trino, and Airflow on the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` |
+| Checks | `transform_lakehouse` and `reconcile_gold` runs. Trino anchors compared with P2-09. The `live-*` and dbt Make targets on the same image |
+| Result | `transform_lakehouse` `success`, every task on attempt 1: Bronze 18/18 checks, Silver 20/20, quarantine 1_603, `dbt build` PASS=287. `reconcile_gold` PASS=56. Silver and Gold anchors match P2-09. Make targets exited 0 with the same results. `uv run pytest tests/unit` → 348 passed. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 
 ---
 
@@ -119,10 +117,10 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 
 | ID | Relevance | State |
 | --- | --- | --- |
-| D-006 | Airflow 3.4 LocalExecutor; task logs in MinIO; Celery and Flower are not a follow-up | `approved` |
+| D-006 | Airflow 3.4 LocalExecutor on `odp-runtime:airflow3.4.0-spark3.5.8`; task logs in MinIO; Celery and Flower are not a follow-up | `approved` |
 | D-007 | Daily and weekly windows. The extract exists (P1-06). Schedules do not | `proposed` |
 | D-014 | CDC does not replace daily or weekly batch | `proposed` |
-| D-005 | DAGs call Spark Bronze/Silver and dbt-trino Gold. They do not reimplement them | Approved |
+| D-005 | DAGs call Spark Bronze/Silver and dbt-trino Gold. They do not reimplement them. Addendum: one runtime image runs Airflow, Spark, and dbt | Approved (addendum 2026-11-13) |
 | D-013 | Invalid rows stay visible. Reprocessing quarantined source rows is P3-07 | Approved |
 
 ---
@@ -146,7 +144,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-02 verified) |
+| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-03 verified) |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
@@ -159,7 +157,9 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 ## Risks and limitations
 
 - D-006 is `approved`. D-007 is still `proposed`. The daily and weekly schedules are not built.
-- `docker compose --profile orchestration stop` with no service names also stops PostgreSQL and MinIO. Stop the three Airflow services by name. Spark and Trino are on the `lakehouse` profile and stay up.
+- `docker compose --profile orchestration stop` with no service names also stops PostgreSQL and MinIO. Stop the three Airflow services by name. The `spark` and Trino services are on the `lakehouse` profile and stay up.
+- Spark `local[*]` runs inside the Airflow scheduler container and shares its CPU and memory. A full `transform_lakehouse` run took 10 min 12 s; the 30-minute timeout applies per task.
+- `reconcile_gold` does not wait for `transform_lakehouse`. A run that overlaps a rebuild can read a table being replaced. The weekly reconciliation took 590 s.
 - A Phase 3 schedule would call the current full rebuild of Bronze, Silver, and Gold. That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
 - Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
@@ -187,6 +187,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-13 — P3-03 verified
+
+`transform_lakehouse` runs Bronze → checks → Silver → checks → quarantine staging → `dbt build` through `open_data_platform.lakehouse.medallion_build`, the same module the `live-*` Make targets call. `reconcile_gold` runs the 56 reconciliation tests weekly. One runtime image now holds Airflow, Spark, and dbt; `spark:3.5.8-java17` is a build stage only and dbt is off the host. DAG run: Bronze 18/18, Silver 20/20, quarantine 1_603, PASS=287, reconciliation PASS=56, anchors equal to P2-09. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Next issue is P3-04.
 
 ### 2026-11-12 — P3-02 verified
 

@@ -4,6 +4,16 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-13 — P3-03 transform and reconciliation DAGs
+
+One runtime image, `odp-runtime:airflow3.4.0-spark3.5.8` (`docker/runtime`), runs Airflow `3.4.0`, Spark `3.5.8` with Temurin JRE `17.0.20` copied from the digest-pinned `spark:3.5.8-java17`, and dbt Core `1.12.6` with dbt-trino `1.11.0` in `/opt/dbt-venv`. The Airflow services and the lakehouse `spark` service use it. No service runs `spark:3.5.8-java17`, and the host no longer installs dbt (`uv.lock` group `dbt`, exported with hashes to `docker/runtime/dbt-requirements.txt`). ADR-0005 addendum approved after the DAG runs. D-006 names the new image.
+
+`python -m open_data_platform.lakehouse.medallion_build <step>` renders SQL, runs `run_bronze.sh` or `run_silver.sh` once per file, checks Trino, or runs dbt. `make live-bronze`, `make live-silver`, `make live-gold`, the dbt targets, and both DAGs call it. `transform_lakehouse` (no schedule): `bronze` → `bronze_checks` → `silver` → `silver_checks` → `stage_quarantine` → `dbt_build`. `reconcile_gold` (`@weekly`): `dbt_reconcile`. Tasks reuse the P3-02 retries 2, 2-minute delay, and 30-minute timeout.
+
+`transform_lakehouse` run `manual__2026-11-14T03:25:52.218916+00:00` (UTC) finished `success` in 10 min 12 s, every task on attempt 1: Bronze 18 Spark files and 18/18 checks, Silver 18 files and 20/20 checks, quarantine 1_603, `dbt build` PASS=287. `reconcile_gold` run `manual__2026-11-14T03:36:32.717852+00:00` PASS=56 in 590 s. Silver geolocation 738_332, Silver postgres_oltp 2/2/2/3, `mart_late_orders` 6_534, on-time 89_936 / 96_470, `dim_customers` 96_096, `dim_zip_prefix` 19_015, `dim_date` 3_774, `dim_municipality` 5_571, and 55 Gold tables match P2-09. Bronze geolocation is 2_000_326 because the raw prefix holds two Olist executions; Bronze checks compare with the raw read of the same run. The Make targets on the same image exited 0 with the same check results. Task logs did not contain the MinIO password, the Fernet key, or the JWT secret.
+
+`DagBag` unit tests load all ten DAGs with zero import errors. `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 348 passed. Detail: [`docs/architecture/airflow-local.md`](architecture/airflow-local.md).
+
 ### 2026-11-12 — P3-02 ingestion DAG wrappers
 
 Airflow DAGs call the Phase 1 ingestion CLIs with `python -m` and an argument vector. The stock image `apache/airflow:3.4.0-python3.12` already imports `boto3` 1.43.117, `psycopg` 3.3.6, and `yaml` 6.0.3, so no custom image was built. Compose mounts `src/`, `config/`, `pyproject.toml`, `tests/fixtures`, and `data/raw` at `/opt/odp/repo` and sets `PYTHONPATH=/opt/odp/repo/src`. Inside those containers `POSTGRES_HOST=postgres`, `POSTGRES_PORT=5432`, `POSTGRES_DB=odp`, and `MINIO_ENDPOINT_URL=http://minio:9000`. Metadata stays on database `airflow`. `airflow-db-create` remains a client of the same PostgreSQL server.

@@ -206,3 +206,38 @@ docker compose --profile orchestration exec -T airflow-scheduler \
 
 `tests/unit/infrastructure/test_dagbag.py` loads `airflow/dags` with the pinned Airflow in a `DagBag`. It checks zero import errors, the ten DAG ids, the task order, the shared retries and timeout, and the entrypoint of each task. Success, retry, and failed-run behavior on a live scheduler is P3-09.
 
+## Verification (2026-11-13, P3-03)
+
+Local Compose with PostgreSQL, MinIO, Trino, and the three Airflow services on `odp-runtime:airflow3.4.0-spark3.5.8`. `airflow dags list` showed `transform_lakehouse` and `reconcile_gold`. `airflow dags list-import-errors` returned no data. Times are UTC, as Airflow records them.
+
+`transform_lakehouse` run `manual__2026-11-14T03:25:52.218916+00:00` finished `success` in 10 min 12 s. Each task succeeded on attempt 1.
+
+| Task | Duration | Result |
+| --- | --- | --- |
+| `bronze` | 5 min 05 s | Catalog database present. 18 Spark files |
+| `bronze_checks` | 1 s | 18 of 18 Trino counts equal to the raw read of this run |
+| `silver` | 4 min 07 s | 18 Spark files |
+| `silver_checks` | 3 s | 20 of 20 checks `ok` |
+| `stage_quarantine` | 14 s | 1_603 findings staged |
+| `dbt_build` | 31 s | PASS=287 WARN=0 ERROR=0 (55 table models, 232 schema tests) |
+
+`reconcile_gold` run `manual__2026-11-14T03:36:32.717852+00:00` ran after that build and finished `success`: PASS=56 WARN=0 ERROR=0 in 590 s, inside the 30-minute task timeout. When the DAG first appeared, the scheduler also started `scheduled__2026-11-08T00:00:00+00:00` on its own, as described above. That run passed 56 of 56 against the Gold built before this issue.
+
+Trino after the DAG run, compared with [P2-09](phase-2-live-run.md):
+
+| Anchor | P2-09 | P3-03 DAG run |
+| --- | --- | --- |
+| Silver geolocation | 738_332 | 738_332 |
+| Silver postgres_oltp customers / orders / items / sellers | 2 / 2 / 2 / 3 | 2 / 2 / 2 / 3 |
+| `mart_late_orders` | 6_534 | 6_534 |
+| On-time / eligible | 89_936 / 96_470 | 89_936 / 96_470 |
+| `dim_customers` / `dim_zip_prefix` / `dim_date` / `dim_municipality` | 96_096 / 19_015 / 3_774 / 5_571 | same |
+| Quarantine findings staged | 1_603 | 1_603 |
+| Gold tables | 55 | 55 |
+| `dbt build` / reconciliation | PASS=287 / PASS=56 | PASS=287 / PASS=56 |
+
+Bronze row counts are not the P2-09 values. Bronze geolocation is 2_000_326, against 1_000_163 in P2-09. The raw prefixes now hold two Olist executions (`run-001` and the P3-02 Airflow run), and Bronze keeps every execution under a prefix. `bronze_checks` compares with the raw read of the same run, and Silver dedup returns the P2-09 counts.
+
+The Make path calls the same steps. `make live-bronze` (323 s, 18/18 checks), `make live-silver` (241 s, 20/20), `make live-gold` (43 s, quarantine 1_603 and PASS=287), and `make dbt-test-reconciliation` (558 s, PASS=56) exited 0. `make test-iceberg-poc` printed `2`. `make test-catalog-probe` printed Spark `2` and Trino `"2"`. `make dbt-parse` and `make spark-ivy-warm` exited 0 in the runtime image with the existing `.local/spark-ivy` cache.
+
+The seven task logs in MinIO did not contain the MinIO password, the Fernet key, or the JWT secret. `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 348 passed.

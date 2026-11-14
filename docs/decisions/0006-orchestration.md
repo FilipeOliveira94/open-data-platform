@@ -19,7 +19,7 @@ Validated batch flows need scheduling, retries, dependencies, backfills and clea
 
 Use **Apache Airflow (OSS)** in local Docker Compose for orchestration. Document **Amazon MWAA** and **AWS Step Functions** as optional AWS counterparts for the IaC case study—not required core modules in Phase 7.
 
-The local topology is one pinned image, `apache/airflow:3.4.0-python3.12`, and **LocalExecutor**. The long-running processes are the API server, the scheduler, and the dag processor, on the Compose profile `orchestration`. The metadata database is `airflow` on the existing PostgreSQL 16. Finished task logs are objects in the MinIO bucket `odp-airflow-logs`.
+The local topology is one pinned image and **LocalExecutor**. P3-01 used `apache/airflow:3.4.0-python3.12` directly. Since P3-03 the services run `odp-runtime:airflow3.4.0-spark3.5.8`, built on that image with Spark and dbt added ([ADR-0005](0005-compute-and-transform.md) addendum). The long-running processes are the API server, the scheduler, and the dag processor, on the Compose profile `orchestration`. The metadata database is `airflow` on the existing PostgreSQL 16. Finished task logs are objects in the MinIO bucket `odp-airflow-logs`.
 
 CeleryExecutor, Redis, and Flower are not part of this platform and are not a planned follow-up. DAG tasks stay thin wrappers. Compute stays in Spark, Trino, and dbt. A Celery worker on the same Compose host does not add a machine. Flower would duplicate the Airflow UI and the Phase 5 Grafana role. Redis after 7.2 is not OSI-licensed.
 

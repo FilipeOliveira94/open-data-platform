@@ -41,7 +41,7 @@ P2-06 (2026-11-06): Gold models run with **dbt-trino** `1.11.0` (dbt Core `1.12.
 
 ## Addendum (2026-11-13, P3-03): one runtime image
 
-**Status:** evaluated during P3-03 and accepted in this form. Approval is recorded here and in `DECISIONS.md` after the transform DAGs run on this runtime. Evaluated because Airflow had to call Spark and dbt. The decision is unchanged: Spark writes Bronze and Silver, dbt-trino builds Gold. This addendum changes where they run.
+**Status:** `approved` on 2026-11-13, after the transform DAGs ran on the new runtime. Evaluated during P3-03 because Airflow had to call Spark and dbt. The decision is unchanged: Spark writes Bronze and Silver, dbt-trino builds Gold. This addendum changes where they run.
 
 **Previous implementation.** Make ran each Spark step in a Compose `spark` service on `spark:3.5.8-java17`, one `docker compose run` per SQL file, after the host rendered the SQL with `uv run python`. dbt-trino was a host dev dependency and `make dbt-build` ran `uv run dbt` against `localhost:8080`. The Airflow image had no Java, Spark, dbt, or Docker access, so a DAG could not call either tool without a second install or the Docker socket.
 
@@ -50,6 +50,8 @@ P2-06 (2026-11-06): Gold models run with **dbt-trino** `1.11.0` (dbt Core `1.12.
 **Why.** One Spark and one dbt install for the whole project, so Make and Airflow cannot drift. No Docker socket in Airflow, which would give the scheduler root-equivalent access to the host. No Spark Thrift or Connect server, which would add a long-running service. The Spark bits are the ones Phase 2 validated.
 
 **Cost.** The image is larger. `docker image inspect` reported 4_839_671_587 bytes for the runtime image and 3_247_536_551 bytes for `apache/airflow:3.4.0-python3.12` on 2026-11-13. Inside the image, `/opt/spark` is 350 MiB and the JRE 269 MiB (`du -sh`). Spark `local[*]` runs in the scheduler container and shares its CPU and memory with Airflow. The Spark and dbt pins now live in the Dockerfile and `uv.lock` instead of a Compose image tag and the host venv.
+
+**Evidence.** 2026-11-13 on local Compose: `transform_lakehouse` run `manual__2026-11-14T03:25:52.218916+00:00` (UTC) finished all six tasks `success` on attempt 1. Bronze 18/18 checks, Silver 20/20, quarantine 1_603, `dbt build` PASS=287. `reconcile_gold` run `manual__2026-11-14T03:36:32.717852+00:00` PASS=56. Silver and Gold anchors match P2-09. The `live-*` and dbt Make targets on the same image exited 0. Detail: [Local Airflow](../architecture/airflow-local.md).
 
 ## Revisit when
 
