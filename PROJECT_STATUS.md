@@ -152,7 +152,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 7 | AWS path as Terraform IaC | Not started |
 | 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–7) |
 | 9 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
-| 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3 and contract-watcher `0.1.0`) |
+| 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3; contract-watcher `0.1.0` (CW-16) from P10-06 onward) |
 
 ---
 
