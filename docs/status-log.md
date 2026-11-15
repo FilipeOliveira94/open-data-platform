@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-15 — Phase 10 added to the roadmap
+
+`ROADMAP.md` gains Phase 10, Table contracts and quality observability, with P10-01–P10-12, all `not started`. Table contracts are ODCS v3.2.0 and run through [contract-watcher](https://github.com/FilipeOliveira94/contract-watcher), a kit in its own repository. The phase depends on Phase 3 verified and on the kit's `0.1.0` release (CW-16, which depends on CW-17). Its position in the roadmap is not fixed; the PO decides it during execution, toward the end. The source for the SLAs is BCB SGS series 1 and 11, with freshness and volume on a business-day calendar. ADR-0022 and ADR-0023 are the deliverables of P10-01 and P10-02 and do not exist yet. `PROJECT_STATUS.md` gains one row in the program table; Phase 3 and Next work are unchanged. Documentation only. `uv run ruff check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 348 passed.
+
 ### 2026-11-14 — Review fixes for the AGENTS.md consolidation
 
 The git policy (local Conventional Commits on `main`, never push) moved from `CLAUDE.md` into `AGENTS.md` §13 Git, so tools that read only `AGENTS.md` get it; `CLAUDE.md` now holds only `@AGENTS.md`. The entry below that says `CLAUDE.md` adds the git policy describes the state before this change. `ROADMAP.md` (verified status) and `DECISIONS.md` (Implemented column) now say evidence is recorded in the architecture doc or ADR and in `docs/status-log.md`, and `PROJECT_STATUS.md` summarizes it, matching `AGENTS.md` §3. `docs/agent-workflow.md`: the plan prompt also asks which §8 Runtime data exposure rules the issue touches, the implement prompt says not to commit, and the prompts cite §12 "Issue Close Checklist" by its heading. Documentation only. `uv run ruff check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 348 passed.
