@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-15 (Phase 10 added to `ROADMAP.md`; no change to Phase 3 or to Next work) |
+| Last updated | 2026-11-15 (Phase 10 switched from contract-watcher to Data Contract CLI in `ROADMAP.md`; no change to Phase 3 or to Next work) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -152,7 +152,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 7 | AWS path as Terraform IaC | Not started |
 | 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–7) |
 | 9 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
-| 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3; contract-watcher `0.1.0` (CW-16) from P10-06 onward) |
+| 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3) |
 
 ---
 
