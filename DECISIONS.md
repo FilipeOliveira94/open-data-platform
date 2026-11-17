@@ -2,7 +2,7 @@
 
 Short index of architecture choices for the Open Data Platform. **Rationale, alternatives, consequences and evidence live in ADRs** under [`docs/decisions/`](docs/decisions/).
 
-| | |
+| Decision log | Reference |
 | --- | --- |
 | Owns | Decision index and status |
 | Detail | [`docs/decisions/`](docs/decisions/) (one ADR per decision) |

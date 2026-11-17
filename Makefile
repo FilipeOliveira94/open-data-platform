@@ -35,8 +35,9 @@ setup: sync ## Install Python 3.12 toolchain and package (via uv)
 sync: ## Sync dependencies from uv.lock
 	$(UV) sync
 
-lint: ## Run Ruff linter
+lint: ## Run Ruff linter and check Markdown tables for an empty header
 	$(RUFF) check src tests airflow docker/airflow
+	python3 scripts/check_markdown_tables.py
 
 format: ## Format with Ruff
 	$(RUFF) format src tests airflow docker/airflow

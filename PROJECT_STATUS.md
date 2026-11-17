@@ -2,7 +2,7 @@
 
 Operational ledger for the **current phase**. Issue backlog and acceptance text live in [`ROADMAP.md`](ROADMAP.md). Full decision index: [`DECISIONS.md`](DECISIONS.md). Chronological archive: [`docs/status-log.md`](docs/status-log.md).
 
-| | |
+| Project | Current |
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
@@ -66,7 +66,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 ## Latest validation
 
-| | |
+| Validation | Detail |
 | --- | --- |
 | Date | 2026-11-13 |
 | Environment | Local Compose. PostgreSQL, MinIO, Trino, and Airflow on the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` |

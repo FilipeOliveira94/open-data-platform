@@ -2,7 +2,7 @@
 
 Each lakehouse Spark script still uses `--packages` with the same pins as P2-01 / P2-02 / P2-03 / P2-04. The `spark` service and the Airflow services mount the same **host directory** so Ivy artifacts survive `docker compose run --rm`. Since P3-03 all of them run the shared runtime image (`docker/runtime`).
 
-| | |
+| Cache | Setting |
 | --- | --- |
 | Host path | `.local/spark-ivy/` (gitignored under `.local/`) |
 | Container path | `/tmp/.ivy2` (`spark.jars.ivy`) |

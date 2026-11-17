@@ -2,7 +2,7 @@
 
 P3-01 runs Apache Airflow on the Compose `orchestration` profile. `docker compose up` still starts only PostgreSQL and MinIO.
 
-| | |
+| Component | Setting |
 | --- | --- |
 | Image | `odp-runtime:airflow3.4.0-spark3.5.8`, built from `docker/runtime` on `apache/airflow:3.4.0-python3.12` (P3-03). P3-01 and P3-02 ran the upstream image directly |
 | Executor | `LocalExecutor` |

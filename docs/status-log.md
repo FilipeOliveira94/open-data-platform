@@ -4,6 +4,12 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-17 — Markdown tables name their columns
+
+8 key and value tables had an empty header row (`| | |`), which GFM renders as a blank row on top. Each now has a header drawn from its context (`Project | Current`, `Validation | Detail`, `Decision log | Reference`, `Document | Reference`, `ADRs | Location`, `Component | Setting`, `Cache | Setting`). `scripts/check_markdown_tables.py` fails on an empty header row in any tracked Markdown file, outside fenced code; `make lint` and CI run it. AGENTS.md §9 states the rule.
+
+---
+
 ### 2026-11-15 — Phase 10 switched to Data Contract CLI
 
 The contract-watcher project was cancelled and its repository deleted, so the link in the entry below no longer resolves. Phase 10 keeps ODCS v3.2.0 table contracts and now lints and runs them with Data Contract CLI (`datacontract-cli`, MIT; `1.2.10` on PyPI on 2026-11-15, ODCS v3.2.0 since `1.2.0`). `soda-core` was set aside because v4 is not Apache-2.0 (Elastic License 2.0 in its repository) and does not read ODCS; `great_expectations` because it does not read ODCS. The library has no business-day calendar, result history, or alert deduplication: P10-06 adds `data_quality.business_days` and `type: sql` rules, P10-07 stores the library's JSON results, and P10-09 computes alert state. CW-16 and CW-17 are no longer dependencies; P10-07 now follows P10-06. P10-01 gains a proof of concept and still delivers ADR-0022, which does not exist yet. Documentation only. `uv run pytest tests/unit` → 348 passed.

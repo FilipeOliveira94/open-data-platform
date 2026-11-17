@@ -116,6 +116,7 @@ Query text, process arguments, and driver logs are logs too.
 - Distinguish code validation, integration validation and real end-to-end execution.
 - If a dependency or external service is unavailable, report the limitation rather than inventing a successful result.
 - Test failure recovery and idempotency, not only the happy path.
+- Markdown: every table has a header row that names its columns, drawn from context (`Issue P2-08 | Detail`, `Validation | Detail`). Never an empty `| | |` header, which GFM renders as a blank row on top. `make lint` checks it.
 
 ## 10. Scope Control
 

@@ -538,7 +538,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Document control
 
-| | |
+| Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
 | Last updated | 2026-11-15 |
