@@ -26,11 +26,13 @@ For each task:
 2. Read `PROJECT_STATUS.md`, `ROADMAP.md` and relevant ADRs when they exist.
 3. Check the relevant roadmap item. Identify dependencies, assumptions, risks and acceptance criteria.
 4. For non-trivial work, propose a short implementation plan before editing files.
-5. Implement the smallest coherent increment.
+5. Implement the smallest coherent increment. When extracting repeated logic or choosing module boundaries (ingestion sources, Spark jobs, statement builders), use the `code-structure` skill; the principles in §4 take precedence.
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
 8. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
-9. Summarize changed files, commands executed, test results, limitations and the next step.
+9. Commit locally, then tell the PO and the Reviewer it is ready for review: the hash of the last local commit, changed files, commands executed, test results, limitations and the next step.
+10. PO and Reviewer review and approve the same version: the hash of the last local commit. Any objection blocks. Each fix (new commits, checks rerun, new signal) is a round. After two rounds of disagreement, Filipe decides.
+11. Small change (docs, text, config tweak, patch dependency bump, or a contained bugfix of up to ~50 lines in up to 3 files that touches no architecture, data model/schema, auth/security, infra/deploy, public API or pipeline logic; when in doubt, it is large; the Dev classifies it on delivery): PO approval is enough.
 
 Do not mark a task complete unless its acceptance criteria have been verified.
 
@@ -154,7 +156,8 @@ Prompts for planning, implementing and closing an issue are in `docs/agent-workf
 
 ## 13. Git
 
-- Commit locally only. Never run `git push`; Filipe reviews and pushes.
+- Filipe's order to implement authorizes the dev to commit locally. The dev never pushes.
+- Pushing `main` is the Reviewer's job, only after Filipe's explicit yes. Filipe may push himself or order a specific bot to do it. For a small change, the Reviewer pushes without reviewing.
 - Use Conventional Commits directly on `main`.
 
 AGENTS.md is the single source; CLAUDE.md imports it.
