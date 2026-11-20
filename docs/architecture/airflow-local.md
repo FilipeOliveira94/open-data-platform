@@ -86,7 +86,7 @@ Inside the Airflow containers, `POSTGRES_HOST` is `postgres` and `POSTGRES_PORT`
 
 Kaggle credentials are the container variables `KAGGLE_API_TOKEN`, `KAGGLE_USERNAME`, and `KAGGLE_KEY`. They are not task arguments.
 
-Each ingestion task runs `python` with an argument vector and `cwd=/opt/odp/repo`. There is no shell. Retries are 2, the delay is 2 minutes, and the execution timeout is 30 minutes. `schedule` is `None` and `catchup` is false; `ingest_postgres_oltp_daily` (P3-04) is the one scheduled ingestion DAG. `airflow/dags/ingest_common.py` holds the task defaults and is listed in `.airflowignore`.
+Each ingestion task runs `python` with an argument vector and `cwd=/opt/odp/repo`. There is no shell. Retries are 2, the delay is 2 minutes, and the execution timeout is 30 minutes. `schedule` is `None` and `catchup` is false; `ingest_postgres_oltp_daily` (P3-04) is the one scheduled ingestion DAG, and it catches up missed days. `airflow/dags/ingest_common.py` holds the task defaults and is listed in `.airflowignore`.
 
 Since P3-04 `run_python_args` starts the child with `start_new_session=True`, so the child and everything it starts (`spark-sql`, Java, dbt) share one process group. When the wait ends, normally or through an exception, the group gets `SIGTERM`; whatever is left after 10 seconds gets `SIGKILL`. The Airflow task timeout (`AirflowTaskTimeout`) and the Airflow kill (`AirflowTaskTerminated`) both derive from `BaseException` in Airflow 3.4 and arrive while the task waits, so they take the same path. `tests/unit/infrastructure/test_run_python_args.py` checks that no child or grandchild survives a timeout, a grandchild that ignores `SIGTERM`, another exception, a non-zero exit, and a zero exit that leaves a grandchild behind.
 
@@ -276,7 +276,7 @@ The seven task logs in MinIO did not contain the MinIO password, the Fernet key,
 | --- | --- |
 | Timetable | `CronDataIntervalTimetable("0 0 * * *", timezone="UTC")` |
 | Window | The run's data interval, `[data_interval_start, data_interval_end)` = `[D-1 00:00Z, D 00:00Z)` for the run at `D 00:00Z` (21:00 in Brasília) |
-| Catchup | `False`. When the DAG is unpaused, the scheduler creates one run for the last complete day |
+| Catchup | `True`, `start_date` 2026-11-19. After a pause or a scheduler outage, the scheduler creates one run per missed day, oldest first, one at a time. On a fresh database the first run is the 2026-11-19 window. Days before `start_date` are a backfill (P3-06). Until 2026-11-20 05:20Z the DAG had `catchup=False`; the live run below used that setting |
 | `max_active_runs` | 1 |
 | Paused at creation | Yes |
 | Params | `execution_id` only. No window params |
@@ -301,6 +301,8 @@ Idempotency:
 
 - A retry or a cleared task keeps the run id, so `execution_id` stays the same. The extract overwrites the same raw keys while the ingestion date is the same. `trigger_transform` resets the transform run with the same id (`reset_dag_run=True`), so it does not create a second one.
 - A new run of the same window, for example a manual trigger on the same day as the scheduled run, has a new run id. It writes a new execution next to the previous one. Bronze keeps both and Silver deduplicates by key. This is the P3-02 rule: a new run keeps the previous raw object.
+- No window is skipped. The window comes only from the schedule and no watermark is stored, so with `catchup=False` a day the scheduler missed would never be extracted, without any error. `catchup=True` closes that gap. A record of covered windows and a gap report are P3-06.
+- Every caught-up run triggers `transform_lakehouse`. Until the lakehouse refresh is incremental and coalesced (P3-13), N missed days queue N full rebuilds.
 - The `dt=` segment is the real ingestion date. A retry that crosses UTC midnight writes the same window under the next `dt`. The content is the same and Silver deduplicates it.
 
 Late commits are accepted and documented. A row whose `updated_at` falls before midnight but whose transaction commits after the 00:00Z run is not in that day's window. The weekly window (P3-05) and backfills (P3-06) are the safety net. Streaming CDC (Phase 4) is the exact path.

@@ -12,7 +12,12 @@ does not wait for it. Clearing that task resets the same transform run
 instead of creating a second one. The manual ``ingest_postgres_oltp`` DAG
 does not trigger the transform.
 
-``catchup`` is false. Older windows are a backfill (P3-06). A run that is
+``catchup`` is true. The window comes only from the schedule, so a day
+the scheduler did not run (DAG paused, scheduler down) would otherwise
+never be extracted. With catchup, the scheduler creates one run per
+missed interval since the last automated run, oldest first, one at a time
+(``max_active_runs=1``). ``START_DATE`` is the first window this DAG
+covers; windows before it are a backfill (P3-06). A run that is
 re-executed keeps its run id, so the extract overwrites the same raw keys
 on the same ingestion date. A new run of the same window writes a new
 execution, and Silver deduplicates by key.
@@ -20,7 +25,7 @@ execution, and Silver deduplicates by key.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sdk import DAG, CronDataIntervalTimetable
@@ -28,6 +33,9 @@ from ingest_common import DEFAULT_ARGS, execution_id_param, postgres_extract_tas
 
 DAG_ID = "ingest_postgres_oltp_daily"
 TRANSFORM_DAG_ID = "transform_lakehouse"
+# First daily window: [2026-11-19, 2026-11-20). Each missed day after it is
+# caught up; earlier days are a backfill.
+START_DATE = datetime(2026, 11, 19, tzinfo=UTC)
 
 # A run without a data interval renders an empty bound, and the extract
 # fails on it before it connects.
@@ -36,9 +44,9 @@ WINDOW_END = "{{ data_interval_end.isoformat() if data_interval_end else '' }}"
 
 with DAG(
     dag_id=DAG_ID,
-    start_date=datetime(2026, 1, 1),
+    start_date=START_DATE,
     schedule=CronDataIntervalTimetable("0 0 * * *", timezone="UTC"),
-    catchup=False,
+    catchup=True,
     max_active_runs=1,
     is_paused_upon_creation=True,
     default_args=DEFAULT_ARGS,

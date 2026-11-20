@@ -4,6 +4,12 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-20 — P3-04 catchup corrected
+
+A review after P3-04 found that `catchup=False` loses windows. The daily window comes only from the schedule and no watermark is stored, so a day the scheduler did not run (DAG paused, scheduler down) would never be extracted, and nothing would fail. `ingest_postgres_oltp_daily` now sets `catchup=True` with `start_date` 2026-11-19, the first window it ran. After a gap the scheduler runs each missed day, oldest first, one at a time. A DagBag test walks three missed days after the 2026-11-19 run and checks that the first run on a fresh database is the 2026-11-19 window. After `airflow dags reserialize`, the live DAG reported its next data interval as `2026-11-20T00:00Z` → `2026-11-21T00:00Z`, with no import errors. A gap filled on a live scheduler is not yet recorded; that is the Phase 3 live run. Each caught-up day still triggers a full `transform_lakehouse` rebuild. The P3-04 live run below used `catchup=False`.
+
+---
+
 ### 2026-11-20 — P3-04 daily PostgreSQL schedule
 
 `ingest_postgres_oltp_daily` uses `CronDataIntervalTimetable("0 0 * * *", "UTC")`, `catchup=False`, and `max_active_runs=1`. The extract renders `--window-start`/`--window-end` from `data_interval_start`/`data_interval_end`, and `execution_id` stays `params.execution_id or run_id`. After a successful extract, `TriggerDagRunOperator` starts `transform_lakehouse` with run id `ingest_postgres_oltp_daily__<run_id>`, `reset_dag_run=True`, `wait_for_completion=False`, and `fail_when_dag_is_paused=True`. The manual `ingest_postgres_oltp` DAG does not trigger it. The extract vector moved to `postgres_extract_task` in `ingest_common.py`. Late commits after the 00:00Z run miss the daily window; P3-05, P3-06, and CDC (Phase 4) cover that. The P3-04 acceptance now includes the transform trigger.

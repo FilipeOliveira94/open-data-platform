@@ -7,7 +7,7 @@ the DagBag does not touch. Run behavior (success, retry, failure) is P3-09.
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -91,7 +91,8 @@ def test_every_dag_imports_without_errors(dagbag) -> None:
 def test_wrapper_tasks_share_the_p3_02_defaults(dagbag) -> None:
     for dag_id in EXPECTED_DAGS - {"platform_health"}:
         dag = dagbag.dags[dag_id]
-        assert dag.catchup is False
+        # The daily extract catches up missed windows (P3-04).
+        assert dag.catchup is (dag_id == DAILY)
         for task in dag.tasks:
             assert task.retries == 2, (dag_id, task.task_id)
             assert task.retry_delay == timedelta(minutes=2)
@@ -188,7 +189,7 @@ def _core_timetable(dag):
     return coerce_to_core_timetable(dag.timetable)
 
 
-def test_daily_dag_runs_at_utc_midnight_without_catchup(dagbag) -> None:
+def test_daily_dag_runs_at_utc_midnight_with_catchup(dagbag) -> None:
     from airflow.timetables.interval import CronDataIntervalTimetable
 
     dag = dagbag.dags[DAILY]
@@ -196,7 +197,8 @@ def test_daily_dag_runs_at_utc_midnight_without_catchup(dagbag) -> None:
     assert isinstance(timetable, CronDataIntervalTimetable)
     assert timetable.summary == "0 0 * * *"
     assert str(timetable._timezone) == "UTC"
-    assert dag.catchup is False
+    assert dag.catchup is True
+    assert dag.start_date == datetime(2026, 11, 19, tzinfo=UTC)
     assert dag.max_active_runs == 1
     assert set(dag.params.keys()) == {"execution_id"}
     assert dag.task_ids == ["extract", "trigger_transform"]
@@ -231,6 +233,40 @@ def test_daily_intervals_are_one_utc_day(dagbag) -> None:
         manual = timetable.infer_manual_data_interval(run_after=run_after)
         assert manual.start == pendulum.datetime(2026, 11, 19, tz=utc)
         assert manual.end == pendulum.datetime(2026, 11, 20, tz=utc)
+
+
+def test_daily_dag_runs_every_missed_window_in_order(dagbag) -> None:
+    """After a gap the next run is the first missed day, not the latest one."""
+    import pendulum
+    from airflow.timetables.base import DataInterval, TimeRestriction
+
+    dag = dagbag.dags[DAILY]
+    timetable = _core_timetable(dag)
+    utc = pendulum.timezone("UTC")
+    restriction = TimeRestriction(
+        earliest=pendulum.instance(dag.start_date), latest=None, catchup=dag.catchup
+    )
+    # Last automated run covered 2026-11-19; the scheduler was away for days.
+    last = DataInterval(
+        pendulum.datetime(2026, 11, 19, tz=utc), pendulum.datetime(2026, 11, 20, tz=utc)
+    )
+    seen = []
+    for _ in range(3):
+        info = timetable.next_dagrun_info(
+            last_automated_data_interval=last, restriction=restriction
+        )
+        seen.append((info.data_interval.start.date(), info.data_interval.end.date()))
+        last = info.data_interval
+    assert [(str(start), str(end)) for start, end in seen] == [
+        ("2026-11-20", "2026-11-21"),
+        ("2026-11-21", "2026-11-22"),
+        ("2026-11-22", "2026-11-23"),
+    ]
+    # The first run on a fresh database is the start_date window.
+    first = timetable.next_dagrun_info(
+        last_automated_data_interval=None, restriction=restriction
+    )
+    assert first.data_interval.start == pendulum.datetime(2026, 11, 19, tz=utc)
 
 
 def _render_extract(dag, context: dict[str, object]) -> list[str]:

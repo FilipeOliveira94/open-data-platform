@@ -93,7 +93,7 @@ def test_execution_id_defaults_to_the_airflow_run() -> None:
 def test_daily_extract_dag_derives_the_window_and_triggers_the_transform() -> None:
     text = _text("ingest_postgres_oltp_daily.py")
     assert 'CronDataIntervalTimetable("0 0 * * *", timezone="UTC")' in text
-    assert "catchup=False" in text
+    assert "catchup=True" in text
     assert "is_paused_upon_creation=True" in text
     assert "data_interval_start.isoformat()" in text
     assert "data_interval_end.isoformat()" in text
