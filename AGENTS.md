@@ -30,9 +30,8 @@ For each task:
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
 8. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
-9. Commit locally, then tell the PO and the Reviewer it is ready for review: the hash of the last local commit, changed files, commands executed, test results, limitations and the next step.
-10. PO and Reviewer review and approve the same version: the hash of the last local commit. Any objection blocks. Each fix (new commits, checks rerun, new signal) is a round. After two rounds of disagreement, Filipe decides.
-11. Small change (docs, text, config tweak, patch dependency bump, or a contained bugfix of up to ~50 lines in up to 3 files that touches no architecture, data model/schema, auth/security, infra/deploy, public API or pipeline logic; when in doubt, it is large; the Dev classifies it on delivery): PO approval is enough.
+9. Commit locally on `main` (see §13), then report to Filipe: the hash of the last local commit, changed files, commands executed, test results, limitations and the next step.
+10. Filipe reviews that commit and publishes it. When he asks, the Reviewer de Projetos bot opens a T3 thread where Claude reviews the commit and summarizes the verdict; Filipe decides.
 
 Do not mark a task complete unless its acceptance criteria have been verified.
 
@@ -156,8 +155,18 @@ Prompts for planning, implementing and closing an issue are in `docs/agent-workf
 
 ## 13. Git
 
-- Filipe's order to implement authorizes the dev to commit locally. The dev never pushes.
-- Pushing `main` is the Reviewer's job, only after Filipe's explicit yes. Filipe may push himself or order a specific bot to do it. For a small change, the Reviewer pushes without reviewing.
+Roles (simplified flow, in force since 2026-11-20):
+
+- **Filipe** asks for status, picks the issue, reviews the work, publishes it, and makes final decisions.
+- **Claude in T3 Code** (Claude Opus 5.5) implements each issue: plan, implement, run checks and tests, commit. Fallback: Grok 4.7 through the Cursor provider in T3, only when the Claude Pro limit runs out. The agent never merges.
+- **PO de Projetos** (bot), only when Filipe asks: status, sending an issue to T3, summarizing what was done after it lands, product view.
+- **Reviewer de Projetos** (bot), only when Filipe asks, for a harder change: opens a T3 thread where Claude reviews it, and summarizes the verdict. It never merges, pushes or deletes branches.
+
+There is no double PO and Reviewer approval, no per-project dev, and no bot that pushes `main`.
+
+Repository exception: the default flow elsewhere is a new branch from an updated `main`, push of the branch and a PR that Filipe merges. This repository keeps Conventional Commits directly on local `main` instead: the agent creates no branch and no PR, and never pushes. Filipe pushes `main`.
+
+- Filipe's order to implement authorizes the agent to commit locally on `main`.
 - Use Conventional Commits directly on `main`.
 
 AGENTS.md is the single source; CLAUDE.md imports it.

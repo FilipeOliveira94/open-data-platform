@@ -61,6 +61,6 @@ Return a concise completion report, the commit SHA, and the next smallest useful
 
 ---
 
-## Fallback to another tool (e.g. Cursor)
+## Fallback model
 
-Paste the same three prompts into the other tool. Point it at `AGENTS.md`; do not keep that tool's own rule files in the repository, so the rules have one source. The git policy is in AGENTS.md §13, so the other tool gets it too.
+The default implementer is Claude Opus 5.5 in T3 Code. When the Claude Pro limit runs out, use Grok 4.7 through the Cursor provider in T3. Paste the same three prompts. Point it at `AGENTS.md`; do not keep that tool's own rule files in the repository, so the rules have one source. The git policy is in AGENTS.md §13, so the other tool gets it too.
