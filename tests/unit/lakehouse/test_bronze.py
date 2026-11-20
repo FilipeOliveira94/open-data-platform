@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import io
 import json
 from pathlib import Path
 from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError
+from fake_s3 import FakeS3 as _Store
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.model import ContractField, DataContract
@@ -110,66 +109,6 @@ def _key(
         f"raw/{source_id}/{dataset}/dt=2026-10-31/"
         f"execution_id={execution_id}/{object_name}"
     )
-
-
-class _Store:
-    """In-memory S3 client covering the calls Bronze and the raw writer make."""
-
-    def __init__(self) -> None:
-        self.buckets: set[str] = set()
-        self.objects: dict[tuple[str, str], dict[str, object]] = {}
-
-    def head_bucket(self, *, Bucket: str) -> dict[str, object]:
-        if Bucket not in self.buckets:
-            raise ClientError(
-                {"Error": {"Code": "404", "Message": "Not Found"}},
-                "HeadBucket",
-            )
-        return {}
-
-    def create_bucket(self, *, Bucket: str) -> None:
-        self.buckets.add(Bucket)
-
-    def put_object(self, **kwargs: object) -> None:
-        bucket = str(kwargs["Bucket"])
-        key = str(kwargs["Key"])
-        body = kwargs["Body"]
-        if not isinstance(body, bytes):
-            msg = "body must be bytes"
-            raise AssertionError(msg)
-        self.buckets.add(bucket)
-        metadata = kwargs.get("Metadata") or {}
-        self.objects[(bucket, key)] = {
-            "Body": body,
-            "Metadata": dict(metadata),  # type: ignore[arg-type]
-        }
-
-    def delete_object(self, *, Bucket: str, Key: str) -> None:
-        self.objects.pop((Bucket, Key), None)
-
-    def get_object(self, *, Bucket: str, Key: str) -> dict[str, object]:
-        item = self.objects[(Bucket, Key)]
-        body = item["Body"]
-        assert isinstance(body, bytes)
-        return {"Body": io.BytesIO(body), "Metadata": item["Metadata"]}
-
-    def list_objects_v2(
-        self,
-        *,
-        Bucket: str,
-        Prefix: str,
-        ContinuationToken: str | None = None,
-    ) -> dict[str, object]:
-        del ContinuationToken
-        keys = sorted(
-            key
-            for bucket, key in self.objects
-            if bucket == Bucket and key.startswith(Prefix)
-        )
-        return {
-            "Contents": [{"Key": key} for key in keys],
-            "IsTruncated": False,
-        }
 
 
 def _loaded() -> dict[tuple[str, str], DataContract]:
@@ -394,7 +333,18 @@ def test_empty_prefix_and_parse_errors_do_not_write_staging() -> None:
             raw_bucket="odp-raw",
             warehouse_bucket="odp-warehouse",
             contracts=(contract,),
+            full_rebuild=True,
         )
+    assert store.objects == {}
+    # The scheduled path records an empty prefix and writes no table.
+    empty = promote_bronze(
+        store,  # type: ignore[arg-type]
+        raw_bucket="odp-raw",
+        warehouse_bucket="odp-warehouse",
+        contracts=(contract,),
+    )
+    assert empty.scripts == ()
+    assert empty.datasets[0].objects_listed == 0
     assert store.objects == {}
 
     good = _key(execution_id="run-a")
@@ -419,6 +369,11 @@ def test_empty_prefix_and_parse_errors_do_not_write_staging() -> None:
             "_ingestion_ts": _TS,
         },
     }
+    for key in (good, bad):
+        store.objects[("odp-raw", key.rsplit("/", 1)[0] + "/_COMPLETE")] = {
+            "Body": _marker("events.jsonl"),
+            "Metadata": {},
+        }
     with pytest.raises(BronzeParseError):
         promote_bronze(
             store,  # type: ignore[arg-type]
@@ -452,6 +407,10 @@ def test_quarantine_objects_are_not_promoted() -> None:
             "_ingestion_ts": _TS,
         },
     }
+    store.objects[("odp-bronze-live", raw_key.rsplit("/", 1)[0] + "/_COMPLETE")] = {
+        "Body": _marker("product_category_name_translation.csv"),
+        "Metadata": {},
+    }
     store.objects[("odp-bronze-live", quarantine_key)] = {
         "Body": b'{"record":"QUARANTINE_ONLY"}\n',
         "Metadata": {
@@ -472,7 +431,7 @@ def test_quarantine_objects_are_not_promoted() -> None:
     staging = store.objects[
         (
             "odp-warehouse",
-            "bronze/_staging/olist_brazilian_ecommerce/"
+            "bronze/_staging/adhoc/olist_brazilian_ecommerce/"
             "product_category_name_translation/rows.jsonl",
         )
     ]["Body"]

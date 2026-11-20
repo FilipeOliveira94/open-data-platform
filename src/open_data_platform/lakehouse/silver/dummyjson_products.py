@@ -19,7 +19,7 @@ from open_data_platform.lakehouse.silver.common import (
     json_typed,
     quote_ident,
 )
-from open_data_platform.lakehouse.write_mode import CURRENT_WRITE_MODE
+from open_data_platform.lakehouse.write_mode import SILVER_WRITE_MODE
 
 SOURCE_ID = "dummyjson_products"
 
@@ -121,6 +121,6 @@ POLICIES: dict[str, DedupPolicy] = {
     "products": DedupPolicy(
         timestamp_style=TimestampStyle.ISO,
         json_expansions=PRODUCTS_EXPANSIONS,
-        write_mode=CURRENT_WRITE_MODE,
+        write_mode=SILVER_WRITE_MODE,
     ),
 }

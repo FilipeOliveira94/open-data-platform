@@ -5,7 +5,9 @@ The default arguments match the documented local command.
 
 Refresh policy (P3-12): manual only. The generator exists for demos, and
 the contract is ``append_only``: each complete batch adds events, a repeated
-``event_id`` is kept once, and ``event_time`` places a late event.
+``event_id`` is kept once, and ``event_time`` places a late event. A
+successful run emits the ``raw_demo_storefront`` Asset, which schedules
+``transform_lakehouse`` (ADR-0024).
 """
 
 from __future__ import annotations
@@ -13,7 +15,13 @@ from __future__ import annotations
 from datetime import datetime
 
 from airflow.sdk import DAG, Param
-from ingest_common import DEFAULT_ARGS, EXECUTION_ID, execution_id_param, python_task
+from ingest_common import (
+    DEFAULT_ARGS,
+    EXECUTION_ID,
+    execution_id_param,
+    python_task,
+    raw_asset,
+)
 
 with DAG(
     dag_id="ingest_demo_storefront",
@@ -49,4 +57,5 @@ with DAG(
             "--event-time-start",
             "{{ params.event_time_start }}",
         ],
+        outlets=[raw_asset("demo_storefront")],
     )

@@ -8,8 +8,8 @@ marker; Silver takes survivors only from the latest complete execution, so a
 municipality absent from it leaves Silver. Runs on day 1 of each month at
 03:00 UTC; the list changes rarely. ``catchup`` is false: the run does not
 depend on a window, and a missed month is covered by the next full fetch.
-This DAG does not start ``transform_lakehouse``; the next lakehouse refresh
-picks the execution up (P3-13 wires Assets).
+A successful run emits the ``raw_ibge_localidades`` Asset, which schedules
+``transform_lakehouse`` (ADR-0024).
 """
 
 from __future__ import annotations
@@ -17,7 +17,13 @@ from __future__ import annotations
 from datetime import datetime
 
 from airflow.sdk import DAG, CronTriggerTimetable
-from ingest_common import DEFAULT_ARGS, EXECUTION_ID, execution_id_param, python_task
+from ingest_common import (
+    DEFAULT_ARGS,
+    EXECUTION_ID,
+    execution_id_param,
+    python_task,
+    raw_asset,
+)
 
 with DAG(
     dag_id="ingest_ibge_localidades",
@@ -38,4 +44,5 @@ with DAG(
             "--execution-id",
             EXECUTION_ID,
         ],
+        outlets=[raw_asset("ibge_localidades")],
     )

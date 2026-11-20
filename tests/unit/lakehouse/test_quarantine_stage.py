@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from open_data_platform.lakehouse.quarantine_stage import (
-    STAGING_KEY,
     QuarantineFindingRow,
     QuarantineStageError,
     encode_findings_jsonl,
@@ -15,6 +14,7 @@ from open_data_platform.lakehouse.quarantine_stage import (
     parse_quarantine_key,
     prepare_quarantine_staging,
     render_load_sql,
+    staging_key,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -58,7 +58,7 @@ def test_load_sql_names_the_staging_path_and_omits_finding_values() -> None:
     sql = render_load_sql(warehouse_bucket="odp-warehouse", row_count=1)
     body = encode_findings_jsonl((row,)).decode("utf-8")
     assert (
-        "s3a://odp-warehouse/gold/_staging/gold_staging/"
+        "s3a://odp-warehouse/gold/_staging/adhoc/gold_staging/"
         "quarantine_findings/rows.jsonl" in sql
     )
     assert "VALUES" not in sql
@@ -99,7 +99,7 @@ def test_prepare_writes_the_jsonl_and_keeps_the_sql_free_of_values() -> None:
     assert staged.row_count == 1
     assert _SECRET not in staged.sql
     assert _CITY not in staged.sql
-    written = store.objects[("odp-warehouse", STAGING_KEY)].decode("utf-8")
+    written = store.objects[("odp-warehouse", staging_key())].decode("utf-8")
     assert _SECRET in written
     assert _CITY not in written
 
@@ -114,8 +114,8 @@ def test_prepare_deletes_the_staging_object_when_there_are_no_findings() -> None
     )
     assert staged.row_count == 0
     assert "rows.jsonl" not in staged.sql
-    assert ("odp-warehouse", STAGING_KEY) in store.deleted
-    assert ("odp-warehouse", STAGING_KEY) not in store.objects
+    assert ("odp-warehouse", staging_key()) in store.deleted
+    assert ("odp-warehouse", staging_key()) not in store.objects
 
 
 def test_make_stage_quarantine_loads_through_spark() -> None:

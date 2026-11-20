@@ -52,7 +52,7 @@ Silver `PARTITION BY` is the window of `ROW_NUMBER` used to keep one survivor pe
 
 ## File sizing
 
-No target file size is configured. Bronze writes one staging object per dataset, `bronze/_staging/{source_id}/{dataset}/rows.jsonl` in the warehouse bucket, then `INSERT OVERWRITE`. Silver and Gold do not set a Spark or dbt target size. dbt sets the file format to Parquet and replaces the table. The engine chooses the Parquet files for that overwrite or replace.
+No target file size is configured. Bronze writes one staging object per changed dataset and run, `bronze/_staging/{run_label}/{source_id}/{dataset}/rows.jsonl` in the warehouse bucket, then one `MERGE INTO` (incremental) or `CREATE OR REPLACE TABLE … AS SELECT` (full rebuild) since P3-13 ([ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md)). Silver and Gold do not set a Spark or dbt target size. dbt sets the file format to Parquet and replaces the table. The engine chooses the Parquet files for that overwrite or replace.
 
 This page does not record byte sizes or file counts for the medallion tables. The synthetic probes recorded object counts for their own tables only. Expiring snapshots and deleting orphan files is P5-07.
 
@@ -78,7 +78,7 @@ Every writer of a table that Trino, dbt, or a check reads replaces it in one com
 
 | Writer | Tables | Replace statement | Code |
 | --- | --- | --- | --- |
-| Bronze (Spark) | `bronze.*` | `CREATE OR REPLACE TABLE bronze.<t> USING iceberg LOCATION … AS SELECT CAST(<c> AS STRING) AS <c> … FROM <staging view>` | `lakehouse/bronze.py` `_table_sql` |
+| Bronze (Spark) | `bronze.*` | Full rebuild: `CREATE OR REPLACE TABLE bronze.<t> USING iceberg LOCATION … AS SELECT CAST(<c> AS STRING) AS <c> … FROM <staging view>`. Incremental (P3-13): `MERGE INTO bronze.<t> … WHEN NOT MATCHED THEN INSERT`, one commit; never drops the table | `lakehouse/bronze.py` `_table_sql`, `_merge_sql` |
 | Silver (Spark) | `silver.*` | `CREATE OR REPLACE TABLE silver.<t> USING iceberg LOCATION … AS SELECT CAST(<c> AS <type>) AS <c> … FROM (<dedup over bronze.<t>>)` | `lakehouse/silver/common.py` `render_silver_sql` |
 | Quarantine staging (Spark) | `gold_staging.quarantine_findings` | `CREATE OR REPLACE TABLE gold_staging.quarantine_findings USING iceberg LOCATION … AS SELECT … FROM <staging view>` | `lakehouse/quarantine_stage.py` `render_load_sql` |
 | Gold (dbt-trino 1.11) | the seven Gold schemas | `materialized: table` with `on_table_exists: replace` renders `create or replace table … as select` in Trino | `dbt/dbt_project.yml` |

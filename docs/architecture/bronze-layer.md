@@ -2,7 +2,7 @@
 
 Near-source Iceberg tables built from the raw objects in [raw storage layout](raw-storage-layout.md). Decision context: [ADR-0012](../decisions/0012-medallion-layers.md) (still `proposed`) and [ADR-0020](../decisions/0020-raw-storage-layout.md). Silver typing, JSON expansion, and deduplication are documented in [silver layer](silver-layer.md). This layer does not replace the raw objects.
 
-**Write mode (P2-03):** `WriteMode.FULL_OVERWRITE` only — each run replaces the whole Bronze table from every object under that dataset’s raw prefix with one `CREATE OR REPLACE TABLE … AS SELECT` (one Iceberg commit since P3-11; see [atomic table replace](phase-2-lakehouse.md#atomic-table-replace-p3-11)). Placeholders for incremental MERGE / append live in `open_data_platform.lakehouse.write_mode` and fail if selected. The phase strategy is [Phase 2 lakehouse](phase-2-lakehouse.md).
+**Write mode (P3-13, [ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md)):** the scheduled refresh is `WriteMode.INCREMENTAL_APPEND`. Bronze promotes only raw objects of complete executions that the promotion registry has not seen, and appends their rows with one `MERGE INTO` per dataset. `--full-rebuild` and a dataset's first promotion use `WriteMode.FULL_OVERWRITE`: one `CREATE OR REPLACE TABLE … AS SELECT` from every complete object (one Iceberg commit since P3-11; see [atomic table replace](phase-2-lakehouse.md#atomic-table-replace-p3-11)). The upsert and windowed placeholders in `open_data_platform.lakehouse.write_mode` still fail if selected. The phase strategy is [Phase 2 lakehouse](phase-2-lakehouse.md).
 
 ## Table
 
@@ -30,24 +30,41 @@ Columns, in order:
 | `raw_object_key` | Full raw key. |
 | `record_index` | Zero-based index inside that object. |
 | `dt` | `dt=` segment of the raw key. A column, not an Iceberg partition. |
+| `_execution_completed_ts` | `completed_at` of the execution's `_COMPLETE` marker (P3-12). Never null for rows promoted since P3-13. |
+| `_raw_etag` | ETag of the raw object the row came from (P3-13). Bronze only; Silver does not carry it. |
 | Contract fields | Contract order. |
 | Envelope fields | Page fields other than the `record_locator`, in contract order. |
 
-`dt` is the ingestion date already used to lay out raw objects. The write replaces the whole table, so there is no Iceberg partition spec in this issue.
+`dt` is the ingestion date already used to lay out raw objects. There is no Iceberg partition spec. Each incremental append writes its own data files, so the rows of one run sit in files of their own.
 
 Quarantine objects are not read. Invalid rows that remain inside a raw object are promoted with it. A payload that does not match the contract shape fails that dataset before the table is overwritten.
 
 ## Write
 
-Each run reads every object under `raw/{source_id}/{dataset}/` in `ODP_RAW_BUCKET` (default `odp-raw`). Keys are sorted. After every object parses, the job writes one staging file and then Spark commits one overwrite per table:
+### Incremental refresh (P3-13)
+
+Each run lists `raw/{source_id}/{dataset}/` in `ODP_RAW_BUCKET` (default `odp-raw`) with ETags and reads the promotion registry, `lakehouse_state.bronze_promotions` in the Iceberg catalog database. A data object is a candidate when its key is not registered or its ETag differs. Only candidates in a **complete** execution are promoted: the execution's `_COMPLETE` marker lists exactly the data objects under its prefix. Markers are read only for executions that hold a candidate. An incomplete execution is counted and waits for its marker.
+
+Objects are read one at a time. Each object's rows go to a local JSONL file in the run's work directory, and the file is uploaded once per dataset:
 
 ```text
-s3a://{ODP_WAREHOUSE_BUCKET}/bronze/_staging/{source_id}/{dataset}/rows.jsonl
+s3a://{ODP_WAREHOUSE_BUCKET}/bronze/_staging/{run_label}/{source_id}/{dataset}/rows.jsonl
 ```
 
-Staging is a build artifact in the warehouse bucket. The auditable bytes stay under `raw/`. An empty prefix fails and does not delete the table. A second run with the same objects produces the same rows. Several `execution_id` values all remain. There is no `MERGE` and no exactly-once claim.
+Airflow passes its run id as the run label; Make passes `make-<UTC timestamp>`. The Spark script per changed dataset is one of:
 
-An empty JSON array is a successful object with zero records. The table overwrite then commits zero rows. PostgreSQL can land that array for an empty window. A prefix with no objects is a different case and fails.
+| Mode | When | Statement |
+| --- | --- | --- |
+| `incremental_append` | Scheduled refresh of a registered dataset | `MERGE INTO bronze.{table}` on `raw_object_key`, `_raw_etag`, `record_index`; `WHEN NOT MATCHED THEN INSERT`. When a registered key has a new ETag, `WHEN NOT MATCHED BY SOURCE AND raw_object_key IN (…) THEN DELETE` removes its old rows in the same commit |
+| `full_overwrite` | `--full-rebuild`, or a dataset the registry has never seen | `CREATE OR REPLACE TABLE … AS SELECT` from every complete object |
+
+After Spark commits, one registry transaction upserts the promoted objects and marks the dataset pending for Silver. Then the staging object is deleted. A crash between the commit and the registry write leaves the objects unregistered; the retry stages them again and the `MERGE` inserts nothing. `lakehouse_state.bronze_refreshes` records, per run and dataset, the objects listed, waiting for a marker, and promoted, the rows appended, and the table total. A failed dataset is recorded with mode `…:failed`.
+
+A dataset with nothing new gets no script, and its table is not written. A refresh where no dataset changed and no later layer is pending writes no table, and the Airflow task ends as skipped. An empty prefix is recorded, not failed, on the scheduled path. `--full-rebuild` fails for a dataset with no complete execution instead of emptying its table.
+
+An empty JSON array is a successful object with zero records. The incremental path registers it without a Spark run. A full rebuild of a dataset whose complete objects hold zero rows commits an empty table.
+
+Staging is a build artifact in the warehouse bucket. The auditable bytes stay under `raw/`. There is no exactly-once claim: the `MERGE` key makes a repeated promotion a no-op, and the registry records what was promoted.
 
 ## Live run vs unit fixtures
 
@@ -59,12 +76,14 @@ An empty JSON array is a successful object with zero records. The table overwrit
 The live run does **not** use a separate fixture bucket. Buckets in normal local use are `odp-raw` (landing) and `odp-warehouse` (Iceberg). `odp-smoke` remains the Phase 0 MinIO smoke bucket.
 
 ```bash
-make live-bronze
+make live-bronze     # incremental Bronze, then count checks
+make live-refresh    # every transform step, incremental (same as transform_lakehouse)
+make live-rebuild    # every table from all complete raw objects
 ```
 
-PostgreSQL and MinIO must be healthy. The catalog database `iceberg` is created when it is missing. `--all` writes `.local/bronze-source-counts.tsv` (`source.dataset`, then the raw row count). `--print-live-checks` requires that file and emits one `COUNT(*)` per Bronze table. A missing or partial file fails the check. The expected side is the count from that run, not a pinned snapshot.
+PostgreSQL and MinIO must be healthy. The catalog database `iceberg` and the `lakehouse_state` schema are created when they are missing. The bronze step writes `bronze-source-counts.tsv` in the run's work directory: one line per table written in that run, with the registry row total of the dataset. `bronze-checks` compares each with Trino `COUNT(*)`. An empty file means no table was written, and the check step is skipped.
 
-To promote a subset after objects are already in the raw bucket:
+The standalone CLI below has no registry. It renders a full rebuild of each selected dataset. To render a subset after objects are already in the raw bucket:
 
 ```bash
 uv run python -m open_data_platform.lakehouse.bronze \
@@ -72,7 +91,29 @@ uv run python -m open_data_platform.lakehouse.bronze \
   --sql-out .local/bronze-sql
 ```
 
-Then run the shared Spark runtime once per file in that directory. Mount the file at `/tmp/bronze.sql` and set `ODP_SPARK_SQL` to that path. `--all` promotes every contract and fails if any prefix is empty. Each Spark process loads one dataset, so a failed dataset leaves the others at the snapshot written by their own invocation.
+Then run the shared Spark runtime once per file in that directory. Mount the file at `/tmp/bronze.sql` and set `ODP_SPARK_SQL` to that path. The CLI does not update the registry, so prefer `make live-rebuild`. Each Spark process loads one dataset, so a failed dataset leaves the others at the snapshot written by their own invocation.
+
+## Result (2026-11-20 incremental refresh, P3-13)
+
+Local Compose, runtime image `odp-runtime:airflow3.4.0-spark3.5.8`, one Spark JVM per dataset. Raw held 102 data objects in 18 prefixes, 28 of them in complete executions; the other 74 predate the P3-12 markers and wait as incomplete. Before the run, the two `postgres_oltp` windows that existed only without markers were re-extracted under `p3-13-reland-*`.
+
+| Refresh | Raw objects read / rows appended | Tables written | Step durations | Wall |
+| --- | --- | --- | --- | --- |
+| `make live-rebuild` (`--full-rebuild`, also the registry bootstrap) | 28 / 1_565_638 (geolocation 1_000_163) | Bronze 18, Silver 18, quarantine, Gold | bronze 251.7 s, bronze-checks 2.3 s (18 passed), silver 255.4 s, silver-checks 5.2 s (20 passed), stage-quarantine 15.1 s, dbt-build 26.5 s (PASS=287) | 565 s |
+| `make live-refresh`, no new raw object | 0 / 0; 102 keys listed, no object body or marker read | None | bronze 1.0 s (0.2 s promotion), every later step skipped in 0.5–0.7 s | 13 s |
+| `make live-refresh` after one new daily window (`postgres_oltp` `[2026-10-17, 2026-10-18)`) | 4 / 5 | Bronze 4 (`MERGE`), Silver 4, quarantine, Gold | bronze 50.7 s, bronze-checks 0.7 s (4 passed), silver 50.3 s, silver-checks 0.8 s (4 passed), stage-quarantine 14.2 s, dbt-build 26.2 s (PASS=287) | 151 s |
+| `make live-bronze` after the same execution was re-ingested with 60, then 100 events | 1 / 60, then 1 / 100 | Bronze 1 (`MERGE` with delete) | bronze 16.8 s, 15.8 s; Bronze count 60, then 100, equal to the registry total | — |
+| `make live-refresh` with Silver and Gold still pending, no new raw object | 0 / 0 | Silver 1, quarantine, Gold | bronze 1.0 s, silver 16.3 s, stage-quarantine 14.3 s, dbt-build 25.2 s | 67 s |
+
+Iceberg snapshot summaries show what the commits did. Each insert-only `MERGE` into `bronze.postgres_oltp__orders` committed as `append`, one data file added and none rewritten. The re-ingested clickstream object committed as `overwrite`: 60 added and 100 deleted, then 100 added and 60 deleted, one file replaced each time. `bronze.olist_brazilian_ecommerce__geolocation` kept 14 snapshots and `silver.…__geolocation` kept 4 through the daily-window refresh, so untouched tables were not rewritten.
+
+Airflow (`make airflow-up`, same stack):
+
+- With the default `batch_asset_events=False`, four raw Asset events produced four `transform_lakehouse` runs, one event each. The last two wrote nothing (8–9 s). The DAG now sets `batch_asset_events=True`.
+- After the change, `ingest_demo_storefront` started run A (1 event). Three `ingest_postgres_oltp` runs landed while A ran. When A ended, one follow-up run consumed all 3 events and promoted the 3 executions at once (12 objects, 15 rows). No third run was created, and the queue was empty.
+- A manual `transform_lakehouse` run with nothing new finished in 8.2 s with all six tasks `skipped`.
+
+Bronze time in an incremental run is mostly one Spark JVM start per changed dataset (about 12 s). `dbt-build` took 25–27 s in every run against Silver rebuilds of 16–255 s, so Gold stays a full dbt build ([ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md)). A `MERGE` into a large Bronze table was not measured: no new Olist release landed. Raw listing still grows with the number of keys under a prefix (metadata only).
 
 ## Result (2026-11-05 full-data live)
 

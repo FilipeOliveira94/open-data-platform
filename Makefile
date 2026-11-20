@@ -6,12 +6,18 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold runtime-build up airflow-up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver live-refresh live-rebuild stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold runtime-build up airflow-up down ps logs clean
+
+# One run label per make invocation (ADR-0024). The work directory and the
+# staging keys carry it, so a make run and an Airflow run never share staging.
+RUN_LABEL := make-$(shell date -u +%Y%m%dT%H%M%SZ)
+# Empty: incremental refresh. live-rebuild passes --full-rebuild.
+REFRESH_FLAGS ?=
 
 # One medallion step in the shared runtime image (Spark + dbt, P3-03).
 # Make and the Airflow transform DAGs call the same medallion_build module.
 define medallion_step
-$(COMPOSE) --profile lakehouse run --rm -T spark python -m open_data_platform.lakehouse.medallion_build $(1) --run-label make
+$(COMPOSE) --profile lakehouse run --rm -T spark python -m open_data_platform.lakehouse.medallion_build $(1) --run-label $(RUN_LABEL) $(REFRESH_FLAGS)
 endef
 
 # Host path mounted at /tmp/.ivy2 in the Spark service (P2-08).
@@ -93,7 +99,7 @@ spark-ivy-warm: ## Download pinned Spark lakehouse jars into .local/spark-ivy (P
 	$(COMPOSE) up -d --wait postgres minio; \
 	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/spark/warm_ivy.sh
 
-live-bronze: ## Full-data Bronze from ODP_RAW_BUCKET, then Trino count checks (runtime image)
+live-bronze: ## Promote new raw objects into Bronze, then Trino count checks (runtime image)
 	@set -e; \
 	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
@@ -105,7 +111,7 @@ live-bronze: ## Full-data Bronze from ODP_RAW_BUCKET, then Trino count checks (r
 	$(call medallion_step,bronze); \
 	$(call medallion_step,bronze-checks)
 
-live-silver: ## Full-data Silver from existing Bronze tables, then Trino checks (runtime image)
+live-silver: ## Rebuild the Silver tables pending after Bronze, then Trino checks (runtime image)
 	@set -e; \
 	set -a; \
 	[ -f .env.example ] && . ./.env.example; \
@@ -154,7 +160,26 @@ dbt-test-reconciliation: ## Run reconciliation tests (separate from live-gold; w
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(call medallion_step,dbt-reconcile)
 
-live-gold: stage-quarantine dbt-build ## Stage quarantine sidecars then build Gold models
+live-gold: stage-quarantine dbt-build ## Stage quarantine sidecars then build Gold models (while Gold is pending)
+
+live-refresh: ## Incremental refresh, the same steps as transform_lakehouse (ADR-0024)
+	@set -e; \
+	set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(ensure_spark_ivy); \
+	$(COMPOSE) up -d --wait postgres minio; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(call medallion_step,bronze); \
+	$(call medallion_step,bronze-checks); \
+	$(call medallion_step,silver); \
+	$(call medallion_step,silver-checks); \
+	$(call medallion_step,stage-quarantine); \
+	$(call medallion_step,dbt-build)
+
+live-rebuild: ## Rebuild every table from all complete raw objects (contract change or recovery; never scheduled)
+	$(MAKE) live-refresh REFRESH_FLAGS=--full-rebuild
 
 runtime-build: ## Build the shared runtime image (Airflow + Spark + dbt)
 	$(COMPOSE) --profile lakehouse build spark

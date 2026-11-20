@@ -2,8 +2,9 @@
 
 Business logic stays in ``open_data_platform.ingestion.postgres_oltp``.
 The caller supplies both window bounds. This DAG does not calculate a
-daily or weekly window, it does not seed the tables, and it does not
-trigger ``transform_lakehouse``. The scheduled daily path is
+daily or weekly window, and it does not seed the tables. A successful
+extract emits the ``raw_postgres_oltp`` Asset, which schedules
+``transform_lakehouse`` (ADR-0024). The scheduled daily path is
 ``ingest_postgres_oltp_daily``.
 """
 

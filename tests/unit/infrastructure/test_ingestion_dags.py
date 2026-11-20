@@ -100,7 +100,7 @@ def test_execution_id_defaults_to_the_airflow_run() -> None:
         assert "execution_id_param()" in _text(name)
 
 
-def test_daily_extract_dag_derives_the_window_and_triggers_the_transform() -> None:
+def test_daily_extract_dag_derives_the_window_and_emits_the_raw_asset() -> None:
     text = _text("ingest_postgres_oltp_daily.py")
     assert 'CronDataIntervalTimetable("0 0 * * *", timezone="UTC")' in text
     assert "catchup=True" in text
@@ -108,8 +108,9 @@ def test_daily_extract_dag_derives_the_window_and_triggers_the_transform() -> No
     assert "data_interval_start.isoformat()" in text
     assert "data_interval_end.isoformat()" in text
     assert "params.window_start" not in text
-    assert 'TRANSFORM_DAG_ID = "transform_lakehouse"' in text
-    assert "extract >> trigger_transform" in text
+    # The transform is scheduled on the raw Asset (ADR-0024), not triggered.
+    assert "import TriggerDagRunOperator" not in text
+    assert "postgres_extract_task(WINDOW_START, WINDOW_END)" in text
     assert "SELECT" not in text.upper()
     manual = _text("ingest_postgres_oltp.py")
     assert "TriggerDagRunOperator" not in manual

@@ -106,9 +106,9 @@ def test_dbt_build_excludes_reconciliation_and_reconcile_selects_it(
 
 def test_dbt_step_failure_is_reported(tmp_path: Path) -> None:
     recorder = _Recorder([2])
-    with pytest.raises(MedallionBuildError, match="dbt-build exited with status 2"):
-        medallion_build.run_step("dbt-build", tmp_path / "w", {}, recorder)
-    assert recorder.calls[0][0][1] == "build"
+    with pytest.raises(MedallionBuildError, match="dbt-reconcile exited with status 2"):
+        medallion_build.run_step("dbt-reconcile", tmp_path / "w", {}, recorder)
+    assert recorder.calls[0][0][1] == "test"
 
 
 def test_bronze_checks_need_the_count_file(tmp_path: Path) -> None:

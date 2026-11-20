@@ -16,6 +16,7 @@ _SOURCED_WORK = {
     "spark-ivy-warm": "warm_ivy.sh",
     "live-bronze": f"{_MODULE} bronze-checks",
     "live-silver": f"{_MODULE} silver-checks",
+    "live-refresh": f"{_MODULE} dbt-build",
     "stage-quarantine": f"{_MODULE} stage-quarantine",
     "dbt-build": f"{_MODULE} dbt-build",
     "dbt-test-reconciliation": f"{_MODULE} dbt-reconcile",
@@ -60,3 +61,22 @@ def test_ivy_chmod_does_not_abort_the_bronze_recipe() -> None:
     shell = sourced[0]
     assert "set -e" in shell
     assert 'chmod -R a+rwX ".local/spark-ivy" || true' in shell
+
+
+def test_make_uses_one_unique_run_label_per_invocation() -> None:
+    shell = next(s for s in _recipe_shells("live-refresh") if ". ./.env" in s)
+    labels = {part.split()[0] for part in shell.split("--run-label ")[1:]}
+    assert len(labels) == 1
+    (label,) = labels
+    assert label.startswith("make-") and label != "make"
+
+
+def test_live_rebuild_passes_full_rebuild() -> None:
+    completed = subprocess.run(
+        ["make", "-n", "live-rebuild"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "--full-rebuild" in completed.stdout

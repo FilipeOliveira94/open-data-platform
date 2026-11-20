@@ -2,7 +2,7 @@
 
 Typed, deduplicated Iceberg tables built from [Bronze](bronze-layer.md). Decision context: [ADR-0012](../decisions/0012-medallion-layers.md) (still `proposed` until Gold exists). Bronze stays string-typed and keeps duplicate keys. This layer does not replace Bronze or raw objects.
 
-**Write mode (P2-04):** `WriteMode.FULL_OVERWRITE` only — each live run rebuilds the whole Silver table with one `CREATE OR REPLACE TABLE … AS SELECT` (one Iceberg commit since P3-11; see [atomic table replace](phase-2-lakehouse.md#atomic-table-replace-p3-11)). Placeholders for `INCREMENTAL_MERGE` and `APPEND_ONLY` exist in `open_data_platform.lakehouse.write_mode` and fail if selected. Those commit paths are not implemented. The strategy is [Phase 2 lakehouse](phase-2-lakehouse.md). Schedules and backfills are Phase 3. CDC is Phase 4.
+**Write mode (P2-04, P3-13):** `WriteMode.FULL_OVERWRITE` per dataset — a Silver write rebuilds the whole table with one `CREATE OR REPLACE TABLE … AS SELECT` (one Iceberg commit since P3-11; see [atomic table replace](phase-2-lakehouse.md#atomic-table-replace-p3-11)). Since P3-13 ([ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md)) a refresh rebuilds only the datasets pending for Silver: those whose Bronze table received new rows, plus any whose previous Silver write failed. The flag is `lakehouse_state.pending_layers` in the catalog database; it is cleared only after the Spark write succeeds, and that same transaction marks Gold pending. `--full-rebuild` (`make live-rebuild`) rebuilds every Silver table. A pending `incremental_window` or `append_only` dataset re-reads its whole Bronze table, so that rebuild grows with the dataset's Bronze history; Silver `MERGE` is deferred. Placeholders for `INCREMENTAL_MERGE` and `APPEND_ONLY` fail if selected. CDC is Phase 4.
 
 ## Split by source
 
@@ -79,7 +79,7 @@ The write is a full-table overwrite. There is no `MERGE` and no exactly-once cla
 
 | Mode | Command | Data |
 | --- | --- | --- |
-| **Live run** | `make live-silver` | Every Silver module against existing Bronze tables from `odp-raw` |
+| **Live run** | `make live-silver` | The Silver datasets pending after Bronze (`make live-rebuild` for all) |
 | **Unit fixtures** | pytest + `lakehouse.fixtures` | Synthetic payloads only |
 
 ```bash

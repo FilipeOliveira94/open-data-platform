@@ -16,7 +16,8 @@ import time
 from datetime import timedelta
 
 from airflow.providers.standard.operators.python import PythonOperator
-from airflow.sdk import Param
+from airflow.sdk import Asset, Param
+from airflow.sdk.exceptions import AirflowSkipException
 
 REPO = "/opt/odp/repo"
 
@@ -30,6 +31,31 @@ LAKEHOUSE_GOLD_POOL = "lakehouse_gold"
 
 POSTGRES_OLTP = "open_data_platform.ingestion.postgres_oltp"
 
+# ``medallion_build --skip-exit-code``: a step with nothing to do exits with
+# this status and the task ends as skipped (ADR-0024).
+SKIP_EXIT_CODE = 99
+
+# Raw sources that ingestion DAGs land. Each one is an Airflow Asset; a
+# successful ingestion emits an event for the sources it wrote, and
+# ``transform_lakehouse`` is scheduled on any of them (ADR-0024).
+RAW_SOURCES = (
+    "demo_storefront",
+    "dummyjson_products",
+    "ibge_localidades",
+    "olist_brazilian_ecommerce",
+    "olist_marketing_funnel",
+    "postgres_oltp",
+)
+
+
+def raw_asset(source_id: str) -> Asset:
+    """The Asset that stands for new raw objects of one source."""
+    if source_id not in RAW_SOURCES:
+        msg = f"unknown raw source: {source_id}"
+        raise ValueError(msg)
+    return Asset(name=f"raw_{source_id}", uri=f"odp-raw://{source_id}")
+
+
 # Seconds between SIGTERM and SIGKILL for the child process group.
 KILL_GRACE_SECONDS = 10.0
 
@@ -40,12 +66,13 @@ DEFAULT_ARGS: dict[str, object] = {
 }
 
 
-def run_python_args(*args: object) -> None:
+def run_python_args(*args: object, skip_exit_code: int | None = None) -> None:
     """Run ``python`` with ``args`` and fail when the process exits non-zero.
 
     An exception while waiting (Airflow timeout, SIGTERM, or any other) and a
     normal exit both end with the child's process group stopped, so Spark,
-    Java, and dbt descendants do not outlive the task.
+    Java, and dbt descendants do not outlive the task. ``skip_exit_code``
+    turns that status into a skipped task.
     """
     command = ["python", *(str(arg) for arg in args)]
     process = subprocess.Popen(command, cwd=REPO, start_new_session=True)
@@ -53,6 +80,9 @@ def run_python_args(*args: object) -> None:
         returncode = process.wait()
     finally:
         _stop_process_group(process)
+    if skip_exit_code is not None and returncode == skip_exit_code:
+        msg = "entrypoint had nothing to do"
+        raise AirflowSkipException(msg)
     if returncode != 0:
         msg = f"entrypoint exited with status {returncode}"
         raise RuntimeError(msg)
@@ -99,20 +129,33 @@ def python_task(
     op_args: list[str],
     *,
     pool: str | None = None,
+    outlets: list[Asset] | None = None,
+    skip_exit_code: int | None = None,
+    trigger_rule: str | None = None,
 ) -> PythonOperator:
     """Return a task that runs ``python`` with the rendered argument vector."""
-    extra: dict[str, object] = {} if pool is None else {"pool": pool}
+    extra: dict[str, object] = {}
+    if pool is not None:
+        extra["pool"] = pool
+    if outlets:
+        extra["outlets"] = outlets
+    if trigger_rule is not None:
+        extra["trigger_rule"] = trigger_rule
     return PythonOperator(
         task_id=task_id,
         python_callable=run_python_args,
         op_args=op_args,
+        op_kwargs={"skip_exit_code": skip_exit_code},
         show_return_value_in_logs=False,
         **extra,
     )
 
 
 def postgres_extract_task(window_start: str, window_end: str) -> PythonOperator:
-    """Return the P1-06 extract task for the given (templated) window bounds."""
+    """Return the P1-06 extract task for the given (templated) window bounds.
+
+    A successful extract emits the ``postgres_oltp`` raw Asset.
+    """
     return python_task(
         "extract",
         [
@@ -126,4 +169,5 @@ def postgres_extract_task(window_start: str, window_end: str) -> PythonOperator:
             "--execution-id",
             EXECUTION_ID,
         ],
+        outlets=[raw_asset("postgres_oltp")],
     )

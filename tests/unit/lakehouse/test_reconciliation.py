@@ -81,12 +81,20 @@ def test_bronze_checks_use_the_file_not_a_snapshot_pin() -> None:
     assert "194\t" not in rendered
 
 
-def test_bronze_checks_reject_a_partial_file() -> None:
+def test_bronze_checks_cover_only_the_datasets_a_refresh_wrote() -> None:
     contracts = load_contracts()
     first = contracts[0]
     counts = {f"{first.source_id}.{first.dataset}": 1}
-    with pytest.raises(ReconciliationError, match="missing="):
-        bronze_count_checks(counts, contracts)
+    assert len(bronze_count_checks(counts, contracts)) == 1
+    assert bronze_count_checks({}, contracts) == ()
+    with pytest.raises(ReconciliationError, match="unknown datasets"):
+        bronze_count_checks({"nope.nothing": 1}, contracts)
+
+
+def test_shape_checks_follow_the_rebuilt_silver_tables() -> None:
+    assert len(shape_checks({("dummyjson_products", "products")})) == 1
+    assert shape_checks({("olist_brazilian_ecommerce", "orders")}) == ()
+    assert len(shape_checks()) == 2
 
 
 def test_require_expected_names_both_sides() -> None:

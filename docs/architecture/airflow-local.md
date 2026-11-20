@@ -179,16 +179,19 @@ The PostgreSQL extract window was `2026-10-17T00:00:00Z` inclusive to `2026-10-1
 
 ### Medallion build steps
 
-`python -m open_data_platform.lakehouse.medallion_build <step> --run-label <label>` is the one entrypoint. Make passes `--run-label make`. Airflow passes the run id. Rendered SQL, the Bronze raw counts, and dbt `target/` and logs go to the named volume `odp_lakehouse_work` at `/opt/odp/work/<label>`.
+`python -m open_data_platform.lakehouse.medallion_build <step> --run-label <label>` is the one entrypoint. Make passes `make-<UTC timestamp>`, one label per `make` invocation. Airflow passes the run id. Rendered SQL, the Bronze counts, local staging files, and dbt `target/` and logs go to the named volume `odp_lakehouse_work` at `/opt/odp/work/<label>`. The label is also part of every staging key in the warehouse bucket, so a `make` run and a DAG run never share staging ([ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md)).
+
+Since P3-13 the write steps are incremental. A step with nothing to do writes no table, prints why, and exits with `--skip-exit-code` (0 by default, 99 from the DAG). `--full-rebuild` (`make live-rebuild`) rebuilds every table from all complete raw objects; it is never scheduled.
 
 | Step | What it calls |
 | --- | --- |
-| `bronze` | Creates the catalog database if missing, `lakehouse.bronze --all`, then `run_bronze.sh` once per SQL file |
-| `bronze-checks` | `bronze_count_checks` on the counts the `bronze` step wrote, through Trino |
-| `silver` | `lakehouse.silver --all`, then `run_silver.sh` once per SQL file |
-| `silver-checks` | `silver.live_checks()` through Trino |
-| `stage-quarantine` | `lakehouse.quarantine_stage`, then `run_bronze.sh` on that SQL |
-| `dbt-parse` / `dbt-build` / `dbt-reconcile` | `dbt parse`, `dbt build --exclude tag:reconciliation`, `dbt test --select tag:reconciliation` |
+| `bronze` | Creates the catalog database and `lakehouse_state` if missing, promotes new raw objects (`lakehouse.refresh.refresh_bronze`), runs `run_bronze.sh` once per changed dataset, then registers the objects. Skips when nothing is new and no later layer is pending |
+| `bronze-checks` | `bronze_count_checks` on the tables the `bronze` step wrote: Trino `COUNT(*)` against the registry row total. Skips when no table was written |
+| `silver` | Renders and runs `run_silver.sh` for each dataset pending for Silver, then clears its flag and marks Gold pending. Skips when nothing is pending |
+| `silver-checks` | Silver checks for the tables the `silver` step rebuilt. Skips when it rebuilt none |
+| `stage-quarantine` | While Gold is pending: `lakehouse.quarantine_stage`, then `run_bronze.sh` on that SQL |
+| `dbt-build` | While Gold is pending: `dbt build --exclude tag:reconciliation`, then clears the Gold flag |
+| `dbt-parse` / `dbt-reconcile` | `dbt parse`, `dbt test --select tag:reconciliation` |
 
 `medallion_build` runs each process with an argument vector and no shell. Credentials stay in the container environment. Trino checks use the HTTP protocol at `ODP_TRINO_HOST:ODP_TRINO_PORT` (`trino:8080`). A mismatch prints the statement, the expected value, and the result, then fails the step.
 
@@ -270,7 +273,7 @@ The seven task logs in MinIO did not contain the MinIO password, the Fernet key,
 
 ## Daily PostgreSQL schedule (P3-04)
 
-`ingest_postgres_oltp_daily` runs `extract`, then `trigger_transform`.
+`ingest_postgres_oltp_daily` runs `extract`. On success the task emits the `raw_postgres_oltp` Asset, which schedules `transform_lakehouse` (P3-13).
 
 | Setting | Value |
 | --- | --- |
@@ -280,7 +283,7 @@ The seven task logs in MinIO did not contain the MinIO password, the Fernet key,
 | `max_active_runs` | 1 |
 | Paused at creation | Yes |
 | Params | `execution_id` only. No window params |
-| After the extract | `TriggerDagRunOperator` on `transform_lakehouse`, run id `ingest_postgres_oltp_daily__<run_id>`, `wait_for_completion=False`, `reset_dag_run=True`, `fail_when_dag_is_paused=True` |
+| After the extract | Asset event `odp-raw://postgres_oltp`. Until P3-13 a `TriggerDagRunOperator` started `transform_lakehouse` |
 
 The timetable is explicit. In Airflow 3.4 `[scheduler] create_cron_data_intervals` defaults to `False`, so a cron string becomes a `CronTriggerTimetable` whose data interval has zero length. The extract rejects a bound that is not UTC midnight, so the timetable stays in UTC. Midnight in São Paulo is 03:00Z.
 
@@ -295,19 +298,35 @@ How each kind of run gets its window in Airflow 3.4:
 | `airflow dags trigger` without `-l` | No data interval. The extract fails |
 | `airflow backfill create --from-date D --to-date D` | `[D, D+1)`. Backfill parameters are P3-06 |
 
-The transform runs only after a successful extract. `transform_lakehouse` keeps `max_active_runs=1`, so a triggered run waits in `queued` behind one that is still running. A manual `transform_lakehouse` trigger and a manual `ingest_postgres_oltp` run behave as in P3-02 and P3-03: neither one triggers the other DAG. If `transform_lakehouse` is paused, `trigger_transform` fails (`fail_when_dag_is_paused`), so the daily run shows the gap. Otherwise the triggered run would sit in `queued`.
+The transform runs only after a successful extract, because only a successful task emits the Asset event. See [Lakehouse refresh trigger](#lakehouse-refresh-trigger-p3-13) for how several events coalesce.
 
 Idempotency:
 
-- A retry or a cleared task keeps the run id, so `execution_id` stays the same. The extract overwrites the same raw keys while the ingestion date is the same. `trigger_transform` resets the transform run with the same id (`reset_dag_run=True`), so it does not create a second one.
+- A retry or a cleared task keeps the run id, so `execution_id` stays the same. The extract overwrites the same raw keys while the ingestion date is the same. Identical content keeps the same ETag, so Bronze does not promote it again; changed content gets a new ETag, and Bronze replaces that object's rows in one `MERGE`.
 - A new run of the same window, for example a manual trigger on the same day as the scheduled run, has a new run id. It writes a new execution next to the previous one. Bronze keeps both and Silver deduplicates by key. This is the P3-02 rule: a new run keeps the previous raw object.
 - No window is skipped. The window comes only from the schedule and no watermark is stored, so with `catchup=False` a day the scheduler missed would never be extracted, without any error. `catchup=True` closes that gap. A record of covered windows and a gap report are P3-06.
-- Every caught-up run triggers `transform_lakehouse`. Until the lakehouse refresh is incremental and coalesced (P3-13), N missed days queue N full rebuilds.
+- Every caught-up run emits an Asset event. Events that arrive while a refresh runs start one follow-up refresh, which promotes every new window at once (P3-13).
 - The `dt=` segment is the real ingestion date. A retry that crosses UTC midnight writes the same window under the next `dt`. The content is the same and Silver deduplicates it.
 
 Late commits are accepted and documented. A row whose `updated_at` falls before midnight but whose transaction commits after the 00:00Z run is not in that day's window. The weekly window (P3-05) and backfills (P3-06) are the safety net. Streaming CDC (Phase 4) is the exact path.
 
-`transform_lakehouse` rebuilds Bronze, Silver, and Gold from every raw object. It is not a windowed lakehouse commit. One daily run costs one full rebuild, about 10 minutes on this host.
+Since P3-13 `transform_lakehouse` promotes only the new raw objects and rebuilds only the Silver datasets they changed. Measured costs are in [Bronze layer](bronze-layer.md#incremental-refresh-p3-13).
+
+## Lakehouse refresh trigger (P3-13)
+
+Every ingestion DAG emits an Airflow Asset per raw source it lands, on the success of its ingest or extract task:
+
+| DAG | Assets |
+| --- | --- |
+| `ingest_olist` | `raw_olist_brazilian_ecommerce`, `raw_olist_marketing_funnel` |
+| `ingest_dummyjson_products` | `raw_dummyjson_products` |
+| `ingest_ibge_localidades` | `raw_ibge_localidades` |
+| `ingest_demo_storefront` | `raw_demo_storefront` |
+| `ingest_postgres_oltp`, `ingest_postgres_oltp_daily` | `raw_postgres_oltp` |
+
+The URI is `odp-raw://{source_id}`. `transform_lakehouse` is scheduled on any of them (`AssetAny`) with `max_active_runs=1`. No DAG uses `TriggerDagRunOperator`. A manual `transform_lakehouse` trigger still works.
+
+Each write task of the transform after `bronze` uses the trigger rule `none_failed`, so a skipped step does not stop a layer that is still pending from an earlier failed run. A check task keeps `all_success` and is skipped when its write step was skipped. A step with nothing to do exits 99, which `run_python_args` turns into a skipped task.
 
 ## Verification (2026-11-20, P3-04)
 

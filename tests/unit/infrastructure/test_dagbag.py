@@ -97,8 +97,6 @@ def test_wrapper_tasks_share_the_p3_02_defaults(dagbag) -> None:
             assert task.retries == 2, (dag_id, task.task_id)
             assert task.retry_delay == timedelta(minutes=2)
             assert task.execution_timeout == timedelta(minutes=30)
-            if (dag_id, task.task_id) == (DAILY, "trigger_transform"):
-                continue
             assert task.python_callable.__name__ == "run_python_args"
 
 
@@ -114,8 +112,7 @@ def test_ingestion_dags_call_their_entrypoints(dagbag) -> None:
 
 def test_transform_runs_bronze_silver_gold_in_order(dagbag) -> None:
     dag = dagbag.dags["transform_lakehouse"]
-    assert dag.schedule is None
-    assert type(dag.timetable).__name__ == "NullTimetable"
+    assert type(dag.timetable).__name__ == "AssetTriggeredTimetable"
     assert dag.max_active_runs == 1
     assert [task.task_id for task in dag.topological_sort()] == [
         task_id for task_id, _step in TRANSFORM_ORDER
@@ -129,7 +126,13 @@ def test_transform_runs_bronze_silver_gold_in_order(dagbag) -> None:
             step,
             "--run-label",
             "{{ run_id }}",
+            "--skip-exit-code",
+            "99",
         ]
+        assert task.op_kwargs == {"skip_exit_code": 99}
+        writes = task_id in {"bronze", "silver", "stage_quarantine", "dbt_build"}
+        expected_rule = "none_failed" if writes and previous else "all_success"
+        assert task.trigger_rule == expected_rule, task_id
         upstream = set(task.upstream_task_ids)
         assert upstream == (set() if previous is None else {previous})
         previous = task_id
@@ -201,7 +204,7 @@ def test_daily_dag_runs_at_utc_midnight_with_catchup(dagbag) -> None:
     assert dag.start_date == datetime(2026, 11, 19, tzinfo=UTC)
     assert dag.max_active_runs == 1
     assert set(dag.params.keys()) == {"execution_id"}
-    assert dag.task_ids == ["extract", "trigger_transform"]
+    assert dag.task_ids == ["extract"]
     vector = _vector(dag.get_task("extract"))
     assert vector[:3] == ["-m", "open_data_platform.ingestion.postgres_oltp", "extract"]
 
@@ -334,35 +337,53 @@ def test_daily_window_without_interval_renders_empty_bounds(dagbag) -> None:
         patch.undo()
 
 
-def test_daily_dag_triggers_the_transform_after_the_extract(dagbag) -> None:
-    from airflow.providers.standard.operators.trigger_dagrun import (
-        TriggerDagRunOperator,
-    )
-
-    dag = dagbag.dags[DAILY]
-    trigger = dag.get_task("trigger_transform")
-    assert isinstance(trigger, TriggerDagRunOperator)
-    assert trigger.trigger_dag_id == "transform_lakehouse"
-    assert trigger.trigger_dag_id in dagbag.dags
-    assert trigger.upstream_task_ids == {"extract"}
-    assert trigger.wait_for_completion is False
-    assert trigger.reset_dag_run is True
-    assert trigger.fail_when_dag_is_paused is True
-    assert trigger.trigger_run_id == f"{DAILY}__{{{{ run_id }}}}"
-    rendered = trigger.render_template(
-        trigger.trigger_run_id, {"run_id": "scheduled__2026-10-17T00:00:00+00:00"}
-    )
-    assert rendered == f"{DAILY}__scheduled__2026-10-17T00:00:00+00:00"
+RAW_OUTLETS = {
+    "ingest_olist": {"olist_brazilian_ecommerce", "olist_marketing_funnel"},
+    "ingest_dummyjson_products": {"dummyjson_products"},
+    "ingest_ibge_localidades": {"ibge_localidades"},
+    "ingest_demo_storefront": {"demo_storefront"},
+    "ingest_postgres_oltp": {"postgres_oltp"},
+    DAILY: {"postgres_oltp"},
+}
 
 
-def test_only_the_daily_dag_triggers_another_dag(dagbag) -> None:
+def test_every_ingestion_dag_emits_its_raw_assets(dagbag) -> None:
+    for dag_id, sources in RAW_OUTLETS.items():
+        dag = dagbag.dags[dag_id]
+        uris = {outlet.uri for task in dag.tasks for outlet in task.outlets}
+        assert uris == {f"odp-raw://{source}/" for source in sources}, dag_id
+
+
+def test_transform_is_scheduled_on_any_raw_asset(dagbag) -> None:
+    from airflow.sdk import AssetAny
+
+    dag = dagbag.dags["transform_lakehouse"]
+    # One follow-up run consumes every queued event (Airflow 3.4 default
+    # is one run per event).
+    assert dag.timetable.batch_asset_events is True
+    condition = dag.timetable.asset_condition
+    assert isinstance(condition, AssetAny)
+    emitted = set().union(*RAW_OUTLETS.values())
+    assert {asset.uri for asset in condition.objects} == {
+        f"odp-raw://{source}/" for source in emitted
+    }
+    # Only the transform consumes the raw Assets.
+    consumers = {
+        dag_id
+        for dag_id, other in dagbag.dags.items()
+        if type(other.timetable).__name__ == "AssetTriggeredTimetable"
+    }
+    assert consumers == {"transform_lakehouse"}
+
+
+def test_no_dag_triggers_another_dag_directly(dagbag) -> None:
     triggers = {
         (dag_id, task.task_id)
         for dag_id, dag in dagbag.dags.items()
         for task in dag.tasks
         if type(task).__name__ == "TriggerDagRunOperator"
     }
-    assert triggers == {(DAILY, "trigger_transform")}
+    assert triggers == set()
 
 
 # P3-12 source refresh matrix: scheduled sources and their cron, in UTC.
