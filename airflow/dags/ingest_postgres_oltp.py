@@ -2,7 +2,9 @@
 
 Business logic stays in ``open_data_platform.ingestion.postgres_oltp``.
 The caller supplies both window bounds. This DAG does not calculate a
-daily or weekly window and it does not seed the tables.
+daily or weekly window, it does not seed the tables, and it does not
+trigger ``transform_lakehouse``. The scheduled daily path is
+``ingest_postgres_oltp_daily``.
 """
 
 from __future__ import annotations
@@ -10,14 +12,14 @@ from __future__ import annotations
 from datetime import datetime
 
 from airflow.sdk import DAG, Param
-from ingest_common import DEFAULT_ARGS, EXECUTION_ID, execution_id_param, python_task
+from ingest_common import DEFAULT_ARGS, execution_id_param, postgres_extract_task
 
 with DAG(
     dag_id="ingest_postgres_oltp",
     start_date=datetime(2026, 1, 1),
     schedule=None,
     catchup=False,
-    is_paused_upon_creation=False,
+    is_paused_upon_creation=True,
     default_args=DEFAULT_ARGS,
     params={
         "execution_id": execution_id_param(),
@@ -34,17 +36,4 @@ with DAG(
     },
     doc_md=__doc__,
 ):
-    python_task(
-        "extract",
-        [
-            "-m",
-            "open_data_platform.ingestion.postgres_oltp",
-            "extract",
-            "--window-start",
-            "{{ params.window_start }}",
-            "--window-end",
-            "{{ params.window_end }}",
-            "--execution-id",
-            EXECUTION_ID,
-        ],
-    )
+    postgres_extract_task("{{ params.window_start }}", "{{ params.window_end }}")

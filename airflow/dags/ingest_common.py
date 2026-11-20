@@ -24,6 +24,12 @@ REPO = "/opt/odp/repo"
 # A non-empty value overwrites the keys of that execution.
 EXECUTION_ID = "{{ params.execution_id or run_id }}"
 
+# One slot: tasks that write lakehouse tables and the reconciliation tests
+# never run at the same time. Compose ``airflow-init`` creates the pool.
+LAKEHOUSE_GOLD_POOL = "lakehouse_gold"
+
+POSTGRES_OLTP = "open_data_platform.ingestion.postgres_oltp"
+
 # Seconds between SIGTERM and SIGKILL for the child process group.
 KILL_GRACE_SECONDS = 10.0
 
@@ -88,11 +94,36 @@ def execution_id_param() -> Param:
     )
 
 
-def python_task(task_id: str, op_args: list[str]) -> PythonOperator:
+def python_task(
+    task_id: str,
+    op_args: list[str],
+    *,
+    pool: str | None = None,
+) -> PythonOperator:
     """Return a task that runs ``python`` with the rendered argument vector."""
+    extra: dict[str, object] = {} if pool is None else {"pool": pool}
     return PythonOperator(
         task_id=task_id,
         python_callable=run_python_args,
         op_args=op_args,
         show_return_value_in_logs=False,
+        **extra,
+    )
+
+
+def postgres_extract_task(window_start: str, window_end: str) -> PythonOperator:
+    """Return the P1-06 extract task for the given (templated) window bounds."""
+    return python_task(
+        "extract",
+        [
+            "-m",
+            POSTGRES_OLTP,
+            "extract",
+            "--window-start",
+            window_start,
+            "--window-end",
+            window_end,
+            "--execution-id",
+            EXECUTION_ID,
+        ],
     )
