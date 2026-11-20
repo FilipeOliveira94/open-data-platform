@@ -1,6 +1,6 @@
 # Agent workflow prompts
 
-Three prompts drive one issue: plan, implement, close. They are tool-neutral; the rules live in [`AGENTS.md`](../AGENTS.md). Replace the placeholders, run the plan prompt first, and approve the plan before any file changes.
+Three prompts drive one issue: plan, implement, close. They are tool-neutral; the rules live in [`AGENTS.md`](../AGENTS.md). Replace the placeholders and run the plan prompt first. A large task waits for Filipe's approval of the plan before any file changes; a small task goes straight to implementation (see "Task size" in `AGENTS.md` §3).
 
 ---
 
@@ -23,7 +23,7 @@ Return:
 7. Expected files to create or modify.
 8. Which items of the AGENTS.md §12 "Issue Close Checklist" this issue will touch, and which §8 "Runtime data exposure" rules it touches.
 
-Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Wait for my approval before editing.
+Mode: <small|large>. Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Large: wait for my approval before editing. Small: implement after planning. If planning shows the task is larger than stated, reclassify it as large and stop.
 ```
 
 ## 2. Implement (after the plan is approved)

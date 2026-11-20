@@ -25,13 +25,19 @@ For each task:
 1. Inspect the existing codebase and current project documentation.
 2. Read `PROJECT_STATUS.md`, `ROADMAP.md` and relevant ADRs when they exist.
 3. Check the relevant roadmap item. Identify dependencies, assumptions, risks and acceptance criteria.
-4. For non-trivial work, propose a short implementation plan before editing files.
+4. Classify the task as small or large (see Task size below) and plan it. Small: implement directly. Large: present the plan in the thread and stop until Filipe approves it.
 5. Implement the smallest coherent increment. When extracting repeated logic or choosing module boundaries (ingestion sources, Spark jobs, statement builders), use the `code-structure` skill; the principles in §4 take precedence.
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
 8. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
 9. Commit locally on `main` (see §13), then report to Filipe: the hash of the last local commit, changed files, commands executed, test results, limitations and the next step.
 10. Filipe reviews that commit and publishes it. When he asks, the Reviewer de Projetos bot opens a T3 thread where Claude reviews the commit and summarizes the verdict; Filipe decides.
+
+### Task size (rule in force since 2026-11-20)
+
+- **Small**: docs, text, a config tweak, a patch dependency bump, or a contained bugfix of up to ~50 lines in up to 3 files that touches none of: architecture, data model or schema, auth or security, infrastructure or deploy, public API, or pipeline logic. Claude plans and implements straight through to the local commit on `main` (§13).
+- **Large**: everything else, or when in doubt. Claude plans and STOPS: it presents the plan in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, from Filipe directly or relayed by the PO de Projetos as "Plano aprovado pelo Filipe: implemente.", sometimes with adjustments.
+- The issue prompt states which mode to follow. Claude may reclassify a task as large if planning shows it is bigger; it never reclassifies large as small.
 
 Do not mark a task complete unless its acceptance criteria have been verified.
 
