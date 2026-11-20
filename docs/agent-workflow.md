@@ -22,6 +22,7 @@ Return:
 6. Exact commands to run.
 7. Expected files to create or modify.
 8. Which items of the AGENTS.md §12 "Issue Close Checklist" this issue will touch, and which §8 "Runtime data exposure" rules it touches.
+9. For a pipeline step, one answer per row of the ROADMAP.md "Pipeline design checklist", each with the test or live check that proves it. "Not applicable" needs a reason.
 
 Mode: <small|large>. Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Large: wait for my approval before editing. Small: implement after planning. If planning shows the task is larger than stated, reclassify it as large and stop.
 ```

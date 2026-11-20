@@ -82,6 +82,7 @@ Do **not** treat `PROJECT_STATUS.md` as durable evidence storage. Architecture d
 - Validate business metrics against source data.
 - Document partitioning, file sizing and incremental processing strategies.
 - Treat exactly-once end-to-end processing as a claim requiring explicit proof; do not assume it from Kafka or Spark alone.
+- Every plan for a pipeline step (ingestion, Bronze, Silver, Gold, schedule, trigger, backfill, stream) answers each row of the pipeline design checklist in `ROADMAP.md`: change type, window and missed windows, re-run, deletes, what a run reads as history grows, what readers see during and after a failed write, table ownership and concurrency, triggers, failure state, and the evidence that exercises those paths.
 
 ## 7. Environment and Tooling
 

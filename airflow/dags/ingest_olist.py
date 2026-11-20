@@ -16,7 +16,7 @@ with DAG(
     start_date=datetime(2026, 1, 1),
     schedule=None,
     catchup=False,
-    is_paused_upon_creation=False,
+    is_paused_upon_creation=True,
     default_args=DEFAULT_ARGS,
     params={"execution_id": execution_id_param()},
     doc_md=__doc__,

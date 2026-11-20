@@ -4,6 +4,38 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-20 — Pipeline review: roadmap gaps filed
+
+A general review of the orchestrated pipelines, outside the issue text, found defects that the roadmap had not asked about. They are filed in `ROADMAP.md`; no pipeline code changed in this entry.
+
+- `promote_bronze` lists every object under `raw/{source}/{dataset}/`, from every execution and date, loads them into Python memory, and rewrites one staging file per dataset on every run. Each new Olist execution doubles Bronze (geolocation 2_000_326 rows against 1_000_163). The work of each refresh grows with total history. Filed as P3-13, incremental lakehouse refresh, with ADR-0024.
+- Silver writes `DROP TABLE` → `CREATE TABLE` → `INSERT OVERWRITE` (`lakehouse/silver/common.py`). Readers see no table during that window, a failed insert leaves it empty, and Iceberg history is lost on every run. Bronze (`INSERT OVERWRITE`) and dbt (`on_table_exists: replace`) are already single commits. Filed as P3-11.
+- `update_pattern` (`snapshot`, `full_refresh`, `incremental_window`) has no downstream behavior. Silver unions every execution and keeps the latest row per key, so a product or municipality removed at the source never leaves Silver, and `demo_storefront.clickstream` is labelled `snapshot` although it is an event stream. Filed as P3-12, with a source refresh matrix.
+- Only the PostgreSQL daily DAG triggers the refresh; other sources enter whenever a refresh happens to run, and N upstream runs queue N full rebuilds. Folded into P3-13 (ingestion Assets, coalesced refresh).
+- The daily `catchup=False` gap was fixed in P3-04 (entry below). P3-06 gains window coverage and a gap report.
+
+The roadmap gains a pipeline design checklist that every pipeline issue answers in its plan and acceptance. `AGENTS.md` §6 and the plan prompt in `docs/agent-workflow.md` point to it. P3-05 becomes a trailing seven-day re-extract for late commits. P3-08 records rows read and durations per refresh, and P5-03 charts them. P3-09 adds gap, failed-write, no-op, and coalescing scenarios. P4-04 separates stream and batch table ownership. Phase 10 follows P3-12 and P3-13 instead of `FULL_OVERWRITE`. The Phase 3 close pair moves from P3-11/P3-12 to P3-14/P3-15; entries before this one that say P3-11/P3-12 mean the close pair. ADR-0006 related issues are `P3-01`–`P3-15`.
+
+---
+
+### 2026-11-20 — P3-04 catchup corrected
+
+A review after P3-04 found that `catchup=False` loses windows. The daily window comes only from the schedule and no watermark is stored, so a day the scheduler did not run (DAG paused, scheduler down) would never be extracted, and nothing would fail. `ingest_postgres_oltp_daily` now sets `catchup=True` with `start_date` 2026-11-19, the first window it ran. After a gap the scheduler runs each missed day, oldest first, one at a time. A DagBag test walks three missed days after the 2026-11-19 run and checks that the first run on a fresh database is the 2026-11-19 window. After `airflow dags reserialize`, the live DAG reported its next data interval as `2026-11-20T00:00Z` → `2026-11-21T00:00Z`, with no import errors. A gap filled on a live scheduler is not yet recorded; that is the Phase 3 live run. Each caught-up day still triggers a full `transform_lakehouse` rebuild. The P3-04 live run below used `catchup=False`.
+
+---
+
+### 2026-11-20 — P3-04 daily PostgreSQL schedule
+
+`ingest_postgres_oltp_daily` uses `CronDataIntervalTimetable("0 0 * * *", "UTC")`, `catchup=False`, and `max_active_runs=1`. The extract renders `--window-start`/`--window-end` from `data_interval_start`/`data_interval_end`, and `execution_id` stays `params.execution_id or run_id`. After a successful extract, `TriggerDagRunOperator` starts `transform_lakehouse` with run id `ingest_postgres_oltp_daily__<run_id>`, `reset_dag_run=True`, `wait_for_completion=False`, and `fail_when_dag_is_paused=True`. The manual `ingest_postgres_oltp` DAG does not trigger it. The extract vector moved to `postgres_extract_task` in `ingest_common.py`. Late commits after the 00:00Z run miss the daily window; P3-05, P3-06, and CDC (Phase 4) cover that. The P3-04 acceptance now includes the transform trigger.
+
+`lakehouse_gold` is a 1-slot pool that `airflow-init` creates. It holds `transform_lakehouse` `bronze`, `silver`, `stage_quarantine`, `dbt_build`, and `reconcile_gold` `dbt_reconcile`. That is wider than the `dbt_build`-only acceptance text, by Filipe's decision. The pool was chosen over an Asset because an Asset only orders runs. Every DAG sets `is_paused_upon_creation=True`. DAGs already in the metadata database kept their state. `run_python_args` uses `Popen(start_new_session=True)` and sends `SIGTERM`, then `SIGKILL` after 10 s, to the process group when the wait ends.
+
+Airflow 3.4 checks: a cron string gives a zero-length `CronTriggerTimetable` interval; a task in a missing pool is never scheduled; `AirflowTaskTimeout` and `AirflowTaskTerminated` derive from `BaseException`. Divergence: `airflow dags trigger -l` sets only the logical date. The data interval comes from the trigger time, so a past window used `airflow backfill create`.
+
+Live run, 2026-11-20 UTC: the scheduled run `scheduled__2026-11-20T00:00:00+00:00`, the manual run `manual__2026-11-20T03:42:53.785961+00:00` (both window 2026-11-19, empty), and the backfill run `backfill__2026-10-18T00:00:00+00:00` (window 2026-10-17, 2/1/1/1 rows, equal to `COUNT(*)` on `oltp`) finished `success`. The three transform runs they triggered finished `success`, every task on attempt 1: 20 min 22 s, 9 min 22 s, and 9 min 51 s, each with PASS=287. `reconcile_gold` `manual__2026-11-20T03:42:11.378124+00:00` waited for the slot and ran 03:46:51–03:57:12, between `bronze` (ended 03:46:50) and `silver` (started 03:57:14); PASS=56. Clearing the backfill run overwrote the same four raw keys and reset the same transform run (10 min 06 s, PASS=287). Bronze sellers stayed 11, Silver `postgres_oltp` 2/2/2/3, and quarantine 1_603. No secret appeared in the 33 task logs. `uv run pytest tests/unit` → 364 passed; ruff check, ruff format --check, and `make lint` passed. Evidence: [`docs/architecture/airflow-local.md`](architecture/airflow-local.md).
+
+---
+
 ### 2026-11-17 — Markdown tables name their columns
 
 8 key and value tables had an empty header row (`| | |`), which GFM renders as a blank row on top. Each now has a header drawn from its context (`Project | Current`, `Validation | Detail`, `Decision log | Reference`, `Document | Reference`, `ADRs | Location`, `Component | Setting`, `Cache | Setting`). `scripts/check_markdown_tables.py` fails on an empty header row in any tracked Markdown file, outside fenced code; `make lint` and CI run it. AGENTS.md §9 states the rule.

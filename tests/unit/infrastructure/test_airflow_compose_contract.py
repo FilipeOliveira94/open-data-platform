@@ -122,6 +122,15 @@ def test_airflow_profile_pins_local_executor_and_minio_logs() -> None:
     assert "open_data_platform" not in text
 
 
+def test_airflow_init_creates_the_one_slot_lakehouse_pool() -> None:
+    command = " ".join(_services()["airflow-init"]["command"])
+    lines = [line.strip() for line in command.splitlines()]
+    pool_lines = [line for line in lines if line.startswith("airflow pools set")]
+    assert len(pool_lines) == 1
+    assert pool_lines[0].split()[3:5] == ["lakehouse_gold", "1"]
+    assert lines.index(pool_lines[0]) > lines.index("/entrypoint airflow version")
+
+
 def test_env_example_matches_the_local_placeholders() -> None:
     env = ENV_EXAMPLE.read_text(encoding="utf-8")
     assert f"AIRFLOW_FERNET_KEY={FERNET_PLACEHOLDER}" in env

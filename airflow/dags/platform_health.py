@@ -17,6 +17,6 @@ with DAG(
     start_date=datetime(2026, 1, 1),
     schedule=None,
     catchup=False,
-    is_paused_upon_creation=False,
+    is_paused_upon_creation=True,
 ):
     BashOperator(task_id="ready", bash_command="echo platform_health ready")

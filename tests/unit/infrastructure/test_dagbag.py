@@ -1,4 +1,4 @@
-"""Load every DAG under airflow/dags with the pinned Airflow (P3-02, P3-03).
+"""Load every DAG under airflow/dags with the pinned Airflow (P3-02 to P3-04).
 
 No Compose services. Airflow uses a temporary home with a SQLite file that
 the DagBag does not touch. Run behavior (success, retry, failure) is P3-09.
@@ -7,7 +7,7 @@ the DagBag does not touch. Run behavior (success, retry, failure) is P3-09.
 from __future__ import annotations
 
 import sys
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -26,6 +26,16 @@ EXPECTED_DAGS = {
     "seed_postgres_oltp",
     "transform_lakehouse",
     "reconcile_gold",
+    "ingest_postgres_oltp_daily",
+}
+
+POOL = "lakehouse_gold"
+POOLED_TASKS = {
+    ("transform_lakehouse", "bronze"),
+    ("transform_lakehouse", "silver"),
+    ("transform_lakehouse", "stage_quarantine"),
+    ("transform_lakehouse", "dbt_build"),
+    ("reconcile_gold", "dbt_reconcile"),
 }
 
 MEDALLION_BUILD = "open_data_platform.lakehouse.medallion_build"
@@ -38,6 +48,8 @@ TRANSFORM_ORDER = (
     ("stage_quarantine", "stage-quarantine"),
     ("dbt_build", "dbt-build"),
 )
+
+DAILY = "ingest_postgres_oltp_daily"
 
 INGEST_ENTRYPOINTS = {
     "ingest_olist": ("open_data_platform.ingestion.olist",),
@@ -79,11 +91,14 @@ def test_every_dag_imports_without_errors(dagbag) -> None:
 def test_wrapper_tasks_share_the_p3_02_defaults(dagbag) -> None:
     for dag_id in EXPECTED_DAGS - {"platform_health"}:
         dag = dagbag.dags[dag_id]
-        assert dag.catchup is False
+        # The daily extract catches up missed windows (P3-04).
+        assert dag.catchup is (dag_id == DAILY)
         for task in dag.tasks:
             assert task.retries == 2, (dag_id, task.task_id)
             assert task.retry_delay == timedelta(minutes=2)
             assert task.execution_timeout == timedelta(minutes=30)
+            if (dag_id, task.task_id) == (DAILY, "trigger_transform"):
+                continue
             assert task.python_callable.__name__ == "run_python_args"
 
 
@@ -143,3 +158,208 @@ def test_medallion_build_steps_exist(dagbag) -> None:
     for dag_id in ("transform_lakehouse", "reconcile_gold"):
         for task in dagbag.dags[dag_id].tasks:
             assert _vector(task)[2] in STEPS
+
+
+def test_every_dag_is_paused_at_creation(dagbag) -> None:
+    for dag_id, dag in dagbag.dags.items():
+        assert dag.is_paused_upon_creation is True, dag_id
+
+
+def test_lakehouse_pool_holds_exactly_the_writes_and_reconciliation(dagbag) -> None:
+    pooled = {
+        (dag_id, task.task_id)
+        for dag_id, dag in dagbag.dags.items()
+        for task in dag.tasks
+        if task.pool == POOL
+    }
+    assert pooled == POOLED_TASKS
+    from ingest_common import LAKEHOUSE_GOLD_POOL
+
+    assert LAKEHOUSE_GOLD_POOL == POOL
+    for dag_id, task_id in POOLED_TASKS:
+        assert dagbag.dags[dag_id].get_task(task_id).pool_slots == 1
+    transform = dagbag.dags["transform_lakehouse"]
+    for task_id in ("bronze_checks", "silver_checks"):
+        assert transform.get_task(task_id).pool == "default_pool"
+
+
+def _core_timetable(dag):
+    from airflow.serialization.encoders import coerce_to_core_timetable
+
+    return coerce_to_core_timetable(dag.timetable)
+
+
+def test_daily_dag_runs_at_utc_midnight_with_catchup(dagbag) -> None:
+    from airflow.timetables.interval import CronDataIntervalTimetable
+
+    dag = dagbag.dags[DAILY]
+    timetable = _core_timetable(dag)
+    assert isinstance(timetable, CronDataIntervalTimetable)
+    assert timetable.summary == "0 0 * * *"
+    assert str(timetable._timezone) == "UTC"
+    assert dag.catchup is True
+    assert dag.start_date == datetime(2026, 11, 19, tzinfo=UTC)
+    assert dag.max_active_runs == 1
+    assert set(dag.params.keys()) == {"execution_id"}
+    assert dag.task_ids == ["extract", "trigger_transform"]
+    vector = _vector(dag.get_task("extract"))
+    assert vector[:3] == ["-m", "open_data_platform.ingestion.postgres_oltp", "extract"]
+
+
+def test_daily_intervals_are_one_utc_day(dagbag) -> None:
+    import pendulum
+    from airflow.timetables.base import DataInterval, TimeRestriction
+
+    timetable = _core_timetable(dagbag.dags[DAILY])
+    utc = pendulum.timezone("UTC")
+    previous = DataInterval(
+        pendulum.datetime(2026, 10, 16, tz=utc), pendulum.datetime(2026, 10, 17, tz=utc)
+    )
+    info = timetable.next_dagrun_info(
+        last_automated_data_interval=previous,
+        restriction=TimeRestriction(
+            earliest=pendulum.datetime(2026, 1, 1, tz=utc), latest=None, catchup=True
+        ),
+    )
+    assert info.data_interval.start == pendulum.datetime(2026, 10, 17, tz=utc)
+    assert info.data_interval.end == pendulum.datetime(2026, 10, 18, tz=utc)
+    assert info.run_after == info.data_interval.end
+    # A manual run gets the last complete UTC day before its run_after.
+    for run_after in (
+        pendulum.datetime(2026, 11, 20, 0, 31, tz=utc),
+        pendulum.datetime(2026, 11, 20, 23, 59, tz=utc),
+        pendulum.datetime(2026, 11, 20, tz=utc),
+    ):
+        manual = timetable.infer_manual_data_interval(run_after=run_after)
+        assert manual.start == pendulum.datetime(2026, 11, 19, tz=utc)
+        assert manual.end == pendulum.datetime(2026, 11, 20, tz=utc)
+
+
+def test_daily_dag_runs_every_missed_window_in_order(dagbag) -> None:
+    """After a gap the next run is the first missed day, not the latest one."""
+    import pendulum
+    from airflow.timetables.base import DataInterval, TimeRestriction
+
+    dag = dagbag.dags[DAILY]
+    timetable = _core_timetable(dag)
+    utc = pendulum.timezone("UTC")
+    restriction = TimeRestriction(
+        earliest=pendulum.instance(dag.start_date), latest=None, catchup=dag.catchup
+    )
+    # Last automated run covered 2026-11-19; the scheduler was away for days.
+    last = DataInterval(
+        pendulum.datetime(2026, 11, 19, tz=utc), pendulum.datetime(2026, 11, 20, tz=utc)
+    )
+    seen = []
+    for _ in range(3):
+        info = timetable.next_dagrun_info(
+            last_automated_data_interval=last, restriction=restriction
+        )
+        seen.append((info.data_interval.start.date(), info.data_interval.end.date()))
+        last = info.data_interval
+    assert [(str(start), str(end)) for start, end in seen] == [
+        ("2026-11-20", "2026-11-21"),
+        ("2026-11-21", "2026-11-22"),
+        ("2026-11-22", "2026-11-23"),
+    ]
+    # The first run on a fresh database is the start_date window.
+    first = timetable.next_dagrun_info(
+        last_automated_data_interval=None, restriction=restriction
+    )
+    assert first.data_interval.start == pendulum.datetime(2026, 11, 19, tz=utc)
+
+
+def _render_extract(dag, context: dict[str, object]) -> list[str]:
+    task = dag.get_task("extract")
+    return [str(task.render_template(arg, context)) for arg in task.op_args]
+
+
+def test_daily_window_renders_into_a_valid_extract_window(dagbag) -> None:
+    import pendulum
+
+    from open_data_platform.ingestion.postgres_oltp import (
+        validate_window,
+        window_object_name,
+    )
+
+    dag = dagbag.dags[DAILY]
+    run_id = "scheduled__2026-10-17T00:00:00+00:00"
+    vector = _render_extract(
+        dag,
+        {
+            "data_interval_start": pendulum.datetime(2026, 10, 17, tz="UTC"),
+            "data_interval_end": pendulum.datetime(2026, 10, 18, tz="UTC"),
+            "params": {"execution_id": ""},
+            "run_id": run_id,
+        },
+    )
+    assert vector[3:] == [
+        "--window-start",
+        "2026-10-17T00:00:00+00:00",
+        "--window-end",
+        "2026-10-18T00:00:00+00:00",
+        "--execution-id",
+        run_id,
+    ]
+    start = datetime.fromisoformat(vector[4])
+    end = datetime.fromisoformat(vector[6])
+    assert validate_window(start, end) == (start, end)
+    name = window_object_name("sellers", start, end)
+    assert name == "sellers_2026-10-17_2026-10-18.json"
+
+
+def test_daily_window_without_interval_renders_empty_bounds(dagbag) -> None:
+    from open_data_platform.ingestion.postgres_oltp import main
+
+    vector = _render_extract(
+        dagbag.dags[DAILY],
+        {
+            "data_interval_start": None,
+            "data_interval_end": None,
+            "params": {"execution_id": ""},
+            "run_id": "manual__x",
+        },
+    )
+    assert vector[4] == ""
+    assert vector[6] == ""
+    # The extract rejects the empty bound before it connects.
+    patch = pytest.MonkeyPatch()
+    patch.setenv("ODP_RAW_BUCKET", "odp-raw")
+    patch.setenv("POSTGRES_USER", "odp")
+    patch.setenv("POSTGRES_PASSWORD", "unused")
+    patch.setenv("POSTGRES_DB", "odp")
+    try:
+        assert main(vector[2:]) == 1
+    finally:
+        patch.undo()
+
+
+def test_daily_dag_triggers_the_transform_after_the_extract(dagbag) -> None:
+    from airflow.providers.standard.operators.trigger_dagrun import (
+        TriggerDagRunOperator,
+    )
+
+    dag = dagbag.dags[DAILY]
+    trigger = dag.get_task("trigger_transform")
+    assert isinstance(trigger, TriggerDagRunOperator)
+    assert trigger.trigger_dag_id == "transform_lakehouse"
+    assert trigger.trigger_dag_id in dagbag.dags
+    assert trigger.upstream_task_ids == {"extract"}
+    assert trigger.wait_for_completion is False
+    assert trigger.reset_dag_run is True
+    assert trigger.fail_when_dag_is_paused is True
+    assert trigger.trigger_run_id == f"{DAILY}__{{{{ run_id }}}}"
+    rendered = trigger.render_template(
+        trigger.trigger_run_id, {"run_id": "scheduled__2026-10-17T00:00:00+00:00"}
+    )
+    assert rendered == f"{DAILY}__scheduled__2026-10-17T00:00:00+00:00"
+
+
+def test_only_the_daily_dag_triggers_another_dag(dagbag) -> None:
+    triggers = {
+        (dag_id, task.task_id)
+        for dag_id, dag in dagbag.dags.items()
+        for task in dag.tasks
+        if type(task).__name__ == "TriggerDagRunOperator"
+    }
+    assert triggers == {(DAILY, "trigger_transform")}

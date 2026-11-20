@@ -221,8 +221,9 @@ services:
       postgres:
         condition: service_healthy
 
-  # Migrate, create the local admin, and ensure the log bucket. Runs as root
-  # so the log volume can be handed to uid 50000. Does not chown the repo.
+  # Migrate, create the local admin, ensure the log bucket, and set the
+  # 1-slot lakehouse_gold pool (P3-04). Runs as root so the log volume can be
+  # handed to uid 50000. Does not chown the repo.
   airflow-init:
     <<: *airflow-common
     profiles: [orchestration]
@@ -235,6 +236,7 @@ services:
         mkdir -p /opt/airflow/logs
         python /opt/odp/ensure_log_bucket.py
         /entrypoint airflow version
+        airflow pools set lakehouse_gold 1 "Lakehouse table writes and reconciliation, one at a time"
         chown -R "$${AIRFLOW_UID:-50000}:0" /opt/airflow/logs
     environment:
       <<: *airflow-env

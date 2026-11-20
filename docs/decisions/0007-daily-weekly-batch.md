@@ -37,7 +37,7 @@ Implement **one** PostgreSQL incremental extract path parameterized by time/wate
 
 ## Evidence / validation
 
-None yet — Phase 1 extract + Phase 3 schedules.
+Daily half (P3-04), 2026-11-20, recorded in [Local Airflow](../architecture/airflow-local.md) and [`docs/status-log.md`](../status-log.md): `ingest_postgres_oltp_daily` (`CronDataIntervalTimetable("0 0 * * *", "UTC")`, catchup off) passed its data interval to the P1-06 extract. A scheduled run, a manual run, and a one-day backfill for `[2026-10-17, 2026-10-18)` finished `success`. The backfill landed 2/1/1/1 rows, equal to `COUNT(*)` on `oltp` for that window. Each run triggered `transform_lakehouse`, which finished `success` (PASS=287). The weekly half (P3-05) is not built, so this ADR stays `proposed`.
 
 ## Revisit when
 
