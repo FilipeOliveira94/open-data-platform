@@ -4,6 +4,14 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-20 — P3-11 atomic table replace
+
+Bronze (`lakehouse/bronze.py`), Silver (`lakehouse/silver/common.py`), and quarantine staging (`lakehouse/quarantine_stage.py`) now replace each table with one `CREATE OR REPLACE TABLE … USING iceberg LOCATION … AS SELECT`. Silver and quarantine no longer run `DROP TABLE` → `CREATE TABLE` → `INSERT OVERWRITE`. Bronze no longer runs `CREATE TABLE IF NOT EXISTS` + `INSERT OVERWRITE`, which kept the first schema. Spark rejects a column list in a CTAS, so each column is cast to its contract type in the select. Zero-row writes select typed `NULL` columns `WHERE 1 = 0`. A new contract schema lands in the same commit. dbt Gold was already atomic: `on_table_exists: replace` renders 55 `create or replace table` statements. Replace is atomic because Spark uses `SparkCatalog` over the JDBC catalog. A probe first confirmed that replacing with the same `LOCATION` and an added column works and keeps snapshots.
+
+`tests/unit/lakehouse/test_atomic_replace.py` fails on `DROP TABLE`, `CREATE TABLE`, or `INSERT OVERWRITE` in any rendered writer SQL and pins `on_table_exists: replace`. `scripts/p3_11_replace_check.sh` ran live. A Silver geolocation write forced to fail with `raise_error` kept 738_332 rows and 1 snapshot. A Trino count loop over Bronze, Silver, quarantine, and `fct_orders` during a full rebuild (live-bronze 309 s, live-silver 260 s, stage-quarantine 19 s, dbt-build 36 s) ran 410 queries with 0 errors and 0 zero counts. Each table gained one snapshot. Unit tests: 371 passed. The loop checks reads between statements, not a scan already running when a commit lands.
+
+---
+
 ### 2026-11-20 — Pipeline review: roadmap gaps filed
 
 A general review of the orchestrated pipelines, outside the issue text, found defects that the roadmap had not asked about. They are filed in `ROADMAP.md`; no pipeline code changed in this entry.

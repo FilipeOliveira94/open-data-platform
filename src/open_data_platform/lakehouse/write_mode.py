@@ -1,7 +1,10 @@
 """Lakehouse write modes for Bronze and Silver.
 
 P2-03 / P2-04 implement **full load + overwrite** only: each run rebuilds the
-whole Iceberg table from the current Bronze/raw inputs.
+whole Iceberg table from the current Bronze/raw inputs. Since P3-11 the rebuild
+is one ``CREATE OR REPLACE TABLE ... AS SELECT``: a single Iceberg commit, so a
+reader never sees the table missing or empty and a failed write keeps the
+previous snapshot.
 
 Incremental MERGE, append-only windows, and CDC upserts are **placeholders**.
 Selecting them must fail loudly until a later phase implements the commit path

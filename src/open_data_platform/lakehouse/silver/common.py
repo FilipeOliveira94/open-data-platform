@@ -248,10 +248,14 @@ def render_silver_sql(
     warehouse_bucket: str,
     policy: DedupPolicy,
 ) -> str:
-    """Spark SQL that creates one Silver table and overwrites it from Bronze.
+    """Spark SQL that replaces one Silver table from Bronze in one commit.
 
-    Only ``WriteMode.FULL_OVERWRITE`` is implemented: drop/recreate + overwrite.
-    Incremental modes branch to placeholders in ``lakehouse.write_mode``.
+    Only ``WriteMode.FULL_OVERWRITE`` is implemented. The table is replaced by
+    ``CREATE OR REPLACE TABLE ... AS SELECT``: one Iceberg commit, so readers
+    see the previous snapshot or the new one, never a missing or empty table.
+    A failed write leaves the previous snapshot. A new contract schema lands
+    in the same commit. Incremental modes branch to placeholders in
+    ``lakehouse.write_mode``.
     """
     context = f"{contract.source_id}.{contract.dataset}"
     try:
@@ -270,9 +274,6 @@ def render_silver_sql(
     quoted_silver = _quote_ident(table)
     quoted_bronze = _quote_ident(bronze)
     columns = resolve_output_columns(contract, policy)
-    column_defs = ",\n".join(
-        f"    {_quote_ident(col.name)} {col.iceberg_type}" for col in columns
-    )
     location = f"s3a://{bucket}/silver/{source_id}/{dataset}"
     typed_select = ",\n".join(
         f"  {col.select_sql} AS {_quote_ident(col.name)}" for col in columns
@@ -281,23 +282,22 @@ def render_silver_sql(
     order_sql = _order_by_sql(policy)
     pk_filter = _primary_key_filter(partition)
     names = tuple(col.name for col in columns)
-    column_list = ", ".join(_quote_ident(name) for name in names)
-    outer_select = ",\n".join(f"  {_quote_ident(name)}" for name in names)
+    outer_select = ",\n".join(
+        f"  CAST({_quote_ident(col.name)} AS {col.iceberg_type})"
+        f" AS {_quote_ident(col.name)}"
+        for col in columns
+    )
     inner_select = ",\n".join(f"    {_quote_ident(name)}" for name in names)
     lines = [
         f"-- {source_id}.{dataset}",
-        f"-- write_mode={policy.write_mode.value} (full load + overwrite)",
+        f"-- write_mode={policy.write_mode.value} (full load, one atomic replace)",
         "CREATE NAMESPACE IF NOT EXISTS silver;",
         "",
-        f"DROP TABLE IF EXISTS silver.{quoted_silver};",
-        f"CREATE TABLE silver.{quoted_silver} (",
-        column_defs,
-        ") USING iceberg",
+        f"CREATE OR REPLACE TABLE silver.{quoted_silver}",
+        "USING iceberg",
         f"LOCATION '{location}'",
-        "TBLPROPERTIES ('format-version' = '2');",
-        "",
-        f"INSERT OVERWRITE silver.{quoted_silver} ({column_list})",
-        "SELECT",
+        "TBLPROPERTIES ('format-version' = '2')",
+        "AS SELECT",
         outer_select,
         "FROM (",
         "  SELECT",

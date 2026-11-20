@@ -186,7 +186,7 @@ def test_shipped_contracts_keep_primary_keys_and_drop_the_page_array() -> None:
     loaded = load_contracts()
     assert len(loaded) == 18
     sql = render_bronze_sql([(item, 1) for item in loaded], "odp-warehouse")
-    assert sql.count("CREATE TABLE IF NOT EXISTS") == 18
+    assert sql.count("CREATE OR REPLACE TABLE bronze.") == 18
     assert sql.count("'format-version' = '2'") == 18
     assert "s3a://odp-warehouse/catalog" not in sql
     for contract in loaded:
@@ -478,7 +478,7 @@ def test_quarantine_objects_are_not_promoted() -> None:
     ]["Body"]
     assert isinstance(staging, bytes)
     assert b"QUARANTINE_ONLY" not in staging
-    assert "INSERT OVERWRITE" in promotion.sql
+    assert "CREATE OR REPLACE TABLE bronze." in promotion.sql
     assert "WHERE 1 = 0" not in promotion.sql
 
 
@@ -525,7 +525,10 @@ def test_live_fixtures_are_idempotent_and_cover_each_payload_format() -> None:
         "ibge_localidades__municipios.sql",
         "dummyjson_products__products.sql",
     ]
-    assert all(sql.count("INSERT OVERWRITE") == 1 for _name, sql in first.scripts)
+    assert all(
+        sql.count("CREATE OR REPLACE TABLE bronze.") == 1
+        for _name, sql in first.scripts
+    )
     checks = live_checks()
     statements = "\n".join(statement for _expected, statement in checks)
     assert "São Teste" in statements

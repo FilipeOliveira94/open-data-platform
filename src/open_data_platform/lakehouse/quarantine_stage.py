@@ -186,6 +186,9 @@ def encode_findings_jsonl(rows: Sequence[QuarantineFindingRow]) -> bytes:
 def render_load_sql(*, warehouse_bucket: str, row_count: int) -> str:
     """Spark SQL that replaces the findings table from the staging object.
 
+    One ``CREATE OR REPLACE TABLE ... AS SELECT``: a single Iceberg commit, so
+    readers never see the table missing or empty during a failed run.
+
     The statement names the warehouse path and the columns. Finding values
     stay in the JSONL object.
     """
@@ -195,22 +198,20 @@ def render_load_sql(*, warehouse_bucket: str, row_count: int) -> str:
         raise QuarantineStageError(msg)
     location = f"s3a://{bucket}/{TABLE_LOCATION}"
     quoted_table = _quote(TABLE)
-    column_sql = ",\n".join(f"    {_quote(name)} {kind}" for name, kind in _COLUMNS)
-    column_list = ", ".join(_quote(name) for name, _kind in _COLUMNS)
     select_sql = ",\n".join(
-        f"  CAST({_quote(name)} AS {kind})" for name, kind in _COLUMNS
+        f"  CAST({_quote(name)} AS {kind}) AS {_quote(name)}" for name, kind in _COLUMNS
     )
+    # One atomic replace: readers see the previous snapshot or the new one.
+    replace = [
+        f"CREATE OR REPLACE TABLE {SCHEMA}.{quoted_table}",
+        "USING iceberg",
+        f"LOCATION '{location}'",
+        "TBLPROPERTIES ('format-version' = '2')",
+    ]
     lines = [
         f"-- {SCHEMA}.{TABLE}",
         "-- values stay in the staging JSONL; this script names the path only",
         f"CREATE NAMESPACE IF NOT EXISTS {SCHEMA};",
-        "",
-        f"DROP TABLE IF EXISTS {SCHEMA}.{quoted_table};",
-        f"CREATE TABLE {SCHEMA}.{quoted_table} (",
-        column_sql,
-        ") USING iceberg",
-        f"LOCATION '{location}'",
-        "TBLPROPERTIES ('format-version' = '2');",
         "",
     ]
     if row_count == 0:
@@ -219,8 +220,8 @@ def render_load_sql(*, warehouse_bucket: str, row_count: int) -> str:
         )
         lines.extend(
             [
-                f"INSERT OVERWRITE {SCHEMA}.{quoted_table} ({column_list})",
-                "SELECT * FROM (",
+                *replace,
+                "AS SELECT * FROM (",
                 "SELECT",
                 nulls,
                 ") empty_staging",
@@ -240,8 +241,8 @@ def render_load_sql(*, warehouse_bucket: str, row_count: int) -> str:
                 "  multiline 'false'",
                 ");",
                 "",
-                f"INSERT OVERWRITE {SCHEMA}.{quoted_table} ({column_list})",
-                "SELECT",
+                *replace,
+                "AS SELECT",
                 select_sql,
                 f"FROM {view};",
             ]

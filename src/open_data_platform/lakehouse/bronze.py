@@ -591,21 +591,21 @@ def _table_sql(
     table = bronze_table_name(source_id, dataset)
     quoted_table = _quote_ident(table)
     columns = bronze_columns(contract)
-    column_sql = ",\n".join(f"    {_quote_ident(name)} STRING" for name in columns)
     select_sql = ",\n".join(
-        f"  CAST({_quote_ident(name)} AS STRING)" for name in columns
+        f"  CAST({_quote_ident(name)} AS STRING) AS {_quote_ident(name)}"
+        for name in columns
     )
-    column_list = ", ".join(_quote_ident(name) for name in columns)
     location = f"s3a://{bucket}/bronze/{source_id}/{dataset}"
+    # One atomic replace: readers see the previous snapshot or the new one.
+    replace = [
+        f"CREATE OR REPLACE TABLE bronze.{quoted_table}",
+        "USING iceberg",
+        f"LOCATION '{location}'",
+        "TBLPROPERTIES ('format-version' = '2')",
+    ]
     lines = [
         f"-- {source_id}.{dataset}",
-        f"-- write_mode={write_mode.value} (full load + overwrite)",
-        f"CREATE TABLE IF NOT EXISTS bronze.{quoted_table} (",
-        column_sql,
-        ") USING iceberg",
-        f"LOCATION '{location}'",
-        "TBLPROPERTIES ('format-version' = '2');",
-        "",
+        f"-- write_mode={write_mode.value} (full load, one atomic replace)",
     ]
     if row_count == 0:
         nulls = ",\n".join(
@@ -613,8 +613,8 @@ def _table_sql(
         )
         lines.extend(
             [
-                f"INSERT OVERWRITE bronze.{quoted_table} ({column_list})",
-                "SELECT * FROM (",
+                *replace,
+                "AS SELECT * FROM (",
                 "SELECT",
                 nulls,
                 ") empty_staging",
@@ -634,8 +634,8 @@ def _table_sql(
                 "  multiline 'false'",
                 ");",
                 "",
-                f"INSERT OVERWRITE bronze.{quoted_table} ({column_list})",
-                "SELECT",
+                *replace,
+                "AS SELECT",
                 select_sql,
                 f"FROM {view};",
             ]

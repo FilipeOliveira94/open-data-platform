@@ -86,7 +86,7 @@ def test_clickstream_orders_by_event_time_and_keeps_null_product() -> None:
     )
     assert "ORDER BY `event_time` DESC" in sql
     assert "PARTITION BY `event_id`" in sql
-    assert "`product_id` STRING" in sql
+    assert "CAST(`product_id` AS STRING) AS `product_id`" in sql
 
 
 def test_dummyjson_expands_nested_json_columns() -> None:
@@ -106,7 +106,8 @@ def test_dummyjson_expands_nested_json_columns() -> None:
     assert "from_json(`tags`, 'ARRAY<STRING>')" in sql
     assert "dimensions_width" in sql
     assert "ARRAY<STRUCT<" in sql
-    assert "DROP TABLE IF EXISTS silver." in sql
+    assert "CREATE OR REPLACE TABLE silver." in sql
+    assert "DROP TABLE" not in sql
     assert "write_mode=full_overwrite" in sql
     # Timestamp parsing for nested meta uses the shared helper.
     assert json_path_timestamp("`meta`", "$.createdAt") in sql
