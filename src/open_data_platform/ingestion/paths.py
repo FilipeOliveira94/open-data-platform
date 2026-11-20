@@ -71,6 +71,32 @@ def build_raw_object_key(
     return f"raw/{source}/{ds}/dt={dt}/execution_id={exec_id}/{name}"
 
 
+COMPLETION_MARKER_NAME = "_COMPLETE"
+
+
+def build_completion_marker_key(
+    *,
+    source_id: str,
+    dataset: str,
+    execution_id: str,
+    ingestion_date: date,
+) -> str:
+    """Build the key of the marker that closes one execution of one dataset.
+
+    Layout::
+
+        raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/_COMPLETE
+
+    The marker sits next to the data objects of the same execution. The
+    leading underscore keeps it out of the data object name space.
+    """
+    source = _validate_source_segment("source_id", source_id)
+    ds = _validate_source_segment("dataset", dataset)
+    exec_id = _validate_execution_id(execution_id)
+    dt = ingestion_date.isoformat()
+    return f"raw/{source}/{ds}/dt={dt}/execution_id={exec_id}/{COMPLETION_MARKER_NAME}"
+
+
 def build_quarantine_object_key(
     *,
     source_id: str,

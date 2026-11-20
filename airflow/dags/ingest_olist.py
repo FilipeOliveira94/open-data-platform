@@ -2,6 +2,10 @@
 
 Business logic stays in ``open_data_platform.ingestion.olist``. Kaggle
 credentials come from the container environment, not from task arguments.
+
+Refresh policy (P3-12): manual only. Olist is a fixed historical release
+(``snapshot``); a new run lands the same rows, and Silver keeps the latest
+complete execution, so its rows and counts do not change.
 """
 
 from __future__ import annotations

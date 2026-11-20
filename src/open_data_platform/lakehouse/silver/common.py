@@ -279,8 +279,10 @@ def render_silver_sql(
         f"  {col.select_sql} AS {_quote_ident(col.name)}" for col in columns
     )
     partition = _partition_columns(contract, policy)
-    order_sql = _order_by_sql(policy)
+    pattern = contract.update_pattern
+    order_sql = _order_by_sql(policy, ascending=pattern == "append_only")
     pk_filter = _primary_key_filter(partition)
+    guard, source_lines = _bronze_selection(pattern, quoted_bronze, context)
     names = tuple(col.name for col in columns)
     outer_select = ",\n".join(
         f"  CAST({_quote_ident(col.name)} AS {col.iceberg_type})"
@@ -291,8 +293,10 @@ def render_silver_sql(
     lines = [
         f"-- {source_id}.{dataset}",
         f"-- write_mode={policy.write_mode.value} (full load, one atomic replace)",
+        f"-- update_pattern={pattern}: {_SELECTION_NOTES[pattern]}",
         "CREATE NAMESPACE IF NOT EXISTS silver;",
         "",
+        *guard,
         f"CREATE OR REPLACE TABLE silver.{quoted_silver}",
         "USING iceberg",
         f"LOCATION '{location}'",
@@ -309,7 +313,7 @@ def render_silver_sql(
         "  FROM (",
         "    SELECT",
         typed_select,
-        f"    FROM bronze.{quoted_bronze}",
+        *source_lines,
         "  ) typed",
         f"  WHERE {pk_filter}",
         ") ranked",
@@ -402,7 +406,65 @@ def _primary_key_filter(partition_sql: str) -> str:
     return " AND ".join(f"{part} IS NOT NULL" for part in parts)
 
 
-def _order_by_sql(policy: DedupPolicy) -> str:
+COMPLETED_COLUMN = "_execution_completed_ts"
+
+# Which Bronze rows Silver selects survivors from, per contract update_pattern.
+_SELECTION_NOTES: dict[str, str] = {
+    "snapshot": "survivors from the latest complete execution only",
+    "full_refresh": "survivors from the latest complete execution only",
+    "incremental_window": "union of every window, latest row per key",
+    "append_only": "every complete execution, first ingested row per key",
+}
+
+
+def _bronze_selection(
+    pattern: str,
+    quoted_bronze: str,
+    context: str,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Guard statements and the ``FROM`` lines of the typed Bronze select.
+
+    ``snapshot`` and ``full_refresh`` read only the latest complete execution
+    (by marker time, then ``dt`` and ``execution_id``), so a record absent from
+    it leaves Silver. ``append_only`` reads every complete execution.
+    Both fail before the replace when no execution is complete, so Silver
+    keeps its previous snapshot instead of becoming empty.
+    ``incremental_window`` reads every window, as before.
+    """
+    if pattern not in _SELECTION_NOTES:
+        msg = f"{context}: unsupported update_pattern {pattern!r}"
+        raise SilverError(msg)
+    table = f"bronze.{quoted_bronze}"
+    completed = _quote_ident(COMPLETED_COLUMN)
+    if pattern == "incremental_window":
+        return (), (f"    FROM {table}",)
+    guard = (
+        "-- No complete execution: fail here and keep the previous snapshot.",
+        "SELECT assert_true(",
+        "  COUNT(*) > 0,",
+        f"  'no complete execution in Bronze for {context}'",
+        ") AS has_complete_execution",
+        f"FROM {table}",
+        f"WHERE {completed} IS NOT NULL;",
+        "",
+    )
+    if pattern == "append_only":
+        return guard, (f"    FROM {table}", f"    WHERE {completed} IS NOT NULL")
+    completed_at = timestamp_sql(completed, TimestampStyle.ISO)
+    return guard, (
+        f"    FROM {table} b",
+        "    LEFT SEMI JOIN (",
+        "      SELECT `dt`, `execution_id`",
+        f"      FROM {table}",
+        f"      WHERE {completed} IS NOT NULL",
+        f"      ORDER BY {completed_at} DESC, `dt` DESC, `execution_id` DESC",
+        "      LIMIT 1",
+        "    ) latest",
+        "    ON b.`dt` = latest.`dt` AND b.`execution_id` = latest.`execution_id`",
+    )
+
+
+def _order_by_sql(policy: DedupPolicy, *, ascending: bool = False) -> str:
     seen: set[str] = set()
     ordered: list[str] = []
     for name in (*policy.order_by, *DEFAULT_ORDER):
@@ -410,12 +472,13 @@ def _order_by_sql(policy: DedupPolicy) -> str:
             continue
         seen.add(name)
         ordered.append(name)
+    direction = "ASC" if ascending else "DESC"
     chunks: list[str] = []
     for name in ordered:
         if name == "record_index":
-            chunks.append("CAST(`record_index` AS BIGINT) DESC")
+            chunks.append(f"CAST(`record_index` AS BIGINT) {direction}")
         else:
-            chunks.append(f"{_quote_ident(name)} DESC")
+            chunks.append(f"{_quote_ident(name)} {direction}")
     return ", ".join(chunks)
 
 

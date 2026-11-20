@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: demo_storefront
 dataset: clickstream
 description: "Seedable clickstream from a fictional retail website. One record is one user action: page_view, add_to_cart, or purchase. event_id identifies the action. event_time is the time of the action. Session, user, and product identifiers are generated tokens. The batch lands as JSONL. Ingestion time stays on the object metadata. This source has no join to Olist or DummyJSON. Daily batch, weekly batch, and CDC remain the PostgreSQL paths."
@@ -6,7 +6,7 @@ payload_format: jsonl
 grain: "One user action on the fictional storefront."
 primary_key:
   - event_id
-update_pattern: snapshot
+update_pattern: append_only
 on_invalid: quarantine
 on_structural_error: fail_batch
 governance:
@@ -50,3 +50,5 @@ changelog:
     note: "Initial contract for the fictional storefront clickstream. JSONL, 500 actions per second of event time, millisecond timestamps. No stored sample rows."
   - version: 2
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 3
+    note: "update_pattern moves from snapshot to append_only. Each batch adds events; Silver keeps every complete batch and deduplicates by event_id. event_time places a late event."

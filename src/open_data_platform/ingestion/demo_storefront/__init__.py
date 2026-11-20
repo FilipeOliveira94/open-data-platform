@@ -29,7 +29,13 @@ from open_data_platform.ingestion.quarantine import (
     prepare_quarantine,
     write_quarantine_object,
 )
-from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
+from open_data_platform.ingestion.writer import (
+    RawWriteResult,
+    clear_completion_marker,
+    object_name_of,
+    write_completion_marker,
+    write_raw_object,
+)
 from open_data_platform.object_storage import client_from_env
 
 if TYPE_CHECKING:
@@ -122,6 +128,14 @@ def ingest_demo_storefront(
         sidecar = prepare_quarantine(contract, records)
     except InvalidRecordsError as exc:
         raise DemoStorefrontError(str(exc)) from exc
+    clear_completion_marker(
+        client,
+        bucket=bucket,
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        ingestion_ts=ts,
+    )
     result = write_raw_object(
         client,
         bucket=bucket,
@@ -142,6 +156,15 @@ def ingest_demo_storefront(
         object_name=OBJECT_NAME,
         ingestion_ts=result.metadata.ingestion_ts,
         body=sidecar,
+    )
+    write_completion_marker(
+        client,
+        bucket=bucket,
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        ingestion_ts=ts,
+        object_names=(object_name_of(result.key),),
     )
     log_stage(
         "wrote",

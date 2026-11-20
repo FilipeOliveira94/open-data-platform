@@ -4,6 +4,26 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-20 — P3-12 update-pattern semantics and source refresh policy
+
+Every ingestion entry point (Olist, DummyJSON, IBGE, storefront, PostgreSQL) deletes the execution's `_COMPLETE` marker before its first object and writes it after its last one (`ingestion/writer.py`). The marker lists object names and `completed_at`, no row values. Bronze (`lakehouse/bronze.py`) adds `_execution_completed_ts`: the marker time when its names equal the objects found, else null. Silver (`lakehouse/silver/common.py`) selects Bronze rows by `update_pattern`: the latest complete execution for `snapshot` and `full_refresh`; every complete execution for `append_only`, first ingested row per key; every window for `incremental_window`, unchanged. Without a complete execution, an `assert_true` fails the Silver script before `CREATE OR REPLACE`. `append_only` is a new contract value; `demo_storefront.clickstream` moves to it in contract version 3. The Silver reconciliation check scopes Bronze the same way. `ingest_dummyjson_products` runs Monday 03:00 UTC and `ingest_ibge_localidades` day 1 03:00 UTC, both `catchup=False` and created paused; Olist and the storefront stay manual. The source refresh matrix in `ROADMAP.md` is filled.
+
+`scripts/p3_12_refresh_check.sh` ran against the live stack with the shipped ingestion code and a scripted HTTP transport, in a separate raw bucket. It passed 19 of 19 checks (`.local/p3-12/results.tsv`):
+
+| Check | Result |
+| --- | --- |
+| DummyJSON run A (3 products), then B (2 products) | Silver 2 rows, all from B; the removed product is absent; Bronze keeps A's 3 rows |
+| Run C stopped after page 0 (no marker) | Bronze holds its 2 rows with null `_execution_completed_ts`; Silver stays on B |
+| Run D re-ingests B's snapshot | Silver 2 rows from D; payload checksum equal to B's |
+| Raw holds only the incomplete run | Silver Spark script exits non-zero with the guard message; Silver keeps 2 rows |
+| Clickstream batch A (50), the same 50 again, a late batch (20, earlier `event_time`) | Bronze 100 after the repeat, Silver 50 from the first batch; after the late batch Silver 70, 20 of them before 2026-11-10 |
+
+Raw objects from before P3-12 have no marker. The local lake was rebuilt: Olist, DummyJSON, IBGE, and the storefront were re-ingested under `p3-12-rebuild-20261120`, then `make live-bronze` (310 s, 18 checks passed), `make live-silver` (248 s, 20 checks passed), and `make live-gold` (42 s, dbt 287 passed). Silver counts match the previous build: geolocation 738_332, orders 99_441, DummyJSON 194, IBGE 5_571. Silver clickstream is 100: only the new batch is complete. Bronze still holds every execution (geolocation 3_000_489 rows across three Olist executions); P3-13 removes that re-read.
+
+Not exercised: a scheduled run of the two new DAGs on Airflow (DagBag tests cover schedule, catchup, and paused state).
+
+---
+
 ### 2026-11-20 — P3-11 atomic table replace
 
 Bronze (`lakehouse/bronze.py`), Silver (`lakehouse/silver/common.py`), and quarantine staging (`lakehouse/quarantine_stage.py`) now replace each table with one `CREATE OR REPLACE TABLE … USING iceberg LOCATION … AS SELECT`. Silver and quarantine no longer run `DROP TABLE` → `CREATE TABLE` → `INSERT OVERWRITE`. Bronze no longer runs `CREATE TABLE IF NOT EXISTS` + `INSERT OVERWRITE`, which kept the first schema. Spark rejects a column list in a CTAS, so each column is cast to its contract type in the select. Zero-row writes select typed `NULL` columns `WHERE 1 = 0`. A new contract schema lands in the same commit. dbt Gold was already atomic: `on_table_exists: replace` renders 55 `create or replace table` statements. Replace is atomic because Spark uses `SparkCatalog` over the JDBC catalog. A probe first confirmed that replacing with the same `LOCATION` and an added column works and keeps snapshots.

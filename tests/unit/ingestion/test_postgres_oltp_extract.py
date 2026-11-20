@@ -177,7 +177,7 @@ def _extract(
 
 
 def _puts(client: MagicMock) -> list[Any]:
-    return client.put_object.call_args_list
+    return _data_puts(client)
 
 
 def _env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -414,7 +414,7 @@ def test_null_primary_key_stays_in_raw_and_is_quarantined() -> None:
     finding = json.loads(sidecar["Body"].splitlines()[0])
     assert finding["reason"] == "null_violation"
     assert finding["field"] == "seller_id"
-    assert client.delete_object.call_count == 0
+    assert len(_data_deletes(client)) == 0
 
 
 def test_column_mismatch_keeps_the_dataset_already_written() -> None:
@@ -433,7 +433,7 @@ def test_column_mismatch_keeps_the_dataset_already_written() -> None:
         _extract(connection, client, datasets=("sellers", "customers", "orders"))
 
     assert len(connection.queries) == 2
-    assert client.put_object.call_count == 1
+    assert len(_data_puts(client)) == 1
     assert connection.steps
 
 
@@ -448,7 +448,7 @@ def test_database_error_stops_the_remaining_datasets() -> None:
         _extract(connection, client, datasets=("sellers", "customers"))
 
     assert "secret-row" not in str(caught.value)
-    assert client.put_object.call_count == 1
+    assert len(_data_puts(client)) == 1
     assert len(connection.queries) == 2
     assert connection.rollbacks == 1
     assert connection.commits == 0
@@ -464,7 +464,7 @@ def test_naive_timestamp_value_fails_the_batch() -> None:
     with pytest.raises(PostgresOltpError, match="timezone"):
         _extract(connection, client)
 
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 def test_boolean_in_an_integer_field_is_quarantined() -> None:
@@ -491,7 +491,7 @@ def test_non_finite_numbers_fail_before_the_write() -> None:
     with pytest.raises(PostgresOltpError, match="finite number"):
         _extract(infinite, client, datasets=("order_items",))
 
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 def test_unsafe_identifier_never_reaches_the_database() -> None:
@@ -516,7 +516,7 @@ def test_unsafe_identifier_never_reaches_the_database() -> None:
         )
 
     assert connection.queries == []
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 @pytest.mark.parametrize(
@@ -632,3 +632,28 @@ def test_cli_rejects_a_non_integer_port(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("POSTGRES_PORT", "abc")
 
     assert main(["seed"]) == 1
+
+
+def _is_marker(call: Any) -> bool:
+    return str(call.kwargs["Key"]).endswith("/_COMPLETE")
+
+
+def _data_puts(client: MagicMock) -> list[Any]:
+    """Raw and quarantine puts, without completion markers."""
+    return [call for call in client.put_object.call_args_list if not _is_marker(call)]
+
+
+def _data_deletes(client: MagicMock) -> list[Any]:
+    """Deletes of stale objects, without completion marker clears."""
+    return [
+        call for call in client.delete_object.call_args_list if not _is_marker(call)
+    ]
+
+
+def _markers(client: MagicMock) -> list[dict[str, Any]]:
+    """Bodies of the completion markers written, in order."""
+    return [
+        json.loads(call.kwargs["Body"])
+        for call in client.put_object.call_args_list
+        if _is_marker(call)
+    ]

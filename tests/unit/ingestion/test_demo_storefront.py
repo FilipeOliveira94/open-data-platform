@@ -146,11 +146,11 @@ def test_valid_clickstream_deletes_a_stale_quarantine_object() -> None:
         ingestion_ts=_INGESTION_TS,
     )
 
-    keys = [call.kwargs["Key"] for call in client.put_object.call_args_list]
+    keys = [call.kwargs["Key"] for call in _data_puts(client)]
     assert keys == [
         "raw/demo_storefront/clickstream/dt=2026-10-25/execution_id=run-001/events.jsonl"
     ]
-    deleted = client.delete_object.call_args.kwargs["Key"]
+    deleted = _data_deletes(client)[-1].kwargs["Key"]
     assert deleted == (
         "quarantine/demo_storefront/clickstream/dt=2026-10-25/"
         "execution_id=run-001/events.jsonl.jsonl"
@@ -175,8 +175,8 @@ def test_malformed_clickstream_writes_nothing(monkeypatch: pytest.MonkeyPatch) -
             ingestion_ts=_INGESTION_TS,
         )
 
-    assert client.put_object.call_count == 0
-    assert client.delete_object.call_count == 0
+    assert len(_data_puts(client)) == 0
+    assert len(_data_deletes(client)) == 0
 
 
 def test_clickstream_key_mismatch_writes_nothing(
@@ -199,8 +199,8 @@ def test_clickstream_key_mismatch_writes_nothing(
             ingestion_ts=_INGESTION_TS,
         )
 
-    assert client.put_object.call_count == 0
-    assert client.delete_object.call_count == 0
+    assert len(_data_puts(client)) == 0
+    assert len(_data_deletes(client)) == 0
 
 
 def test_write_uses_the_ingestion_date_and_metadata() -> None:
@@ -222,8 +222,8 @@ def test_write_uses_the_ingestion_date_and_metadata() -> None:
         "raw/demo_storefront/clickstream/dt=2026-10-25/"
         "execution_id=run-001/events.jsonl"
     )
-    client.put_object.assert_called_once()
-    payload = client.put_object.call_args.kwargs
+    assert len(_data_puts(client)) == 1
+    payload = _data_puts(client)[-1].kwargs
     assert payload["ContentType"] == "application/x-ndjson"
     assert payload["Metadata"]["_ingestion_ts"] == "2026-10-25T12:00:00Z"
     assert payload["Body"].count(b"\n") == 2
@@ -261,7 +261,7 @@ def test_same_execution_overwrites_and_a_new_execution_keeps_another_key() -> No
     )
     assert first.key == second.key
     assert third.key != first.key
-    bodies = [call.kwargs["Body"] for call in client.put_object.call_args_list]
+    bodies = [call.kwargs["Body"] for call in _data_puts(client)]
     assert bodies[0] != bodies[1]
 
 
@@ -306,3 +306,28 @@ def test_main_requires_the_raw_bucket(monkeypatch: pytest.MonkeyPatch) -> None:
         ]
     )
     assert code == 1
+
+
+def _is_marker(call: Any) -> bool:
+    return str(call.kwargs["Key"]).endswith("/_COMPLETE")
+
+
+def _data_puts(client: MagicMock) -> list[Any]:
+    """Raw and quarantine puts, without completion markers."""
+    return [call for call in client.put_object.call_args_list if not _is_marker(call)]
+
+
+def _data_deletes(client: MagicMock) -> list[Any]:
+    """Deletes of stale objects, without completion marker clears."""
+    return [
+        call for call in client.delete_object.call_args_list if not _is_marker(call)
+    ]
+
+
+def _markers(client: MagicMock) -> list[dict[str, Any]]:
+    """Bodies of the completion markers written, in order."""
+    return [
+        json.loads(call.kwargs["Body"])
+        for call in client.put_object.call_args_list
+        if _is_marker(call)
+    ]

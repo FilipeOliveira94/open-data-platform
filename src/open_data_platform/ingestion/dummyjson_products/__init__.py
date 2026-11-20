@@ -39,7 +39,13 @@ from open_data_platform.ingestion.quarantine import (
     prepare_quarantine,
     write_quarantine_object,
 )
-from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
+from open_data_platform.ingestion.writer import (
+    RawWriteResult,
+    clear_completion_marker,
+    object_name_of,
+    write_completion_marker,
+    write_raw_object,
+)
 from open_data_platform.object_storage import client_from_env
 
 if TYPE_CHECKING:
@@ -174,6 +180,14 @@ def ingest_dummyjson_products(
         execution_id=execution_id,
         page_limit=page_limit,
     )
+    clear_completion_marker(
+        client,
+        bucket=bucket,
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        ingestion_ts=ts,
+    )
     while True:
         body = fetch_products_page(
             limit=page_limit,
@@ -242,6 +256,16 @@ def ingest_dummyjson_products(
         if next_skip >= seen_total:
             break
         skip = next_skip
+    # Written only after the last page: a partial page set stays incomplete.
+    write_completion_marker(
+        client,
+        bucket=bucket,
+        source_id=SOURCE_ID,
+        dataset=DATASET,
+        execution_id=execution_id,
+        ingestion_ts=ts,
+        object_names=tuple(object_name_of(item.key) for item in results),
+    )
     log_stage(
         "fetch_finished",
         source_id=SOURCE_ID,

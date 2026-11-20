@@ -158,7 +158,7 @@ def test_fixture_lands_under_ibge_localidades() -> None:
     assert request.url == _URL
     assert request.headers["Accept"] == "application/json"
     assert request.headers["User-Agent"] == USER_AGENT
-    put = client.put_object.call_args.kwargs
+    put = _data_puts(client)[-1].kwargs
     assert put["Body"] == body
     assert put["ContentType"] == "application/json"
     assert put["Metadata"] == {
@@ -184,7 +184,7 @@ def test_same_execution_overwrites_and_a_new_execution_keeps_its_own_key() -> No
     assert first_result.key == second_result.key
     assert other.key != first_result.key
     assert other.key.endswith("/execution_id=run-002/municipios.json")
-    puts = client.put_object.call_args_list
+    puts = _data_puts(client)
     assert puts[0].kwargs["Body"] == first
     assert puts[1].kwargs["Body"] == second
     assert puts[1].kwargs["Key"] == puts[0].kwargs["Key"]
@@ -203,14 +203,14 @@ def test_null_and_duplicate_ids_stay_in_the_array() -> None:
 
     raw = next(
         call.kwargs
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].endswith("/municipios.json")
     )
     stored = json.loads(raw["Body"])
     assert [item["municipio-id"] for item in stored] == [None, 1, 1]
     sidecar = next(
         call.kwargs
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].endswith("/municipios.json.jsonl")
     )
     findings = [json.loads(line) for line in sidecar["Body"].splitlines()]
@@ -232,8 +232,8 @@ def test_fail_batch_on_invalid_writes_nothing() -> None:
     with pytest.raises(IbgeLocalidadesError, match="invalid records fail the batch"):
         _ingest(client, _Body(body), contracts=(contract,))
 
-    assert client.put_object.call_count == 0
-    assert client.delete_object.call_count == 0
+    assert len(_data_puts(client)) == 0
+    assert len(_data_deletes(client)) == 0
 
 
 def test_omitted_nullable_region_keys_stay_omitted() -> None:
@@ -250,7 +250,7 @@ def test_omitted_nullable_region_keys_stay_omitted() -> None:
 
     _ingest(client, _Body(_array(item)))
 
-    stored = json.loads(client.put_object.call_args.kwargs["Body"])
+    stored = json.loads(_data_puts(client)[-1].kwargs["Body"])
     assert "microrregiao-id" not in stored[0]
     assert "mesorregiao-nome" not in stored[0]
 
@@ -278,7 +278,7 @@ def test_structural_mismatch_writes_nothing(mutate: str, match: str) -> None:
     with pytest.raises(IbgeLocalidadesError, match=match):
         _ingest(client, _Body(body))
 
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 @pytest.mark.parametrize(
@@ -296,7 +296,7 @@ def test_unreadable_payload_writes_nothing(body: bytes, match: str) -> None:
     with pytest.raises(IbgeLocalidadesError, match=match):
         _ingest(client, _Body(body))
 
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 def test_missing_contract_makes_no_request() -> None:
@@ -307,7 +307,7 @@ def test_missing_contract_makes_no_request() -> None:
         _ingest(client, transport, contracts=())
 
     assert transport.requests == []
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 def test_timeouts_retry_with_the_ibge_message() -> None:
@@ -396,3 +396,28 @@ def test_cli_rejects_a_naive_ingestion_timestamp(
     monkeypatch.setenv("ODP_RAW_BUCKET", "odp-raw")
     code = main(["--execution-id", "run-001", "--ingestion-ts", "2026-10-25T18:00:00"])
     assert code == 1
+
+
+def _is_marker(call: Any) -> bool:
+    return str(call.kwargs["Key"]).endswith("/_COMPLETE")
+
+
+def _data_puts(client: MagicMock) -> list[Any]:
+    """Raw and quarantine puts, without completion markers."""
+    return [call for call in client.put_object.call_args_list if not _is_marker(call)]
+
+
+def _data_deletes(client: MagicMock) -> list[Any]:
+    """Deletes of stale objects, without completion marker clears."""
+    return [
+        call for call in client.delete_object.call_args_list if not _is_marker(call)
+    ]
+
+
+def _markers(client: MagicMock) -> list[dict[str, Any]]:
+    """Bodies of the completion markers written, in order."""
+    return [
+        json.loads(call.kwargs["Body"])
+        for call in client.put_object.call_args_list
+        if _is_marker(call)
+    ]

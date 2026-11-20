@@ -617,3 +617,108 @@ def test_cli_prints_live_and_fixture_checks(
     fixtures = capsys.readouterr().out
     assert "demo_storefront__clickstream" in fixtures
     assert "product_category_name_translation" in fixtures
+
+
+_EXEC = "raw/dummyjson_products/products/dt=2026-11-01/execution_id=run-1/"
+
+
+def _marker(*names: str, completed_at: str = "2026-11-01T03:05:00Z") -> bytes:
+    return json.dumps(
+        {"object_names": list(names), "completed_at": completed_at}
+    ).encode()
+
+
+def test_marker_keys_are_split_from_data_keys() -> None:
+    from open_data_platform.lakehouse.bronze import split_marker_keys
+
+    data, markers = split_marker_keys(
+        (_EXEC + "products-skip-000000.json", _EXEC + "_COMPLETE")
+    )
+    assert data == (_EXEC + "products-skip-000000.json",)
+    assert markers == (_EXEC + "_COMPLETE",)
+
+
+def test_execution_is_complete_only_when_the_marker_lists_every_object() -> None:
+    from open_data_platform.lakehouse.bronze import execution_completion
+
+    page_0 = _EXEC + "products-skip-000000.json"
+    page_2 = _EXEC + "products-skip-000002.json"
+    other = "raw/dummyjson_products/products/dt=2026-11-02/execution_id=run-2/"
+    partial = other + "products-skip-000000.json"
+
+    completion = execution_completion(
+        (page_0, page_2, partial),
+        {
+            _EXEC: _marker("products-skip-000000.json", "products-skip-000002.json"),
+            # run-2 lists a page that never landed: a partial page set.
+            other: _marker("products-skip-000000.json", "products-skip-000002.json"),
+        },
+    )
+
+    assert completion == {_EXEC: "2026-11-01T03:05:00Z", other: None}
+
+
+@pytest.mark.parametrize(
+    "marker",
+    [
+        None,
+        b"not json",
+        b"[]",
+        json.dumps({"object_names": ["a.json"]}).encode(),
+        json.dumps({"object_names": "a.json", "completed_at": "x"}).encode(),
+        json.dumps({"object_names": ["a.json"], "completed_at": ""}).encode(),
+    ],
+)
+def test_missing_or_unreadable_marker_leaves_the_execution_incomplete(
+    marker: bytes | None,
+) -> None:
+    from open_data_platform.lakehouse.bronze import execution_completion
+
+    markers = {} if marker is None else {_EXEC: marker}
+    assert execution_completion((_EXEC + "a.json",), markers) == {_EXEC: None}
+
+
+def test_rows_carry_the_execution_completion_time() -> None:
+    contract = next(
+        item
+        for item in load_contracts()
+        if (item.source_id, item.dataset) == ("demo_storefront", "clickstream")
+    )
+    body = b"".join(
+        json.dumps(
+            {
+                "event_id": f"e{index}",
+                "event_time": "2026-11-01T00:00:00.000Z",
+                "event_type": "page_view",
+                "session_id": "s",
+                "user_id": "u",
+                "product_id": None,
+            }
+        ).encode()
+        + b"\n"
+        for index in range(2)
+    )
+    key = (
+        "raw/demo_storefront/clickstream/dt=2026-11-01/execution_id=run-1/events.jsonl"
+    )
+    metadata = {
+        "source_id": "demo_storefront",
+        "execution_id": "run-1",
+        "_ingestion_ts": "2026-11-01T03:00:00Z",
+    }
+    complete = rows_from_object(
+        contract,
+        RawObject(
+            key=key,
+            body=body,
+            metadata=metadata,
+            execution_completed_ts="2026-11-01T03:05:00Z",
+        ),
+    )
+    incomplete = rows_from_object(
+        contract, RawObject(key=key, body=body, metadata=metadata)
+    )
+    assert {row["_execution_completed_ts"] for row in complete} == {
+        "2026-11-01T03:05:00Z"
+    }
+    assert {row["_execution_completed_ts"] for row in incomplete} == {None}

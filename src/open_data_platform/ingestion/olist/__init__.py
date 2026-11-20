@@ -39,7 +39,13 @@ from open_data_platform.ingestion.quarantine import (
     prepare_quarantine,
     write_quarantine_object,
 )
-from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
+from open_data_platform.ingestion.writer import (
+    RawWriteResult,
+    clear_completion_marker,
+    object_name_of,
+    write_completion_marker,
+    write_raw_object,
+)
 from open_data_platform.object_storage import client_from_env
 
 if TYPE_CHECKING:
@@ -234,26 +240,31 @@ def ingest_olist_historical(
                 sidecar = prepare_quarantine(contract, records)
             except InvalidRecordsError as exc:
                 raise OlistIngestError(str(exc)) from exc
+            identity = {
+                "bucket": bucket,
+                "source_id": source.source_id,
+                "dataset": spec.dataset,
+                "execution_id": execution_id,
+                "ingestion_ts": ts,
+            }
+            clear_completion_marker(client, **identity)
             result = write_raw_object(
                 client,
-                bucket=bucket,
                 body=body,
-                source_id=source.source_id,
-                dataset=spec.dataset,
-                execution_id=execution_id,
                 object_name=spec.object_name,
-                ingestion_ts=ts,
                 content_type="text/csv",
+                **identity,
             )
             write_quarantine_object(
                 client,
-                bucket=bucket,
-                source_id=source.source_id,
-                dataset=spec.dataset,
-                execution_id=execution_id,
                 object_name=spec.object_name,
-                ingestion_ts=result.metadata.ingestion_ts,
                 body=sidecar,
+                **identity,
+            )
+            write_completion_marker(
+                client,
+                object_names=(object_name_of(result.key),),
+                **identity,
             )
             log_stage(
                 "wrote",

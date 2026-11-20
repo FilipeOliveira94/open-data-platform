@@ -124,3 +124,63 @@ def test_write_raw_object_rejects_an_unknown_prefix() -> None:
             object_name="events.jsonl",
             prefix="bronze",
         )
+
+
+def test_completion_marker_lists_object_names_without_row_values() -> None:
+    import json
+
+    from open_data_platform.ingestion.writer import (
+        clear_completion_marker,
+        write_completion_marker,
+    )
+
+    client = MagicMock()
+    client.head_bucket.return_value = {}
+    ts = datetime(2026, 10, 18, 15, 0, 0, tzinfo=UTC)
+    done = datetime(2026, 10, 18, 15, 5, 0, tzinfo=UTC)
+    identity: dict[str, Any] = {
+        "bucket": "odp-raw",
+        "source_id": "dummyjson_products",
+        "dataset": "products",
+        "execution_id": "run-001",
+        "ingestion_ts": ts,
+    }
+    expected_key = (
+        "raw/dummyjson_products/products/dt=2026-10-18/execution_id=run-001/_COMPLETE"
+    )
+
+    assert clear_completion_marker(client, **identity) == expected_key
+    client.delete_object.assert_called_once_with(Bucket="odp-raw", Key=expected_key)
+
+    key = write_completion_marker(
+        client,
+        object_names=("b.json", "a.json"),
+        completed_at=done,
+        **identity,
+    )
+
+    assert key == expected_key
+    body = json.loads(client.put_object.call_args.kwargs["Body"])
+    assert body == {
+        "completed_at": "2026-10-18T15:05:00Z",
+        "dataset": "products",
+        "execution_id": "run-001",
+        "object_count": 2,
+        "object_names": ["a.json", "b.json"],
+        "source_id": "dummyjson_products",
+    }
+
+
+def test_completion_marker_needs_an_object() -> None:
+    from open_data_platform.ingestion.writer import write_completion_marker
+
+    with pytest.raises(ValueError, match="at least one object"):
+        write_completion_marker(
+            MagicMock(),
+            bucket="odp-raw",
+            source_id="ibge_localidades",
+            dataset="municipios",
+            execution_id="run-001",
+            ingestion_ts=datetime(2026, 10, 18, tzinfo=UTC),
+            object_names=(),
+        )

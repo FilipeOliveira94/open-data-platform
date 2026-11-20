@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-20 (P3-11 verified: atomic table replace for Bronze, Silver, and quarantine staging) |
+| Last updated | 2026-11-20 (P3-12 verified: update-pattern semantics and source refresh policy) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,17 +22,17 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-12** — Update-pattern semantics and source refresh policy. Not started.
+**P3-13** — Incremental lakehouse refresh. Not started.
 
-A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. P3-11 is verified: every Spark writer now replaces its table in one Iceberg commit, and dbt Gold already did. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
+A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. P3-11 is verified: every Spark writer now replaces its table in one Iceberg commit, and dbt Gold already did. P3-12 is verified: each ingestion closes its execution with a completion marker, and Silver selects Bronze rows by `update_pattern` ([data contracts](docs/architecture/data-contracts.md#update-patterns-p3-12)). DummyJSON runs weekly and IBGE monthly. Bronze still re-reads every raw execution on each run; P3-13 removes that. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
 
 P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse`. The 1-slot `lakehouse_gold` pool keeps `reconcile_gold` away from every transform step that writes tables. Every DAG is created paused. `run_python_args` stops the child's whole process group. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-12** — Update-pattern semantics and source refresh policy. Acceptance: `ROADMAP.md` → P3-12.
-2. **P3-13** — Incremental lakehouse refresh (ADR-0024). Acceptance: `ROADMAP.md` → P3-13.
-3. **P3-05** — Weekly batch schedule, after P3-13. Acceptance: `ROADMAP.md` → P3-05.
+1. **P3-13** — Incremental lakehouse refresh (ADR-0024). Acceptance: `ROADMAP.md` → P3-13.
+2. **P3-05** — Weekly batch schedule, after P3-13. Acceptance: `ROADMAP.md` → P3-05.
+3. **P3-06** — Window coverage, gap report, and backfill. Acceptance: `ROADMAP.md` → P3-06.
 
 ---
 
@@ -51,7 +51,7 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 | P3-09 | Orchestration success/failure tests | Not started | — |
 | P3-10 | Orchestration runtime hardening | Not started | — |
 | P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
-| P3-12 | Update-pattern semantics and source refresh policy | Not started | — |
+| P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
 | P3-13 | Incremental lakehouse refresh | Not started | — |
 | P3-14 | Live run, result, and consistency check | Not started | — |
 | P3-15 | Phase 3 documentation and status | Not started | — |
@@ -66,7 +66,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [ ] Backfills do not corrupt data or create undue duplication.
 - [ ] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06).
 - [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
-- [ ] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
+- [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
 - [ ] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13).
 - [ ] Invalid records are identified and handled per documented rules.
 - [ ] Success and failure scenarios have tests or reproducible evidence.
@@ -81,8 +81,8 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 | --- | --- |
 | Date | 2026-11-20 |
 | Environment | Local Compose. PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` (Spark and dbt) |
-| Checks | `scripts/p3_11_replace_check.sh`: a forced Silver write failure, then `make live-bronze`, `live-silver`, `stage-quarantine`, and `dbt-build` under a Trino count loop, then snapshot counts |
-| Result | Forced failure: Spark exit 1 on `p3_11_forced_failure`; Silver geolocation 738_332 rows and 1 snapshot before and after. Rebuild: 410 Trino queries over Bronze, Silver, quarantine, and Gold tables, 0 errors, 0 zero counts; steps took 309/260/19/36 s; Bronze 18 and Silver 20 checks passed, dbt PASS=287. Each table gained one snapshot. `uv run pytest tests/unit` → 371 passed; `make lint` passed. Detail: [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
+| Checks | `scripts/p3_12_refresh_check.sh` (full_refresh A → B → partial C → re-ingest D, the no-complete-execution guard, and append_only repeat and late batches), then a re-ingest of every snapshot source and `make live-bronze`, `live-silver`, `live-gold` |
+| Result | 19 of 19 checks passed: a removed product leaves Silver, a partial run is ignored, a re-ingest keeps the payload checksum, the guard keeps Silver at 2 rows, clickstream dedups 100 → 50 and places 20 late events by `event_time`. Rebuild: Bronze 18, Silver 20, dbt 287 checks passed; Silver geolocation 738_332, orders 99_441, DummyJSON 194, IBGE 5_571. Detail: [`docs/status-log.md`](docs/status-log.md) |
 ---
 
 ## Phase 2 baseline
