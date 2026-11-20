@@ -16,7 +16,16 @@ Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-sch
 
 `platform_health` is the P3-01 smoke DAG: one `BashOperator` that prints `platform_health ready`, with no schedule. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
 
-P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 and P3-05 set the daily and weekly schedules on the PostgreSQL extract. Phase 4 sets the CDC schedule. Backfill DAGs stay a later Phase 3 issue.
+P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 adds `ingest_postgres_oltp_daily`, the daily schedule on the PostgreSQL extract, which then triggers `transform_lakehouse`. P3-05 sets the weekly schedule. Phase 4 sets the CDC schedule. Backfill parameters stay P3-06.
+
+Since P3-04 every DAG sets `is_paused_upon_creation=True`. A DAG that appears for the first time is paused, and a run created while it is paused stays `queued`. Unpause a DAG before you trigger it:
+
+```bash
+docker compose --profile orchestration exec -T airflow-scheduler \
+  airflow dags unpause <dag_id>
+```
+
+The flag only applies when the metadata database first records the DAG. DAGs that were already in the `airflow` database keep their paused state. There is no need for `docker compose down -v`.
 
 ## Start
 
@@ -77,7 +86,9 @@ Inside the Airflow containers, `POSTGRES_HOST` is `postgres` and `POSTGRES_PORT`
 
 Kaggle credentials are the container variables `KAGGLE_API_TOKEN`, `KAGGLE_USERNAME`, and `KAGGLE_KEY`. They are not task arguments.
 
-Each ingestion task runs `python` with an argument vector and `cwd=/opt/odp/repo`. There is no shell. Retries are 2, the delay is 2 minutes, and the execution timeout is 30 minutes. `schedule` is `None` and `catchup` is false. `airflow/dags/ingest_common.py` holds the task defaults and is listed in `.airflowignore`.
+Each ingestion task runs `python` with an argument vector and `cwd=/opt/odp/repo`. There is no shell. Retries are 2, the delay is 2 minutes, and the execution timeout is 30 minutes. `schedule` is `None` and `catchup` is false; `ingest_postgres_oltp_daily` (P3-04) is the one scheduled ingestion DAG. `airflow/dags/ingest_common.py` holds the task defaults and is listed in `.airflowignore`.
+
+Since P3-04 `run_python_args` starts the child with `start_new_session=True`, so the child and everything it starts (`spark-sql`, Java, dbt) share one process group. When the wait ends, normally or through an exception, the group gets `SIGTERM`; whatever is left after 10 seconds gets `SIGKILL`. The Airflow task timeout (`AirflowTaskTimeout`) and the Airflow kill (`AirflowTaskTerminated`) both derive from `BaseException` in Airflow 3.4 and arrive while the task waits, so they take the same path. `tests/unit/infrastructure/test_run_python_args.py` checks that no child or grandchild survives a timeout, a grandchild that ignores `SIGTERM`, another exception, a non-zero exit, and a zero exit that leaves a grandchild behind.
 
 `execution_id` defaults to the Airflow `run_id`. A new run keeps the previous raw object. Passing `execution_id` in the trigger conf overwrites the keys of that id. The storefront `seed`, `count`, and `event_time_start` stay the documented generator inputs. The PostgreSQL window bounds stay required and are not calculated here.
 
@@ -93,9 +104,11 @@ Each ingestion task runs `python` with an argument vector and `cwd=/opt/odp/repo
 
 `imports` runs first. The other four `platform_env` tasks run in parallel. `minio_raw` heads `ODP_RAW_BUCKET` and does not create it. `minio_write` puts, reads, and deletes `airflow-env/ready.txt` in `MINIO_SMOKE_BUCKET`. `postgres_oltp` checks `current_database()` and that schema `oltp` exists. It does not seed. Output names the database, the bucket, and the contract count. It does not print passwords or object bodies.
 
-`ingest_postgres_oltp` passes `window_start` and `window_end` through. It does not calculate a daily or weekly window. `seed_postgres_oltp` truncates `oltp.sellers`, `oltp.customers`, `oltp.orders`, and `oltp.order_items`, then loads `tests/fixtures/postgres_oltp/synthetic.json`. It is not upstream of the extract DAG.
+`ingest_postgres_oltp` passes `window_start` and `window_end` through. It does not calculate a daily or weekly window and does not trigger `transform_lakehouse`. The daily window is `ingest_postgres_oltp_daily` (below). `seed_postgres_oltp` truncates `oltp.sellers`, `oltp.customers`, `oltp.orders`, and `oltp.order_items`, then loads `tests/fixtures/postgres_oltp/synthetic.json`. It is not upstream of the extract DAG.
 
 `execution_id` defaults to the Airflow `run_id`. A new run keeps the previous raw object. A trigger conf that sets `execution_id` overwrites the keys of that id.
+
+Each DAG must be unpaused first (see above).
 
 ```bash
 docker compose --profile orchestration exec -T airflow-scheduler \
@@ -187,12 +200,12 @@ The PostgreSQL extract window was `2026-10-17T00:00:00Z` inclusive to `2026-10-1
 
 | DAG | Schedule | Tasks |
 | --- | --- | --- |
-| `transform_lakehouse` | None | `bronze` → `bronze_checks` → `silver` → `silver_checks` → `stage_quarantine` → `dbt_build` |
+| `transform_lakehouse` | None (also triggered by `ingest_postgres_oltp_daily`, P3-04) | `bronze` → `bronze_checks` → `silver` → `silver_checks` → `stage_quarantine` → `dbt_build` |
 | `reconcile_gold` | `@weekly` | `dbt_reconcile` |
 
 The tasks use the P3-02 `DEFAULT_ARGS` from `ingest_common.py`: 2 retries, a 2-minute delay, and a 30-minute execution timeout. Both DAGs set `max_active_runs=1` and `catchup=False`. `transform_lakehouse` is linear. All Spark steps share one Ivy cache and one container, so two Spark steps do not run at the same time. Quarantine staging does not read Bronze or Silver. It runs after `silver_checks` only for that reason.
 
-`reconcile_gold` is unpaused at creation. With `catchup=False`, the scheduler starts the latest finished weekly interval when the DAG first appears. It does not wait for `transform_lakehouse`. A reconciliation run that overlaps a rebuild can read a table that is being replaced.
+Until P3-04, `reconcile_gold` was unpaused at creation and did not wait for `transform_lakehouse`, so a reconciliation run could read a table that was being replaced. P3-04 closes that with a pool (next section).
 
 Trino (profile `lakehouse`) must be up for the check steps and dbt:
 
@@ -204,7 +217,20 @@ docker compose --profile orchestration exec -T airflow-scheduler \
   airflow dags trigger reconcile_gold
 ```
 
-`tests/unit/infrastructure/test_dagbag.py` loads `airflow/dags` with the pinned Airflow in a `DagBag`. It checks zero import errors, the ten DAG ids, the task order, the shared retries and timeout, and the entrypoint of each task. Success, retry, and failed-run behavior on a live scheduler is P3-09.
+`tests/unit/infrastructure/test_dagbag.py` loads `airflow/dags` with the pinned Airflow in a `DagBag`. It checks zero import errors, the DAG ids (ten at P3-03, eleven since P3-04), the task order, the shared retries and timeout, and the entrypoint of each task. Since P3-04 it also checks that every DAG is paused at creation, the exact set of `lakehouse_gold` tasks, the daily timetable and window, and the `extract` → `trigger_transform` dependency. Success, retry, and failed-run behavior on a live scheduler is P3-09.
+
+### `lakehouse_gold` pool (P3-04)
+
+`lakehouse_gold` is an Airflow pool with 1 slot. `airflow-init` creates it with `airflow pools set lakehouse_gold 1 …`, which also resets the slot count on every start. A task in a pool that does not exist is never scheduled: the Airflow 3.4 scheduler logs `Tasks using non-existent pool … will not be scheduled`.
+
+| DAG | Tasks in the pool |
+| --- | --- |
+| `transform_lakehouse` | `bronze`, `silver`, `stage_quarantine`, `dbt_build`: every step that writes tables |
+| `reconcile_gold` | `dbt_reconcile` |
+
+`bronze_checks` and `silver_checks` only read through Trino and use `default_pool`. With one slot, a reconciliation run never overlaps a write, and two writes never overlap either. The slot is per task, not per run. Between two pooled transform steps, a waiting `dbt_reconcile` can take the slot. It then reads a lakehouse that is half rebuilt (for example new Bronze and old Silver and Gold), but no table changes while it reads. `tests/unit/infrastructure/test_dagbag.py` checks the exact list of pooled tasks. The `check_contracts` DAG (P10-08) joins the same pool.
+
+The pool was chosen over an Asset that `dbt_build` emits. An Asset only orders runs. A manual reconciliation or a second rebuild can still overlap, and the weekly cadence would become "after every build".
 
 ## Verification (2026-11-13, P3-03)
 
@@ -241,3 +267,103 @@ Bronze row counts are not the P2-09 values. Bronze geolocation is 2_000_326, aga
 The Make path calls the same steps. `make live-bronze` (323 s, 18/18 checks), `make live-silver` (241 s, 20/20), `make live-gold` (43 s, quarantine 1_603 and PASS=287), and `make dbt-test-reconciliation` (558 s, PASS=56) exited 0. `make test-iceberg-poc` printed `2`. `make test-catalog-probe` printed Spark `2` and Trino `"2"`. `make dbt-parse` and `make spark-ivy-warm` exited 0 in the runtime image with the existing `.local/spark-ivy` cache.
 
 The seven task logs in MinIO did not contain the MinIO password, the Fernet key, or the JWT secret. `uv run ruff check src tests airflow docker/airflow` passed. `uv run ruff format --check src tests airflow docker/airflow` passed. `uv run pytest tests/unit` → 348 passed.
+
+## Daily PostgreSQL schedule (P3-04)
+
+`ingest_postgres_oltp_daily` runs `extract`, then `trigger_transform`.
+
+| Setting | Value |
+| --- | --- |
+| Timetable | `CronDataIntervalTimetable("0 0 * * *", timezone="UTC")` |
+| Window | The run's data interval, `[data_interval_start, data_interval_end)` = `[D-1 00:00Z, D 00:00Z)` for the run at `D 00:00Z` (21:00 in Brasília) |
+| Catchup | `False`. When the DAG is unpaused, the scheduler creates one run for the last complete day |
+| `max_active_runs` | 1 |
+| Paused at creation | Yes |
+| Params | `execution_id` only. No window params |
+| After the extract | `TriggerDagRunOperator` on `transform_lakehouse`, run id `ingest_postgres_oltp_daily__<run_id>`, `wait_for_completion=False`, `reset_dag_run=True`, `fail_when_dag_is_paused=True` |
+
+The timetable is explicit. In Airflow 3.4 `[scheduler] create_cron_data_intervals` defaults to `False`, so a cron string becomes a `CronTriggerTimetable` whose data interval has zero length. The extract rejects a bound that is not UTC midnight, so the timetable stays in UTC. Midnight in São Paulo is 03:00Z.
+
+The extract task renders `--window-start {{ data_interval_start.isoformat() }}` and `--window-end {{ data_interval_end.isoformat() }}`. The DAG does not calculate the window. `validate_window` in the package still checks it. A run without a data interval renders empty bounds, and the extract exits 1 (`window bound must be ISO-8601`) before it connects.
+
+How each kind of run gets its window in Airflow 3.4:
+
+| Run | Window |
+| --- | --- |
+| Scheduled | The interval that just ended. Run id `scheduled__<D>T00:00:00+00:00`, logical date `D-1` |
+| `airflow dags trigger -l <date>` | The last complete UTC day before the trigger time. The CLI infers the interval from `run_after` (now), not from `-l`. `-l` only sets the logical date |
+| `airflow dags trigger` without `-l` | No data interval. The extract fails |
+| `airflow backfill create --from-date D --to-date D` | `[D, D+1)`. Backfill parameters are P3-06 |
+
+The transform runs only after a successful extract. `transform_lakehouse` keeps `max_active_runs=1`, so a triggered run waits in `queued` behind one that is still running. A manual `transform_lakehouse` trigger and a manual `ingest_postgres_oltp` run behave as in P3-02 and P3-03: neither one triggers the other DAG. If `transform_lakehouse` is paused, `trigger_transform` fails (`fail_when_dag_is_paused`), so the daily run shows the gap. Otherwise the triggered run would sit in `queued`.
+
+Idempotency:
+
+- A retry or a cleared task keeps the run id, so `execution_id` stays the same. The extract overwrites the same raw keys while the ingestion date is the same. `trigger_transform` resets the transform run with the same id (`reset_dag_run=True`), so it does not create a second one.
+- A new run of the same window, for example a manual trigger on the same day as the scheduled run, has a new run id. It writes a new execution next to the previous one. Bronze keeps both and Silver deduplicates by key. This is the P3-02 rule: a new run keeps the previous raw object.
+- The `dt=` segment is the real ingestion date. A retry that crosses UTC midnight writes the same window under the next `dt`. The content is the same and Silver deduplicates it.
+
+Late commits are accepted and documented. A row whose `updated_at` falls before midnight but whose transaction commits after the 00:00Z run is not in that day's window. The weekly window (P3-05) and backfills (P3-06) are the safety net. Streaming CDC (Phase 4) is the exact path.
+
+`transform_lakehouse` rebuilds Bronze, Silver, and Gold from every raw object. It is not a windowed lakehouse commit. One daily run costs one full rebuild, about 10 minutes on this host.
+
+## Verification (2026-11-20, P3-04)
+
+Local Compose with PostgreSQL, MinIO, Trino, and the three Airflow services on `odp-runtime:airflow3.4.0-spark3.5.8`. Times are UTC.
+
+`make airflow-up` ran `airflow-init`, which printed `Pool lakehouse_gold created`. `airflow pools list` showed `lakehouse_gold` with 1 slot next to `default_pool` (128). `airflow dags list-import-errors` returned no data. `airflow dags list` showed `ingest_postgres_oltp_daily` paused, the only DAG new to the metadata database. The ten older DAGs kept their unpaused state, as described above.
+
+`seed_postgres_oltp` run `manual__2026-11-20T03:41:23.189741+00:00` finished `success`. That CLI trigger, without `-l`, had no logical date and no data interval.
+
+### Daily runs
+
+| Run | How it started | Data interval | Extract landing | Result |
+| --- | --- | --- | --- | --- |
+| `scheduled__2026-11-20T00:00:00+00:00` | `airflow dags unpause` (catchup off: last complete day) | `2026-11-19T00:00Z` → `2026-11-20T00:00Z` | 4 empty arrays (3 bytes each) | `success` |
+| `manual__2026-11-20T03:42:53.785961+00:00` | `airflow dags trigger -l 2026-11-20T03:45:00+00:00` | `2026-11-19T00:00Z` → `2026-11-20T00:00Z` (logical date 03:45) | 4 empty arrays | `success` |
+| `backfill__2026-10-18T00:00:00+00:00` | `airflow backfill create --from-date 2026-10-17T00:00:00+00:00 --to-date 2026-10-17T00:00:00+00:00` | `2026-10-17T00:00Z` → `2026-10-18T00:00Z` | sellers 2, customers 1, orders 1, order items 1 | `success` |
+
+Each extract log line `stage=extract_started` carried the same `window_start` and `window_end` as the data interval, and `execution_id` equal to the run id. `COUNT(*)` on `oltp` for `[2026-10-17, 2026-10-18)` was 2, 1, 1, and 1, the same as the raw arrays. For `[2026-11-19, 2026-11-20)` it was 0 across the four tables. No quarantine finding was written. Each `trigger_transform` logged `Dag Run triggered successfully.` for `transform_lakehouse`.
+
+### Triggered transform runs
+
+`transform_lakehouse` ran the three triggered runs one after another (`max_active_runs=1`). Every task succeeded on attempt 1.
+
+| Run id | Start → end | Duration | `bronze` | `bronze_checks` | `silver` | `silver_checks` | `stage_quarantine` | `dbt_build` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `ingest_postgres_oltp_daily__scheduled__2026-11-20T00:00:00+00:00` | 03:41:50 → 04:02:12 | 20 min 22 s | 5 min 00 s | 4 s | 4 min 07 s | 3 s | 13 s | 31 s |
+| `ingest_postgres_oltp_daily__manual__2026-11-20T03:42:53.785961+00:00` | 04:02:12 → 04:11:34 | 9 min 22 s | 4 min 27 s | 1 s | 4 min 01 s | 3 s | 13 s | 29 s |
+| `ingest_postgres_oltp_daily__backfill__2026-10-18T00:00:00+00:00` | 04:11:35 → 04:21:26 | 9 min 51 s | 4 min 53 s | 1 s | 4 min 07 s | 3 s | 12 s | 27 s |
+
+Each `dbt_build` printed PASS=287 WARN=0 ERROR=0. The backfill-triggered run passed 18 Bronze checks and 20 Silver checks. After it, Trino showed Silver `postgres_oltp` customers 2, orders 2, order items 2, and sellers 3, the P2-09 values, while Bronze sellers held 11 rows across executions. `gold_staging.quarantine_findings` held 1_603 rows.
+
+### Pool serialization
+
+`reconcile_gold` run `manual__2026-11-20T03:42:11.378124+00:00` was triggered while the first transform's `bronze` ran. `dbt_reconcile` stayed `scheduled` until `bronze` released the slot.
+
+| Task | Start | End |
+| --- | --- | --- |
+| `transform_lakehouse.bronze` | 03:41:50.8 | 03:46:50.9 |
+| `transform_lakehouse.bronze_checks` (default pool) | 03:46:51.6 | 03:46:56.0 |
+| `reconcile_gold.dbt_reconcile` | 03:46:51.6 | 03:57:12.4 |
+| `transform_lakehouse.silver` | 03:57:14.6 | 04:01:21.8 |
+
+No two `lakehouse_gold` tasks overlapped. `dbt_reconcile` took the slot between `bronze` and `silver`, as the pool section describes, so that transform run took 20 min 22 s instead of about 10. `dbt_reconcile` passed 56 of 56 (PASS=56 WARN=0 ERROR=0).
+
+### Re-execution of the same run
+
+`airflow tasks clear ingest_postgres_oltp_daily -s 2026-10-17T00:00:00+00:00 -e 2026-10-17T00:00:00+00:00 -y` cleared the backfill run. `extract` (attempt 2) wrote the same four keys under `dt=2026-11-20/execution_id=backfill__2026-10-18T00:00:00+00:00/` with the same counts (2/1/1/1). The sellers prefix for `dt=2026-11-20` still held three objects: one per run id. `trigger_transform` reset the existing run `ingest_postgres_oltp_daily__backfill__2026-10-18T00:00:00+00:00` instead of creating a fourth. That run finished `success` again (04:23:23 → 04:33:29, 10 min 06 s; every task on attempt 2). `dbt_build` printed PASS=287. Bronze sellers stayed at 11 rows, Silver `postgres_oltp` stayed 2/2/2/3, and `gold_staging.quarantine_findings` stayed 1_603.
+
+The 33 task-log objects of these runs (8 daily, 24 transform, 1 reconciliation) did not contain the MinIO password, the Fernet key, or the JWT secret. The PostgreSQL placeholder `odp` is shorter than 5 characters and was not scanned.
+
+Unit checks for this issue: `uv run pytest tests/unit` → 364 passed. `uv run ruff check src tests airflow docker/airflow` and `uv run ruff format --check src tests airflow docker/airflow` passed. `make lint` passed. Before the commit, a temporary mutation that dropped `start_new_session` and `killpg` made all six tests in `test_run_python_args.py` fail; the file was restored.
+
+### What differed from the plan
+
+| Item checked | Result |
+| --- | --- |
+| Cron string in Airflow 3.4 | `create_cron_data_intervals` is `False`; a cron string gives `CronTriggerTimetable` with a zero-length interval. Confirmed. The DAG uses `CronDataIntervalTimetable` |
+| Task in a missing pool | The scheduler never schedules it. Confirmed in the 3.4 scheduler source. `airflow-init` creates the pool |
+| `AirflowTaskTimeout` hierarchy | Derives from `BaseException`, as does `AirflowTaskTerminated`. Confirmed |
+| `airflow dags trigger -l` | Diverged from the plan. The flag sets the logical date only. The data interval comes from the trigger time, so `-l 2026-10-17…` does not select that window. A specific past window used `airflow backfill create` |
+| `airflow dags trigger` without `-l` | No logical date and no data interval. The daily extract would fail on empty bounds |

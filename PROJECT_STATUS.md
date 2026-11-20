@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-15 (Phase 10 switched from contract-watcher to Data Contract CLI in `ROADMAP.md`; no change to Phase 3 or to Next work) |
+| Last updated | 2026-11-20 (P3-04 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,13 +22,13 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-04** — Daily batch schedule (PostgreSQL). Not started.
+**P3-05** — Weekly batch schedule (PostgreSQL). Not started.
 
-P3-03 is verified. `transform_lakehouse` rebuilds Bronze, Silver, and Gold. `reconcile_gold` runs the reconciliation tests weekly. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
+P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse`. The 1-slot `lakehouse_gold` pool keeps `reconcile_gold` away from every transform step that writes tables. Every DAG is created paused. `run_python_args` stops the child's whole process group. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-04** — Daily batch schedule. A daily DAG passes a one-day window into the P1-06 extract. Document cadence, catchup, and idempotency. Prove one daily-shaped run. `reconcile_gold` must not run while a `transform_lakehouse` `dbt_build` runs. Every DAG is created paused (`is_paused_upon_creation=True`); a DagBag test covers both. On timeout or exception `run_python_args` kills the whole child process group, with a unit test that no child survives. Acceptance: `ROADMAP.md` → P3-04.
+1. **P3-05** — Weekly batch schedule. A distinct weekly DAG or timetable passes a seven-day UTC window into the same P1-06 extract, through `postgres_extract_task` in `ingest_common.py`. Document purpose and grain against the daily window. Prove one weekly-shaped run. Whether the weekly DAG also triggers `transform_lakehouse` is open. Acceptance: `ROADMAP.md` → P3-05.
 
 ---
 
@@ -39,7 +39,7 @@ P3-03 is verified. `transform_lakehouse` rebuilds Bronze, Silver, and Gold. `rec
 | P3-01 | Airflow in local Compose | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-02 | Ingestion DAGs (thin wrappers) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-03 | Transform / dbt DAGs | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-04 | Daily batch schedule (PostgreSQL) | Not started | — |
+| P3-04 | Daily batch schedule (PostgreSQL) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-05 | Weekly batch schedule (PostgreSQL) | Not started | — |
 | P3-06 | Idempotent backfill support | Not started | — |
 | P3-07 | Quality checks and quarantine | Not started | — |
@@ -68,10 +68,10 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | Validation | Detail |
 | --- | --- |
-| Date | 2026-11-13 |
+| Date | 2026-11-20 |
 | Environment | Local Compose. PostgreSQL, MinIO, Trino, and Airflow on the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` |
-| Checks | `transform_lakehouse` and `reconcile_gold` runs. Trino anchors compared with P2-09. The `live-*` and dbt Make targets on the same image |
-| Result | `transform_lakehouse` `success`, every task on attempt 1: Bronze 18/18 checks, Silver 20/20, quarantine 1_603, `dbt build` PASS=287. `reconcile_gold` PASS=56. Silver and Gold anchors match P2-09. Make targets exited 0 with the same results. `uv run pytest tests/unit` → 348 passed. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
+| Checks | `ingest_postgres_oltp_daily` scheduled, manual, and one-day backfill runs; the three `transform_lakehouse` runs they triggered; `reconcile_gold` triggered during a rebuild; a cleared re-run of the backfill window |
+| Result | All daily runs `success`. Backfill window `[2026-10-17, 2026-10-18)` landed 2/1/1/1, equal to `COUNT(*)` on `oltp`; the 2026-11-19 window was empty in both. Each triggered transform `success` on attempt 1, PASS=287. `dbt_reconcile` waited for the `lakehouse_gold` slot and ran between `bronze` and `silver` (PASS=56). The cleared re-run overwrote the same keys and reset the same transform run; Bronze sellers stayed 11, Silver 2/2/2/3, quarantine 1_603. `uv run pytest tests/unit` → 364 passed. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 
 ---
 
@@ -119,7 +119,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | ID | Relevance | State |
 | --- | --- | --- |
 | D-006 | Airflow 3.4 LocalExecutor on `odp-runtime:airflow3.4.0-spark3.5.8`; task logs in MinIO; Celery and Flower are not a follow-up | `approved` |
-| D-007 | Daily and weekly windows. The extract exists (P1-06). Schedules do not | `proposed` |
+| D-007 | Daily and weekly windows. The extract exists (P1-06). The daily schedule exists (P3-04); the weekly one does not | `proposed` |
 | D-014 | CDC does not replace daily or weekly batch | `proposed` |
 | D-005 | DAGs call Spark Bronze/Silver and dbt-trino Gold. They do not reimplement them. Addendum: one runtime image runs Airflow, Spark, and dbt | Approved (addendum 2026-11-13) |
 | D-013 | Invalid rows stay visible. Reprocessing quarantined source rows is P3-07 | Approved |
@@ -132,7 +132,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 | Use case | Pattern | Phases | Status |
 | --- | --- | --- | --- |
-| Daily batch | Windowed incremental extract + Airflow daily schedule | 1 (P1-06), 3 (P3-04) | Extract verified; schedule not started |
+| Daily batch | Windowed incremental extract + Airflow daily schedule | 1 (P1-06), 3 (P3-04) | Verified |
 | Weekly batch | Windowed extract + Airflow weekly schedule | 1 (P1-06), 3 (P3-05) | Extract verified; schedule not started |
 | Streaming | Logical replication → Debezium → Kafka → Spark SS | 4 | Not started |
 
@@ -145,7 +145,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-03 verified) |
+| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-04 verified) |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
@@ -158,11 +158,13 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 ## Risks and limitations
 
-- D-006 is `approved`. D-007 is still `proposed`. The daily and weekly schedules are not built.
+- D-006 is `approved`. D-007 is still `proposed`. The daily schedule is built (P3-04); the weekly one is not.
 - `docker compose --profile orchestration stop` with no service names also stops PostgreSQL and MinIO. Stop the three Airflow services by name. The `spark` and Trino services are on the `lakehouse` profile and stay up.
 - Spark `local[*]` runs inside the Airflow scheduler container and shares its CPU and memory. A full `transform_lakehouse` run took 10 min 12 s; the 30-minute timeout applies per task.
-- `reconcile_gold` does not wait for `transform_lakehouse`. A run that overlaps a rebuild can read a table being replaced. The weekly reconciliation took 590 s.
-- A Phase 3 schedule would call the current full rebuild of Bronze, Silver, and Gold. That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
+- The `lakehouse_gold` pool is held per task, not per run. A waiting `dbt_reconcile` can take the slot between two transform writes and read a half-rebuilt lakehouse (no table changes while it reads). On 2026-11-20 that stretched one transform run to 20 min 22 s.
+- DAGs already in the `airflow` metadata database keep their paused state; `is_paused_upon_creation=True` applies only to new DAGs. A manual daily trigger gets the last complete UTC day, whatever `-l` says; `airflow dags trigger` without `-l` has no data interval and the extract fails.
+- Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window. P3-05 and P3-06 are the safety net; CDC is Phase 4.
+- Each daily run triggers the current full rebuild of Bronze, Silver, and Gold (about 10 minutes). That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
 - Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Exactly-once end-to-end will not be claimed without a written proof.
@@ -189,6 +191,10 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 ## Log
 
 Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
+
+### 2026-11-20 — P3-04 verified
+
+`ingest_postgres_oltp_daily` runs at 00:00 UTC on `CronDataIntervalTimetable`, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse` (run id `ingest_postgres_oltp_daily__<run_id>`, reset on re-run). The 1-slot `lakehouse_gold` pool holds `dbt_reconcile` and the four transform steps that write tables. Every DAG is created paused. `run_python_args` starts the child in its own session and stops the whole process group. Live: scheduled, manual, and backfill daily runs, three triggered transforms at PASS=287, pool serialization with `reconcile_gold`, and an idempotent cleared re-run. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Next issue is P3-05.
 
 ### 2026-11-14 — Agent rules consolidated
 

@@ -4,6 +4,18 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-20 — P3-04 daily PostgreSQL schedule
+
+`ingest_postgres_oltp_daily` uses `CronDataIntervalTimetable("0 0 * * *", "UTC")`, `catchup=False`, and `max_active_runs=1`. The extract renders `--window-start`/`--window-end` from `data_interval_start`/`data_interval_end`, and `execution_id` stays `params.execution_id or run_id`. After a successful extract, `TriggerDagRunOperator` starts `transform_lakehouse` with run id `ingest_postgres_oltp_daily__<run_id>`, `reset_dag_run=True`, `wait_for_completion=False`, and `fail_when_dag_is_paused=True`. The manual `ingest_postgres_oltp` DAG does not trigger it. The extract vector moved to `postgres_extract_task` in `ingest_common.py`. Late commits after the 00:00Z run miss the daily window; P3-05, P3-06, and CDC (Phase 4) cover that. The P3-04 acceptance now includes the transform trigger.
+
+`lakehouse_gold` is a 1-slot pool that `airflow-init` creates. It holds `transform_lakehouse` `bronze`, `silver`, `stage_quarantine`, `dbt_build`, and `reconcile_gold` `dbt_reconcile`. That is wider than the `dbt_build`-only acceptance text, by Filipe's decision. The pool was chosen over an Asset because an Asset only orders runs. Every DAG sets `is_paused_upon_creation=True`. DAGs already in the metadata database kept their state. `run_python_args` uses `Popen(start_new_session=True)` and sends `SIGTERM`, then `SIGKILL` after 10 s, to the process group when the wait ends.
+
+Airflow 3.4 checks: a cron string gives a zero-length `CronTriggerTimetable` interval; a task in a missing pool is never scheduled; `AirflowTaskTimeout` and `AirflowTaskTerminated` derive from `BaseException`. Divergence: `airflow dags trigger -l` sets only the logical date. The data interval comes from the trigger time, so a past window used `airflow backfill create`.
+
+Live run, 2026-11-20 UTC: the scheduled run `scheduled__2026-11-20T00:00:00+00:00`, the manual run `manual__2026-11-20T03:42:53.785961+00:00` (both window 2026-11-19, empty), and the backfill run `backfill__2026-10-18T00:00:00+00:00` (window 2026-10-17, 2/1/1/1 rows, equal to `COUNT(*)` on `oltp`) finished `success`. The three transform runs they triggered finished `success`, every task on attempt 1: 20 min 22 s, 9 min 22 s, and 9 min 51 s, each with PASS=287. `reconcile_gold` `manual__2026-11-20T03:42:11.378124+00:00` waited for the slot and ran 03:46:51–03:57:12, between `bronze` (ended 03:46:50) and `silver` (started 03:57:14); PASS=56. Clearing the backfill run overwrote the same four raw keys and reset the same transform run (10 min 06 s, PASS=287). Bronze sellers stayed 11, Silver `postgres_oltp` 2/2/2/3, and quarantine 1_603. No secret appeared in the 33 task logs. `uv run pytest tests/unit` → 364 passed; ruff check, ruff format --check, and `make lint` passed. Evidence: [`docs/architecture/airflow-local.md`](architecture/airflow-local.md).
+
+---
+
 ### 2026-11-17 — Markdown tables name their columns
 
 8 key and value tables had an empty header row (`| | |`), which GFM renders as a blank row on top. Each now has a header drawn from its context (`Project | Current`, `Validation | Detail`, `Decision log | Reference`, `Document | Reference`, `ADRs | Location`, `Component | Setting`, `Cache | Setting`). `scripts/check_markdown_tables.py` fails on an empty header row in any tracked Markdown file, outside fenced code; `make lint` and CI run it. AGENTS.md §9 states the rule.
