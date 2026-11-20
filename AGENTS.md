@@ -30,12 +30,12 @@ For each task:
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
 8. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
-9. Commit locally on `main` (see §13), then report to Filipe: the hash of the last local commit, changed files, commands executed, test results, limitations and the next step.
-10. Filipe reviews that commit and publishes it. When he asks, the Reviewer de Projetos bot opens a T3 thread where Claude reviews the commit and summarizes the verdict; Filipe decides.
+9. Commit on the issue branch, push it and open a PR to `main` (see §13), then report to Filipe: the PR link, the last commit hash, changed files, commands executed, test results, limitations and the next step.
+10. Filipe reviews the PR and merges it. When he asks, the Reviewer de Projetos bot opens a T3 thread where Claude reviews the PR and summarizes the verdict; Filipe decides.
 
 ### Task size (rule in force since 2026-11-20)
 
-- **Small**: docs, text, a config tweak, a patch dependency bump, or a contained bugfix of up to ~50 lines in up to 3 files that touches none of: architecture, data model or schema, auth or security, infrastructure or deploy, public API, or pipeline logic. Claude plans and implements straight through to the local commit on `main` (§13).
+- **Small**: docs, text, a config tweak, a patch dependency bump, or a contained bugfix of up to ~50 lines in up to 3 files that touches none of: architecture, data model or schema, auth or security, infrastructure or deploy, public API, or pipeline logic. Claude plans and implements straight through to the PR (§13).
 - **Large**: everything else, or when in doubt. Claude plans and STOPS: it presents the plan in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, from Filipe directly or relayed by the PO de Projetos as "Plano aprovado pelo Filipe: implemente.", sometimes with adjustments.
 - The issue prompt states which mode to follow. Claude may reclassify a task as large if planning shows it is bigger; it never reclassifies large as small.
 
@@ -170,9 +170,12 @@ Roles (simplified flow, in force since 2026-11-20):
 
 There is no double PO and Reviewer approval, no per-project dev, and no bot that pushes `main`.
 
-Repository exception: the default flow elsewhere is a new branch from an updated `main`, push of the branch and a PR that Filipe merges. This repository keeps Conventional Commits directly on local `main` instead: the agent creates no branch and no PR, and never pushes. Filipe pushes `main`.
+Branch and PR flow (in force since 2026-11-20, same as Filipe's other repositories):
 
-- Filipe's order to implement authorizes the agent to commit locally on `main`.
-- Use Conventional Commits directly on `main`.
+- Start each issue on a new branch from an updated `origin/main`, named `<type>/<issue-or-topic>` (for example `feat/p3-11-atomic-replace`).
+- Use Conventional Commits on that branch. Filipe's order to implement authorizes the agent to commit, push the branch, and open the PR.
+- Open one PR to `main` per issue. Its body gives the summary, the checks and their results, and what was not verified.
+- Filipe reviews and merges. The agent never merges, never pushes `main`, and never force-pushes unless Filipe asks.
+- After a merge, update local `main` with `git pull --ff-only` before starting the next branch.
 
 AGENTS.md is the single source; CLAUDE.md imports it.
