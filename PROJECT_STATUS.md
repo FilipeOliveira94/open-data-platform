@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-20 (P3-04 verified) |
+| Last updated | 2026-11-20 (P3-04 verified; catchup corrected; pipeline review added P3-11 to P3-13 and moved the close pair to P3-14/P3-15) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,13 +22,17 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-05** — Weekly batch schedule (PostgreSQL). Not started.
+**P3-11** — Atomic table replace for readers. Not started.
+
+A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
 
 P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse`. The 1-slot `lakehouse_gold` pool keeps `reconcile_gold` away from every transform step that writes tables. Every DAG is created paused. `run_python_args` stops the child's whole process group. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-05** — Weekly batch schedule. A distinct weekly DAG or timetable passes a seven-day UTC window into the same P1-06 extract, through `postgres_extract_task` in `ingest_common.py`. Document purpose and grain against the daily window. Prove one weekly-shaped run. Whether the weekly DAG also triggers `transform_lakehouse` is open. Acceptance: `ROADMAP.md` → P3-05.
+1. **P3-11** — Atomic table replace. List every writer of a read table; Silver replaces its table in one Iceberg commit instead of `DROP` → `CREATE` → `INSERT`; a failed write leaves the previous snapshot readable. Acceptance: `ROADMAP.md` → P3-11.
+2. **P3-12** — Update-pattern semantics and source refresh policy. Acceptance: `ROADMAP.md` → P3-12.
+3. **P3-13** — Incremental lakehouse refresh (ADR-0024). Acceptance: `ROADMAP.md` → P3-13.
 
 ---
 
@@ -46,8 +50,11 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 | P3-08 | Execution metadata and failure logging | Not started | — |
 | P3-09 | Orchestration success/failure tests | Not started | — |
 | P3-10 | Orchestration runtime hardening | Not started | — |
-| P3-11 | Live run, result, and consistency check | Not started | — |
-| P3-12 | Phase 3 documentation and status | Not started | — |
+| P3-11 | Atomic table replace for readers | Not started | — |
+| P3-12 | Update-pattern semantics and source refresh policy | Not started | — |
+| P3-13 | Incremental lakehouse refresh | Not started | — |
+| P3-14 | Live run, result, and consistency check | Not started | — |
+| P3-15 | Phase 3 documentation and status | Not started | — |
 
 Acceptance detail: `ROADMAP.md` → Phase 3.
 
@@ -57,10 +64,14 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
 - [ ] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily).
 - [ ] Backfills do not corrupt data or create undue duplication.
+- [ ] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06).
+- [ ] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
+- [ ] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
+- [ ] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13).
 - [ ] Invalid records are identified and handled per documented rules.
 - [ ] Success and failure scenarios have tests or reproducible evidence.
-- [ ] A live run result is recorded and compared to the source windows (P3-11).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-12).
+- [ ] A live run result is recorded and compared to the source windows (P3-14).
+- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-15).
 
 ---
 
@@ -164,7 +175,10 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 - The `lakehouse_gold` pool is held per task, not per run. A waiting `dbt_reconcile` can take the slot between two transform writes and read a half-rebuilt lakehouse (no table changes while it reads). On 2026-11-20 that stretched one transform run to 20 min 22 s.
 - DAGs already in the `airflow` metadata database keep their paused state; `is_paused_upon_creation=True` applies only to new DAGs. A manual daily trigger gets the last complete UTC day, whatever `-l` says; `airflow dags trigger` without `-l` has no data interval and the extract fails.
 - Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window. P3-05 and P3-06 are the safety net; CDC is Phase 4.
-- Each daily run triggers the current full rebuild of Bronze, Silver, and Gold (about 10 minutes). That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
+- Each daily run triggers the current full rebuild of Bronze, Silver, and Gold (about 10 minutes). Bronze reads every raw object of every source into Python memory on each run, so the work grows with total history (P3-13). With `catchup=True`, N missed days queue N full rebuilds.
+- Silver replaces each table with `DROP` → `CREATE` → `INSERT OVERWRITE`. During that window the table does not exist for Trino or dbt, and a failed insert leaves it empty (P3-11).
+- `full_refresh` sources (DummyJSON, IBGE) keep every record ever seen in Silver: a record removed at the source never leaves. `demo_storefront.clickstream` is labelled `snapshot` (P3-12).
+- The windowed batch extract does not see hard deletes. That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
 - Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Exactly-once end-to-end will not be claimed without a written proof.

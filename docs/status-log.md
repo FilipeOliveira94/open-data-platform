@@ -4,6 +4,20 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-20 — Pipeline review: roadmap gaps filed
+
+A general review of the orchestrated pipelines, outside the issue text, found defects that the roadmap had not asked about. They are filed in `ROADMAP.md`; no pipeline code changed in this entry.
+
+- `promote_bronze` lists every object under `raw/{source}/{dataset}/`, from every execution and date, loads them into Python memory, and rewrites one staging file per dataset on every run. Each new Olist execution doubles Bronze (geolocation 2_000_326 rows against 1_000_163). The work of each refresh grows with total history. Filed as P3-13, incremental lakehouse refresh, with ADR-0024.
+- Silver writes `DROP TABLE` → `CREATE TABLE` → `INSERT OVERWRITE` (`lakehouse/silver/common.py`). Readers see no table during that window, a failed insert leaves it empty, and Iceberg history is lost on every run. Bronze (`INSERT OVERWRITE`) and dbt (`on_table_exists: replace`) are already single commits. Filed as P3-11.
+- `update_pattern` (`snapshot`, `full_refresh`, `incremental_window`) has no downstream behavior. Silver unions every execution and keeps the latest row per key, so a product or municipality removed at the source never leaves Silver, and `demo_storefront.clickstream` is labelled `snapshot` although it is an event stream. Filed as P3-12, with a source refresh matrix.
+- Only the PostgreSQL daily DAG triggers the refresh; other sources enter whenever a refresh happens to run, and N upstream runs queue N full rebuilds. Folded into P3-13 (ingestion Assets, coalesced refresh).
+- The daily `catchup=False` gap was fixed in P3-04 (entry below). P3-06 gains window coverage and a gap report.
+
+The roadmap gains a pipeline design checklist that every pipeline issue answers in its plan and acceptance. `AGENTS.md` §6 and the plan prompt in `docs/agent-workflow.md` point to it. P3-05 becomes a trailing seven-day re-extract for late commits. P3-08 records rows read and durations per refresh, and P5-03 charts them. P3-09 adds gap, failed-write, no-op, and coalescing scenarios. P4-04 separates stream and batch table ownership. Phase 10 follows P3-12 and P3-13 instead of `FULL_OVERWRITE`. The Phase 3 close pair moves from P3-11/P3-12 to P3-14/P3-15; entries before this one that say P3-11/P3-12 mean the close pair. ADR-0006 related issues are `P3-01`–`P3-15`.
+
+---
+
 ### 2026-11-20 — P3-04 catchup corrected
 
 A review after P3-04 found that `catchup=False` loses windows. The daily window comes only from the schedule and no watermark is stored, so a day the scheduler did not run (DAG paused, scheduler down) would never be extracted, and nothing would fail. `ingest_postgres_oltp_daily` now sets `catchup=True` with `start_date` 2026-11-19, the first window it ran. After a gap the scheduler runs each missed day, oldest first, one at a time. A DagBag test walks three missed days after the 2026-11-19 run and checks that the first run on a fresh database is the 2026-11-19 window. After `airflow dags reserialize`, the live DAG reported its next data interval as `2026-11-20T00:00Z` → `2026-11-21T00:00Z`, with no import errors. A gap filled on a live scheduler is not yet recorded; that is the Phase 3 live run. Each caught-up day still triggers a full `transform_lakehouse` rebuild. The P3-04 live run below used `catchup=False`.
