@@ -43,7 +43,8 @@ def test_shared_task_defaults_are_not_a_dag() -> None:
     assert '"retries": 2' in text
     assert "timedelta(minutes=2)" in text
     assert "timedelta(minutes=30)" in text
-    assert "subprocess.run" in text
+    assert "subprocess.Popen(command, cwd=REPO, start_new_session=True)" in text
+    assert "os.killpg" in text
     assert "shell=True" not in text
     assert "cwd=REPO" in text
     assert 'EXECUTION_ID = "{{ params.execution_id or run_id }}"' in text
