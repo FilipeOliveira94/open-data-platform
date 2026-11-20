@@ -4,9 +4,22 @@ Bronze keeps one string column per contract field, plus ingestion metadata.
 It does not cast logical types, drop invalid rows, or deduplicate keys.
 Spark, invoked separately, loads the staging file into the JDBC catalog.
 
-Write mode is full load + overwrite only (``WriteMode.FULL_OVERWRITE``).
-Incremental MERGE / append / CDC placeholders live in
-``open_data_platform.lakehouse.write_mode`` for later phases.
+Since P3-13 (ADR-0024) a promotion is incremental. Only data objects of a
+complete execution (a valid ``_COMPLETE`` marker) are promoted, and only
+those whose key is absent from the promotion registry or whose ETag changed.
+Objects are read and staged one at a time: each object's rows go to a local
+JSONL file under the run's work directory, which is uploaded to a staging
+key that carries the run label. The Spark script per dataset is either:
+
+- ``INCREMENTAL_APPEND``: one ``MERGE INTO`` that inserts staged rows not
+  already present (same ``raw_object_key``, ``_raw_etag``, ``record_index``).
+  When a registered key has a new ETag, the same ``MERGE`` deletes that key's
+  old rows.
+- ``FULL_OVERWRITE``: one ``CREATE OR REPLACE TABLE ... AS SELECT`` from every
+  complete object, for ``--full-rebuild`` and for a dataset the registry has
+  never seen.
+
+A dataset with nothing new gets no script and its table is not written.
 """
 
 from __future__ import annotations
@@ -18,19 +31,22 @@ import json
 import os
 import re
 import sys
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.records import (
     PayloadStructureError,
     load_jsonl_records,
 )
+from open_data_platform.lakehouse.promotion_registry import PromotedObject
 from open_data_platform.lakehouse.write_mode import (
-    CURRENT_WRITE_MODE,
+    BRONZE_WRITE_MODE,
+    REBUILD_WRITE_MODE,
     WriteMode,
     WriteModeError,
     render_append_only_sql,
@@ -54,9 +70,15 @@ METADATA_COLUMNS: tuple[str, ...] = (
     "_execution_completed_ts",
 )
 
+# Bronze-only lineage: the ETag of the raw object a row came from. Silver
+# does not carry it.
+ETAG_COLUMN = "_raw_etag"
+
 # Name of the marker an ingestion writes after the last object of one
 # execution (``ingestion.writer.write_completion_marker``).
 COMPLETION_MARKER_NAME = "_COMPLETE"
+
+_RUN_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -90,6 +112,21 @@ class RawObject:
     body: bytes
     metadata: Mapping[str, str]
     execution_completed_ts: str | None = None
+    etag: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RawListing:
+    """One listed raw key and its ETag (quotes stripped)."""
+
+    key: str
+    etag: str
+
+
+class RegistryReader(Protocol):
+    """The registry lookup Bronze needs: ``raw_object_key -> etag``."""
+
+    def promoted(self, source_id: str, dataset: str) -> dict[str, str]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,12 +138,37 @@ class _RawKey:
 
 
 @dataclass(frozen=True, slots=True)
+class DatasetPromotion:
+    """What one Bronze run does to one dataset.
+
+    ``objects`` are the raw objects staged in this run. ``script`` is the
+    Spark SQL file name, or ``None`` when no table is written.
+    """
+
+    source_id: str
+    dataset: str
+    mode: WriteMode
+    objects_listed: int
+    objects_incomplete: int
+    objects: tuple[PromotedObject, ...]
+    replaced_keys: tuple[str, ...]
+    rows_staged: int
+    script: str | None
+    staging_key: str | None
+
+    @property
+    def name(self) -> str:
+        return f"{self.source_id}.{self.dataset}"
+
+
+@dataclass(frozen=True, slots=True)
 class BronzePromotion:
-    """Staging uploads and one Spark script per dataset."""
+    """Staging uploads and one Spark script per dataset that changes."""
 
     sql: str
     scripts: tuple[tuple[str, str], ...]
     counts: tuple[tuple[str, int], ...]
+    datasets: tuple[DatasetPromotion, ...] = ()
 
 
 def require_bucket_name(bucket: str) -> str:
@@ -125,11 +187,11 @@ def bronze_table_name(source_id: str, dataset: str) -> str:
 
 
 def bronze_columns(contract: DataContract) -> tuple[str, ...]:
-    """Metadata columns, then contract fields, then page envelope fields.
+    """Metadata columns, ``_raw_etag``, contract fields, then envelope fields.
 
     The ``record_locator`` array is exploded and is not itself a column.
     """
-    names = list(METADATA_COLUMNS)
+    names = [*METADATA_COLUMNS, ETAG_COLUMN]
     seen = set(names)
     for name in _payload_column_names(contract):
         if name in seen:
@@ -140,11 +202,24 @@ def bronze_columns(contract: DataContract) -> tuple[str, ...]:
     return tuple(names)
 
 
-def staging_object_key(source_id: str, dataset: str) -> str:
-    """Warehouse key of the JSONL file Spark reads for one dataset."""
+def staging_object_key(source_id: str, dataset: str, run_label: str) -> str:
+    """Warehouse key of the JSONL file Spark reads for one dataset in one run.
+
+    The run label is part of the key, so a ``make`` run and an Airflow run do
+    not overwrite each other's staging.
+    """
     _require_segment("source_id", source_id)
     _require_segment("dataset", dataset)
-    return f"bronze/_staging/{source_id}/{dataset}/rows.jsonl"
+    label = require_run_label(run_label)
+    return f"bronze/_staging/{label}/{source_id}/{dataset}/rows.jsonl"
+
+
+def require_run_label(run_label: str) -> str:
+    """Reject a run label that is not one safe path segment."""
+    if _RUN_LABEL_RE.fullmatch(run_label) is None:
+        msg = f"run label must be a path segment: {run_label!r}"
+        raise BronzeError(msg)
+    return run_label
 
 
 def parse_payload(
@@ -199,6 +274,7 @@ def rows_from_object(
             "record_index": str(index),
             "dt": parsed.dt,
             "_execution_completed_ts": raw.execution_completed_ts,
+            ETAG_COLUMN: raw.etag,
         }
         row.update(payload)
         missing = [name for name in columns if name not in row]
@@ -209,37 +285,45 @@ def rows_from_object(
     return tuple(staged)
 
 
+def encode_staging_line(
+    columns: Sequence[str],
+    row: Mapping[str, str | None],
+) -> bytes:
+    """Encode one row as a JSONL line. Every value is a JSON string or null."""
+    payload: dict[str, str | None] = {}
+    for column in columns:
+        value = row[column]
+        if value is not None and not isinstance(value, str):
+            msg = f"{column}: staging value must be a string or null"
+            raise BronzeError(msg)
+        payload[column] = value
+    return (
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
 def encode_staging_jsonl(
     columns: Sequence[str],
     rows: Sequence[Mapping[str, str | None]],
 ) -> bytes:
     """Encode rows as JSONL. Every value is a JSON string or null."""
-    lines: list[str] = []
-    for row in rows:
-        payload: dict[str, str | None] = {}
-        for column in columns:
-            value = row[column]
-            if value is not None and not isinstance(value, str):
-                msg = f"{column}: staging value must be a string or null"
-                raise BronzeError(msg)
-            payload[column] = value
-        lines.append(
-            json.dumps(
-                payload,
-                ensure_ascii=False,
-                separators=(",", ":"),
-                allow_nan=False,
-            )
-        )
-    if not lines:
-        return b""
-    return ("\n".join(lines) + "\n").encode("utf-8")
+    return b"".join(encode_staging_line(columns, row) for row in rows)
 
 
 def render_dataset_sql(
     contract: DataContract,
     row_count: int,
     warehouse_bucket: str,
+    *,
+    run_label: str = "adhoc",
+    write_mode: WriteMode = REBUILD_WRITE_MODE,
+    replaced_keys: Sequence[str] = (),
 ) -> str:
     """Spark SQL for one Bronze table.
 
@@ -252,7 +336,14 @@ def render_dataset_sql(
     bucket = require_bucket_name(warehouse_bucket)
     return (
         "CREATE NAMESPACE IF NOT EXISTS bronze;\n\n"
-        + _table_sql(contract, bucket, row_count).rstrip()
+        + _table_sql(
+            contract,
+            bucket,
+            row_count,
+            run_label=require_run_label(run_label),
+            write_mode=write_mode,
+            replaced_keys=replaced_keys,
+        ).rstrip()
         + "\n"
     )
 
@@ -266,7 +357,7 @@ def dataset_scripts(
     entries: Sequence[tuple[DataContract, int]],
     warehouse_bucket: str,
 ) -> tuple[tuple[str, str], ...]:
-    """One ``(filename, sql)`` pair per dataset, in the given order."""
+    """One full-rebuild ``(filename, sql)`` pair per dataset, in order."""
     return tuple(
         (
             dataset_sql_name(contract),
@@ -280,11 +371,10 @@ def render_bronze_sql(
     entries: Sequence[tuple[DataContract, int]],
     warehouse_bucket: str,
 ) -> str:
-    """Spark SQL that creates each Bronze table and overwrites it from staging.
+    """Full-rebuild Spark SQL for each dataset, joined for inspection.
 
     The JDBC warehouse URI stays ``s3a://{bucket}/catalog``. Each table sets
     its own location under ``s3a://{bucket}/bronze/{source_id}/{dataset}``.
-    The returned text is the per-dataset scripts joined for inspection.
     Spark runs each script on its own.
     """
     return "".join(sql for _name, sql in dataset_scripts(entries, warehouse_bucket))
@@ -296,67 +386,253 @@ def promote_bronze(
     raw_bucket: str,
     warehouse_bucket: str,
     contracts: Sequence[DataContract],
+    run_label: str = "adhoc",
+    registry: RegistryReader | None = None,
+    full_rebuild: bool = False,
+    work_dir: Path | None = None,
 ) -> BronzePromotion:
-    """Read each dataset prefix, then write staging and return the Spark SQL.
+    """Stage the new raw objects of each dataset and return the Spark SQL.
 
-    A prefix with no objects fails before any staging put. A parse error
-    fails before any staging put, so the existing Iceberg table stays.
+    Objects are read one at a time and their rows are written to a local
+    file, so no step holds a dataset in memory. A dataset with nothing new
+    gets no script. ``full_rebuild`` stages every complete object and fails
+    when a dataset has none, so a rebuild never empties a table by accident.
+    A parse error fails before that dataset's staging upload, so its Iceberg
+    table stays as it was.
     """
     if not contracts:
         msg = "no datasets selected"
         raise BronzeError(msg)
+    label = require_run_label(run_label)
     raw_name = require_bucket_name(raw_bucket)
     warehouse_name = require_bucket_name(warehouse_bucket)
-    prepared: list[tuple[DataContract, tuple[dict[str, str | None], ...]]] = []
-    for contract in contracts:
-        keys, marker_keys = split_marker_keys(
-            list_raw_keys(
+    if work_dir is None:
+        with tempfile.TemporaryDirectory(prefix="odp-bronze-") as scratch:
+            return promote_bronze(
                 client,
-                bucket=raw_name,
-                source_id=contract.source_id,
-                dataset=contract.dataset,
+                raw_bucket=raw_name,
+                warehouse_bucket=warehouse_name,
+                contracts=contracts,
+                run_label=label,
+                registry=registry,
+                full_rebuild=full_rebuild,
+                work_dir=Path(scratch),
             )
+    staging_dir = work_dir / "bronze-staging"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    state = _UploadState(client, warehouse_name)
+    datasets: list[DatasetPromotion] = []
+    scripts: list[tuple[str, str]] = []
+    for contract in contracts:
+        entry, script = _promote_dataset(
+            client,
+            contract,
+            raw_bucket=raw_name,
+            warehouse_bucket=warehouse_name,
+            run_label=label,
+            registry=registry,
+            full_rebuild=full_rebuild,
+            staging_dir=staging_dir,
+            uploads=state,
         )
-        if not keys:
-            msg = f"no raw objects for {contract.source_id}.{contract.dataset}"
-            raise BronzeError(msg)
-        markers = {
-            execution_prefix(key): client.get_object(Bucket=raw_name, Key=key)[
-                "Body"
-            ].read()
-            for key in marker_keys
-        }
-        completed = execution_completion(keys, markers)
-        rows: list[dict[str, str | None]] = []
-        for key in keys:
-            response = client.get_object(Bucket=raw_name, Key=key)
-            body = response["Body"].read()
-            metadata = response.get("Metadata") or {}
-            rows.extend(
-                rows_from_object(
-                    contract,
-                    RawObject(
-                        key=key,
-                        body=body,
-                        metadata=metadata,
-                        execution_completed_ts=completed[execution_prefix(key)],
-                    ),
-                )
+        datasets.append(entry)
+        if script is not None:
+            scripts.append(script)
+    counts = tuple(
+        (item.name, item.rows_staged) for item in datasets if item.script is not None
+    )
+    return BronzePromotion(
+        sql="".join(sql for _name, sql in scripts),
+        scripts=tuple(scripts),
+        counts=counts,
+        datasets=tuple(datasets),
+    )
+
+
+class _UploadState:
+    """Creates the warehouse bucket once, before the first staging upload."""
+
+    def __init__(self, client: BaseClient, bucket: str) -> None:
+        self.client = client
+        self.bucket = bucket
+        self.ready = False
+
+    def upload(self, path: Path, key: str) -> None:
+        if not self.ready:
+            ensure_bucket(self.client, self.bucket)
+            self.ready = True
+        self.client.upload_file(str(path), self.bucket, key)
+
+
+def _promote_dataset(
+    client: BaseClient,
+    contract: DataContract,
+    *,
+    raw_bucket: str,
+    warehouse_bucket: str,
+    run_label: str,
+    registry: RegistryReader | None,
+    full_rebuild: bool,
+    staging_dir: Path,
+    uploads: _UploadState,
+) -> tuple[DatasetPromotion, tuple[str, str] | None]:
+    name = f"{contract.source_id}.{contract.dataset}"
+    data, markers = split_marker_listing(
+        list_raw_objects(
+            client,
+            bucket=raw_bucket,
+            source_id=contract.source_id,
+            dataset=contract.dataset,
+        )
+    )
+    if full_rebuild and not data:
+        msg = f"no raw objects for {name}"
+        raise BronzeError(msg)
+    registered = (
+        {}
+        if registry is None
+        else registry.promoted(contract.source_id, contract.dataset)
+    )
+    rebuild = full_rebuild or not registered
+    # Only executions with an object to stage need their marker read, so a
+    # run with nothing new reads no object body at all.
+    candidates = (
+        list(data)
+        if rebuild
+        else [item for item in data if registered.get(item.key) != item.etag]
+    )
+    prefixes = {execution_prefix(item.key) for item in candidates}
+    marker_bodies = {
+        execution_prefix(item.key): client.get_object(Bucket=raw_bucket, Key=item.key)[
+            "Body"
+        ].read()
+        for item in markers
+        if execution_prefix(item.key) in prefixes
+    }
+    completion = execution_completion(
+        [item.key for item in data if execution_prefix(item.key) in prefixes],
+        marker_bodies,
+    )
+    selected = [item for item in candidates if completion[execution_prefix(item.key)]]
+    if full_rebuild and not selected:
+        msg = f"no complete execution for {name}; a rebuild would empty the table"
+        raise BronzeError(msg)
+    if rebuild:
+        mode = REBUILD_WRITE_MODE
+        replaced: tuple[str, ...] = ()
+    else:
+        mode = BRONZE_WRITE_MODE
+        replaced = tuple(
+            sorted(item.key for item in selected if item.key in registered)
+        )
+    objects: list[PromotedObject] = []
+    rows_staged = 0
+    table = bronze_table_name(contract.source_id, contract.dataset)
+    local = staging_dir / f"{table}.jsonl"
+    columns = bronze_columns(contract)
+    with local.open("wb") as out:
+        for item in selected:
+            count = _stage_object(
+                client, contract, raw_bucket, item, completion, out, columns
             )
-        prepared.append((contract, tuple(rows)))
-    counted = [(contract, len(rows)) for contract, rows in prepared]
-    sql = render_bronze_sql(counted, warehouse_name)
-    scripts = dataset_scripts(counted, warehouse_name)
-    ensure_bucket(client, warehouse_name)
-    counts: list[tuple[str, int]] = []
-    for contract, rows in prepared:
-        client.put_object(
-            Bucket=warehouse_name,
-            Key=staging_object_key(contract.source_id, contract.dataset),
-            Body=encode_staging_jsonl(bronze_columns(contract), rows),
+            objects.append(PromotedObject(item.key, item.etag, count))
+            rows_staged += count
+    script: tuple[str, str] | None = None
+    staging_key: str | None = None
+    if selected and (rebuild or rows_staged > 0 or replaced):
+        if rows_staged > 0:
+            staging_key = staging_object_key(
+                contract.source_id, contract.dataset, run_label
+            )
+            uploads.upload(local, staging_key)
+        script = (
+            dataset_sql_name(contract),
+            render_dataset_sql(
+                contract,
+                rows_staged,
+                warehouse_bucket,
+                run_label=run_label,
+                write_mode=mode,
+                replaced_keys=replaced,
+            ),
         )
-        counts.append((f"{contract.source_id}.{contract.dataset}", len(rows)))
-    return BronzePromotion(sql=sql, scripts=scripts, counts=tuple(counts))
+    local.unlink(missing_ok=True)
+    entry = DatasetPromotion(
+        source_id=contract.source_id,
+        dataset=contract.dataset,
+        mode=mode,
+        objects_listed=len(data),
+        objects_incomplete=len(candidates) - len(selected),
+        objects=tuple(objects),
+        replaced_keys=replaced,
+        rows_staged=rows_staged,
+        script=None if script is None else script[0],
+        staging_key=staging_key,
+    )
+    return entry, script
+
+
+def _stage_object(
+    client: BaseClient,
+    contract: DataContract,
+    raw_bucket: str,
+    item: RawListing,
+    completion: Mapping[str, str | None],
+    out: io.BufferedWriter,
+    columns: Sequence[str],
+) -> int:
+    """Read one raw object and append its rows to ``out``. Return the count."""
+    response = client.get_object(Bucket=raw_bucket, Key=item.key)
+    etag = _clean_etag(response.get("ETag"))
+    if etag is not None and etag != item.etag:
+        msg = f"{item.key}: object changed after it was listed; rerun the refresh"
+        raise BronzeError(msg)
+    rows = rows_from_object(
+        contract,
+        RawObject(
+            key=item.key,
+            body=response["Body"].read(),
+            metadata=response.get("Metadata") or {},
+            execution_completed_ts=completion[execution_prefix(item.key)],
+            etag=item.etag,
+        ),
+    )
+    for row in rows:
+        out.write(encode_staging_line(columns, row))
+    return len(rows)
+
+
+def list_raw_objects(
+    client: BaseClient,
+    *,
+    bucket: str,
+    source_id: str,
+    dataset: str,
+) -> tuple[RawListing, ...]:
+    """List keys and ETags under ``raw/{source_id}/{dataset}/``, in key order."""
+    _require_segment("source_id", source_id)
+    _require_segment("dataset", dataset)
+    prefix = f"raw/{source_id}/{dataset}/"
+    found: list[RawListing] = []
+    token: str | None = None
+    while True:
+        kwargs: dict[str, object] = {"Bucket": bucket, "Prefix": prefix}
+        if token is not None:
+            kwargs["ContinuationToken"] = token
+        response = client.list_objects_v2(**kwargs)
+        for item in response.get("Contents", []):
+            key = item["Key"]
+            etag = _clean_etag(item.get("ETag"))
+            if etag is None:
+                msg = f"{key}: listing has no ETag"
+                raise BronzeError(msg)
+            found.append(RawListing(key=key, etag=etag))
+        if not response.get("IsTruncated"):
+            break
+        token = response.get("NextContinuationToken")
+        if not isinstance(token, str) or token == "":
+            break
+    return tuple(sorted(found, key=lambda item: item.key))
 
 
 def list_raw_keys(
@@ -385,6 +661,30 @@ def list_raw_keys(
         if not isinstance(token, str) or token == "":
             break
     return tuple(sorted(keys))
+
+
+def split_marker_listing(
+    listing: Sequence[RawListing],
+) -> tuple[tuple[RawListing, ...], tuple[RawListing, ...]]:
+    """Split a listing into data objects and completion markers."""
+    data = tuple(
+        item
+        for item in listing
+        if item.key.rsplit("/", 1)[-1] != COMPLETION_MARKER_NAME
+    )
+    markers = tuple(
+        item
+        for item in listing
+        if item.key.rsplit("/", 1)[-1] == COMPLETION_MARKER_NAME
+    )
+    return data, markers
+
+
+def _clean_etag(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip().strip('"')
+    return cleaned or None
 
 
 def split_marker_keys(
@@ -484,6 +784,15 @@ def main(argv: list[str] | None = None) -> int:
         type=str,
         default=None,
         help="Directory for one Spark SQL file per dataset.",
+    )
+    parser.add_argument(
+        "--run-label",
+        type=str,
+        default="cli",
+        help=(
+            "Run label in the staging key. The CLI has no promotion registry, "
+            "so it renders a full rebuild of each selected dataset."
+        ),
     )
     parser.add_argument(
         "--counts-out",
@@ -597,6 +906,8 @@ def _promote_cli(args: argparse.Namespace) -> None:
         raw_bucket=raw_bucket,
         warehouse_bucket=warehouse_bucket,
         contracts=contracts,
+        run_label=args.run_label,
+        full_rebuild=True,
     )
     _write_dataset_scripts(args.sql_out, promotion.scripts)
     if args.counts_out:
@@ -662,7 +973,9 @@ def _table_sql(
     bucket: str,
     row_count: int,
     *,
-    write_mode: WriteMode = CURRENT_WRITE_MODE,
+    run_label: str,
+    write_mode: WriteMode,
+    replaced_keys: Sequence[str],
 ) -> str:
     context = f"{contract.source_id}.{contract.dataset}"
     try:
@@ -678,57 +991,118 @@ def _table_sql(
     table = bronze_table_name(source_id, dataset)
     quoted_table = _quote_ident(table)
     columns = bronze_columns(contract)
-    select_sql = ",\n".join(
-        f"  CAST({_quote_ident(name)} AS STRING) AS {_quote_ident(name)}"
-        for name in columns
-    )
-    location = f"s3a://{bucket}/bronze/{source_id}/{dataset}"
-    # One atomic replace: readers see the previous snapshot or the new one.
-    replace = [
-        f"CREATE OR REPLACE TABLE bronze.{quoted_table}",
-        "USING iceberg",
-        f"LOCATION '{location}'",
-        "TBLPROPERTIES ('format-version' = '2')",
-    ]
-    lines = [
-        f"-- {source_id}.{dataset}",
-        f"-- write_mode={write_mode.value} (full load, one atomic replace)",
+    view = _quote_ident(f"stage_{table}")
+    staging = f"s3a://{bucket}/{staging_object_key(source_id, dataset, run_label)}"
+    stage_view = [
+        f"CREATE OR REPLACE TEMPORARY VIEW {view}",
+        "USING json",
+        "OPTIONS (",
+        f"  path '{staging}',",
+        "  mode 'FAILFAST',",
+        "  multiline 'false'",
+        ");",
+        "",
     ]
     if row_count == 0:
-        nulls = ",\n".join(
-            f"  CAST(NULL AS STRING) AS {_quote_ident(name)}" for name in columns
-        )
+        source_view: list[str] = []
+        source_select = [
+            "SELECT * FROM (",
+            "SELECT",
+            ",\n".join(
+                f"  CAST(NULL AS STRING) AS {_quote_ident(name)}" for name in columns
+            ),
+            ") empty_staging",
+            "WHERE 1 = 0",
+        ]
+    else:
+        source_view = stage_view
+        source_select = [
+            "SELECT",
+            ",\n".join(
+                f"  CAST({_quote_ident(name)} AS STRING) AS {_quote_ident(name)}"
+                for name in columns
+            ),
+            f"FROM {view}",
+        ]
+    lines = [f"-- {source_id}.{dataset}"]
+    if write_mode is WriteMode.FULL_OVERWRITE:
+        if replaced_keys:
+            msg = f"{context}: a full rebuild does not take replaced keys"
+            raise BronzeError(msg)
+        location = f"s3a://{bucket}/bronze/{source_id}/{dataset}"
+        # One atomic replace: readers see the previous snapshot or the new one.
         lines.extend(
             [
-                *replace,
-                "AS SELECT * FROM (",
-                "SELECT",
-                nulls,
-                ") empty_staging",
-                "WHERE 1 = 0;",
+                f"-- write_mode={write_mode.value} (full rebuild, one atomic replace)",
+                *source_view,
+                f"CREATE OR REPLACE TABLE bronze.{quoted_table}",
+                "USING iceberg",
+                f"LOCATION '{location}'",
+                "TBLPROPERTIES ('format-version' = '2')",
+                "AS " + "\n".join(source_select) + ";",
             ]
         )
     else:
-        staging = f"s3a://{bucket}/bronze/_staging/{source_id}/{dataset}/rows.jsonl"
-        view = _quote_ident(f"stage_{table}")
         lines.extend(
             [
-                f"CREATE OR REPLACE TEMPORARY VIEW {view}",
-                "USING json",
-                "OPTIONS (",
-                f"  path '{staging}',",
-                "  mode 'FAILFAST',",
-                "  multiline 'false'",
-                ");",
-                "",
-                *replace,
-                "AS SELECT",
-                select_sql,
-                f"FROM {view};",
+                f"-- write_mode={write_mode.value} "
+                "(new raw objects only, one MERGE commit)",
+                *source_view,
+                *_merge_sql(quoted_table, columns, source_select, replaced_keys),
             ]
         )
     lines.append(f"SELECT COUNT(*) AS row_count FROM bronze.{quoted_table};")
     return "\n".join(lines)
+
+
+def _merge_sql(
+    quoted_table: str,
+    columns: Sequence[str],
+    source_select: Sequence[str],
+    replaced_keys: Sequence[str],
+) -> list[str]:
+    """``MERGE`` that inserts staged rows not yet present.
+
+    The match key is the row's lineage (object key, ETag, record index), so a
+    retry after a lost registry write inserts nothing. For a registered key
+    whose ETag changed, the old rows of that key are deleted in the same
+    commit. Object keys are paths that match the raw layout; no row value is
+    rendered into the statement.
+    """
+    quoted = [_quote_ident(name) for name in columns]
+    match = " AND ".join(
+        f"target.{_quote_ident(name)} = source.{_quote_ident(name)}"
+        for name in ("raw_object_key", ETAG_COLUMN, "record_index")
+    )
+    lines = [
+        f"MERGE INTO bronze.{quoted_table} AS target",
+        "USING (",
+        *source_select,
+        ") AS source",
+        f"ON {match}",
+        "WHEN NOT MATCHED THEN INSERT (" + ", ".join(quoted) + ")",
+        "VALUES (" + ", ".join(f"source.{name}" for name in quoted) + ")",
+    ]
+    if replaced_keys:
+        literals = ", ".join(_key_literal(key) for key in sorted(set(replaced_keys)))
+        lines.extend(
+            [
+                "WHEN NOT MATCHED BY SOURCE",
+                f"  AND target.`raw_object_key` IN ({literals})",
+                "THEN DELETE",
+            ]
+        )
+    lines[-1] += ";"
+    return lines
+
+
+def _key_literal(key: str) -> str:
+    """A raw object key as a SQL string literal. Only layout keys are accepted."""
+    _parse_key(key)
+    if "'" in key or "\\" in key:
+        msg = f"{key}: raw key cannot be rendered as a literal"
+        raise BronzeError(msg)
+    return f"'{key}'"
 
 
 def _payload_column_names(contract: DataContract) -> tuple[str, ...]:

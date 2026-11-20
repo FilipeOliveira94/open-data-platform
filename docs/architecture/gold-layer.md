@@ -40,7 +40,7 @@ Contract-violation rows live under `quarantine/{source_id}/{dataset}/…/*.jsonl
 make stage-quarantine
 ```
 
-Python reads those sidecars and writes one JSONL object at `gold/_staging/gold_staging/quarantine_findings/rows.jsonl` in `ODP_WAREHOUSE_BUCKET`. Spark loads that file into `iceberg.gold_staging.quarantine_findings` (`gold_staging` namespace on the JDBC catalog). The Spark SQL names the object path and the columns. Finding values stay in the JSONL object. The CLI prints the row count. An empty sidecar set still creates the table with zero rows and deletes the staging object. The staged columns are the finding reason, field, primary-key JSON (`business_key`), and object key. The sidecar's full `record` is not copied.
+Python reads those sidecars and writes one JSONL object at `gold/_staging/{run_label}/gold_staging/quarantine_findings/rows.jsonl` in `ODP_WAREHOUSE_BUCKET` (the run label since P3-13). Since P3-13 the step runs only while Gold is pending, that is after a Silver table changed; it still lists the whole `quarantine/` prefix (follow-up: P3-07). Spark loads that file into `iceberg.gold_staging.quarantine_findings` (`gold_staging` namespace on the JDBC catalog). The Spark SQL names the object path and the columns. Finding values stay in the JSONL object. The CLI prints the row count. An empty sidecar set still creates the table with zero rows and deletes the staging object. The staged columns are the finding reason, field, primary-key JSON (`business_key`), and object key. The sidecar's full `record` is not copied.
 
 Quality facts union those rows with Silver-derived `business_anomaly` reasons from the model design. Reprocessing quarantined source rows remains P3-07.
 

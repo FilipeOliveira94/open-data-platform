@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from open_data_platform.lakehouse.bronze import METADATA_COLUMNS, bronze_table_name
 from open_data_platform.lakehouse.write_mode import (
-    CURRENT_WRITE_MODE,
+    SILVER_WRITE_MODE,
     WriteMode,
     WriteModeError,
     render_append_only_sql,
@@ -87,7 +87,7 @@ class DedupPolicy:
     rows (geolocation). ``order_by`` lists columns available after the typed
     select; later columns in ``DEFAULT_ORDER`` are appended when missing.
     ``json_expansions`` flatten selected Bronze JSON strings into columns.
-    ``write_mode`` defaults to full overwrite (the only mode implemented).
+    ``write_mode`` defaults to full overwrite, the only Silver mode (ADR-0024).
     """
 
     partition_keys: tuple[str, ...] | None = None
@@ -95,7 +95,7 @@ class DedupPolicy:
     order_by: tuple[str, ...] = ()
     timestamp_style: TimestampStyle = TimestampStyle.OLIST_CSV
     json_expansions: tuple[JsonExpansion, ...] = ()
-    write_mode: WriteMode = CURRENT_WRITE_MODE
+    write_mode: WriteMode = SILVER_WRITE_MODE
 
 
 def require_bucket_name(bucket: str) -> str:
@@ -266,6 +266,9 @@ def render_silver_sql(
         require_implemented(policy.write_mode, context=context)
     except WriteModeError as exc:
         raise SilverError(str(exc)) from exc
+    if policy.write_mode is not WriteMode.FULL_OVERWRITE:
+        msg = f"{context}: Silver implements only full_overwrite per dataset"
+        raise SilverError(msg)
     bucket = require_bucket_name(warehouse_bucket)
     source_id = _require_segment("source_id", contract.source_id)
     dataset = _require_segment("dataset", contract.dataset)

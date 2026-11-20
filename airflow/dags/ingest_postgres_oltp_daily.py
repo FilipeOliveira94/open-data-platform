@@ -1,4 +1,4 @@
-"""Extract yesterday's PostgreSQL OLTP window every day, then rebuild the lakehouse.
+"""Extract yesterday's PostgreSQL OLTP window every day into raw storage.
 
 Business logic stays in ``open_data_platform.ingestion.postgres_oltp``. The
 window is the Airflow data interval of the run: ``CronDataIntervalTimetable``
@@ -6,11 +6,11 @@ at ``0 0 * * *`` in UTC gives ``[D-1 00:00Z, D 00:00Z)`` for the run that
 starts at ``D 00:00Z``. The extract rejects a bound that is not UTC
 midnight, so the timetable stays in UTC.
 
-After a successful extract, ``trigger_transform`` starts
-``transform_lakehouse`` with the run id ``<this DAG id>__<this run id>`` and
-does not wait for it. Clearing that task resets the same transform run
-instead of creating a second one. The manual ``ingest_postgres_oltp`` DAG
-does not trigger the transform.
+A successful extract emits the ``raw_postgres_oltp`` Asset. Since P3-13
+(ADR-0024) ``transform_lakehouse`` is scheduled on the raw Assets, which
+replaces the P3-04 ``TriggerDagRunOperator``: several extracts that land
+while a refresh runs (a catch-up of missed days) lead to at most one
+follow-up refresh, which promotes every new raw object at once.
 
 ``catchup`` is true. The window comes only from the schedule, so a day
 the scheduler did not run (DAG paused, scheduler down) would otherwise
@@ -27,12 +27,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sdk import DAG, CronDataIntervalTimetable
 from ingest_common import DEFAULT_ARGS, execution_id_param, postgres_extract_task
 
 DAG_ID = "ingest_postgres_oltp_daily"
-TRANSFORM_DAG_ID = "transform_lakehouse"
 # First daily window: [2026-11-19, 2026-11-20). Each missed day after it is
 # caught up; earlier days are a backfill.
 START_DATE = datetime(2026, 11, 19, tzinfo=UTC)
@@ -53,13 +51,4 @@ with DAG(
     params={"execution_id": execution_id_param()},
     doc_md=__doc__,
 ):
-    extract = postgres_extract_task(WINDOW_START, WINDOW_END)
-    trigger_transform = TriggerDagRunOperator(
-        task_id="trigger_transform",
-        trigger_dag_id=TRANSFORM_DAG_ID,
-        trigger_run_id=f"{DAG_ID}__{{{{ run_id }}}}",
-        reset_dag_run=True,
-        wait_for_completion=False,
-        fail_when_dag_is_paused=True,
-    )
-    extract >> trigger_transform
+    postgres_extract_task(WINDOW_START, WINDOW_END)

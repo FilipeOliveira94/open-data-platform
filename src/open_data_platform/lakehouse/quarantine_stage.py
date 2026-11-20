@@ -27,7 +27,21 @@ from open_data_platform.object_storage import client_from_env, ensure_bucket
 
 SCHEMA = "gold_staging"
 TABLE = "quarantine_findings"
-STAGING_KEY = f"gold/_staging/{SCHEMA}/{TABLE}/rows.jsonl"
+_RUN_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def staging_key(run_label: str = "adhoc") -> str:
+    """Warehouse key of the findings JSONL for one run (ADR-0024).
+
+    The run label is part of the key, so a ``make`` run and an Airflow run do
+    not overwrite each other's staging.
+    """
+    if _RUN_LABEL_RE.fullmatch(run_label) is None:
+        msg = f"run label must be a path segment: {run_label!r}"
+        raise QuarantineStageError(msg)
+    return f"gold/_staging/{run_label}/{SCHEMA}/{TABLE}/rows.jsonl"
+
+
 TABLE_LOCATION = f"gold/{SCHEMA}/{TABLE}"
 _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _COLUMNS: tuple[tuple[str, str], ...] = (
@@ -183,7 +197,9 @@ def encode_findings_jsonl(rows: Sequence[QuarantineFindingRow]) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def render_load_sql(*, warehouse_bucket: str, row_count: int) -> str:
+def render_load_sql(
+    *, warehouse_bucket: str, row_count: int, run_label: str = "adhoc"
+) -> str:
     """Spark SQL that replaces the findings table from the staging object.
 
     One ``CREATE OR REPLACE TABLE ... AS SELECT``: a single Iceberg commit, so
@@ -229,7 +245,7 @@ def render_load_sql(*, warehouse_bucket: str, row_count: int) -> str:
             ]
         )
     else:
-        staging = f"s3a://{bucket}/{STAGING_KEY}"
+        staging = f"s3a://{bucket}/{staging_key(run_label)}"
         view = _quote(f"stage_{TABLE}")
         lines.extend(
             [
@@ -266,6 +282,7 @@ def prepare_quarantine_staging(
     bucket: str | None = None,
     warehouse_bucket: str | None = None,
     keys: Sequence[str] | None = None,
+    run_label: str = "adhoc",
 ) -> QuarantineStaging:
     """Read quarantine sidecars and write the staging JSONL when rows exist.
 
@@ -283,15 +300,17 @@ def prepare_quarantine_staging(
     if rows:
         s3.put_object(
             Bucket=wh,
-            Key=STAGING_KEY,
+            Key=staging_key(run_label),
             Body=encode_findings_jsonl(rows),
             ContentType="application/x-ndjson",
         )
     else:
-        _delete_staging_object(s3, wh)
+        _delete_staging_object(s3, wh, run_label)
     return QuarantineStaging(
         row_count=len(rows),
-        sql=render_load_sql(warehouse_bucket=wh, row_count=len(rows)),
+        sql=render_load_sql(
+            warehouse_bucket=wh, row_count=len(rows), run_label=run_label
+        ),
     )
 
 
@@ -322,6 +341,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         required=True,
         help="Directory for quarantine_findings.sql.",
     )
+    parser.add_argument(
+        "--run-label",
+        type=str,
+        default="adhoc",
+        help="Run label in the staging key (medallion_build passes its run).",
+    )
     args = parser.parse_args(argv)
     try:
         endpoint = os.environ.get("MINIO_ENDPOINT_URL", "http://localhost:9000")
@@ -329,7 +354,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if parsed.scheme not in {"http", "https"}:
             msg = f"MINIO_ENDPOINT_URL must be http(s): {endpoint}"
             raise QuarantineStageError(msg)
-        staged = prepare_quarantine_staging()
+        staged = prepare_quarantine_staging(run_label=args.run_label)
         write_sql(Path(args.sql_out), staged.sql)
         print(staged.row_count)
     except QuarantineStageError as exc:
@@ -362,9 +387,9 @@ def _quote(name: str) -> str:
     return f"`{name}`"
 
 
-def _delete_staging_object(client: BaseClient, bucket: str) -> None:
+def _delete_staging_object(client: BaseClient, bucket: str, run_label: str) -> None:
     try:
-        client.delete_object(Bucket=bucket, Key=STAGING_KEY)
+        client.delete_object(Bucket=bucket, Key=staging_key(run_label))
     except ClientError:
         return
 

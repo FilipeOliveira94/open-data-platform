@@ -1,8 +1,10 @@
 """Live count checks derived from a run, not from a pinned snapshot.
 
-Bronze checks compare Trino to the row counts read from raw objects in that
-promotion. Silver checks compare Trino Silver to distinct Bronze keys (or
-distinct payload rows) using the same partition list as the Spark writer.
+Bronze checks compare Trino to the row total that the promotion registry
+holds for each dataset a refresh wrote (ADR-0024): every registered object's
+rows, so the Bronze table equals the sum of what was promoted into it.
+Silver checks compare Trino Silver to distinct Bronze keys (or distinct
+payload rows) using the same partition list as the Spark writer.
 Shape checks compare a column rule to the Silver table itself.
 
 The expected side of every check is ``ok`` or the raw-derived count. Snapshot
@@ -75,19 +77,20 @@ def bronze_count_checks(
     counts: Mapping[str, int],
     contracts: Sequence[DataContract],
 ) -> tuple[tuple[str, str], ...]:
-    """Trino ``COUNT(*)`` checks whose expected side is the raw read."""
+    """Trino ``COUNT(*)`` checks for the datasets a refresh wrote.
+
+    The expected side is the registry row total of each dataset. A refresh
+    that wrote no table has an empty count file and no checks.
+    """
     expected_names = {
         f"{contract.source_id}.{contract.dataset}": contract for contract in contracts
     }
-    missing = sorted(set(expected_names) - set(counts))
     extra = sorted(set(counts) - set(expected_names))
-    if missing or extra:
-        msg = (
-            f"count file does not match the contracts: missing={missing} extra={extra}"
-        )
+    if extra:
+        msg = f"count file names unknown datasets: {extra}"
         raise ReconciliationError(msg)
     checks: list[tuple[str, str]] = []
-    for name in sorted(expected_names):
+    for name in sorted(counts):
         contract = expected_names[name]
         table = _qualified(
             "bronze",
@@ -105,7 +108,8 @@ def silver_live_checks(
     relational = tuple(
         ("ok", silver_relation_sql(contract, policy)) for contract, policy in entries
     )
-    return relational + shape_checks()
+    rebuilt = {(contract.source_id, contract.dataset) for contract, _p in entries}
+    return relational + shape_checks(rebuilt)
 
 
 def silver_relation_sql(contract: DataContract, policy: DedupPolicy) -> str:
@@ -165,8 +169,13 @@ def _bronze_scope(update_pattern: str, bronze: str) -> str:
     raise ReconciliationError(msg)
 
 
-def shape_checks() -> tuple[tuple[str, str], ...]:
-    """Column rules whose expected count is the Silver table, not a snapshot size."""
+def shape_checks(
+    datasets: set[tuple[str, str]] | None = None,
+) -> tuple[tuple[str, str], ...]:
+    """Column rules whose expected count is the Silver table, not a snapshot size.
+
+    ``datasets`` keeps only the rules of those Silver tables; ``None`` keeps all.
+    """
     products = _qualified("silver", "dummyjson_products__products")
     clickstream = _qualified("silver", "demo_storefront__clickstream")
     expanded = (
@@ -188,9 +197,12 @@ def shape_checks() -> tuple[tuple[str, str], ...]:
         f"SELECT COUNT(*) AS missing FROM {clickstream} "
         "WHERE event_type IN ('add_to_cart', 'purchase') AND product_id IS NULL)"
     )
-    return (
-        ("ok", _one_line(expanded)),
-        ("ok", _one_line(product_on_cart)),
+    rules = (
+        (("dummyjson_products", "products"), ("ok", _one_line(expanded))),
+        (("demo_storefront", "clickstream"), ("ok", _one_line(product_on_cart))),
+    )
+    return tuple(
+        check for owner, check in rules if datasets is None or owner in datasets
     )
 
 

@@ -46,6 +46,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-019 | HTTP API sources | P1-05 DummyJSON `/products`; IBGE Localidades (P1-08). BrasilAPI CEP withdrawn | DummyJSON products client; IBGE `municipios` client. No CEP dataset | `approved` | [ADR-0019](docs/decisions/0019-public-api-ingestion-source.md) |
 | D-020 | Raw storage layout | Object-store `raw/{source_id}/{dataset}/dt=…/execution_id=…/`; metadata `source_id`, `execution_id`, `_ingestion_ts`; `data/raw/` is local staging only | Package helpers + unit tests (P1-02) | `approved` | [ADR-0020](docs/decisions/0020-raw-storage-layout.md) |
 | D-021 | BrasilAPI CEP | Not a platform source. Geography is Olist geolocation plus IBGE, Gold schema `brazil_geography` | No CEP dataset (P1-09 withdrawn) | `approved` | [ADR-0021](docs/decisions/0021-withdraw-brasilapi-cep.md) |
+| D-024 | Incremental lakehouse refresh | Promotion registry (raw key + ETag) in the catalog PostgreSQL; Bronze `MERGE` append of new complete objects; Silver rebuilds pending datasets; Gold while pending; Asset-scheduled transform; `--full-rebuild` for recovery | `lakehouse_state` schema, `lakehouse/refresh.py`, raw Assets on every ingestion DAG with batched events (P3-13) | `approved` | [ADR-0024](docs/decisions/0024-incremental-lakehouse-refresh.md) |
 
 `—` means not yet implemented or not yet verified in the repository.
 
@@ -61,6 +62,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 
 | Date | Change |
 | --- | --- |
+| 2026-11-20 | D-024 approved: incremental lakehouse refresh (P3-13). Promotion registry and pending-layer flags in the catalog PostgreSQL (`lakehouse_state`), Bronze `MERGE` append of new complete raw objects, Silver rebuild of pending datasets, Gold while pending, `--full-rebuild` for recovery, and `transform_lakehouse` scheduled on raw Assets with batched events. Evidence in [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
 | 2026-11-13 | D-005 addendum approved: one runtime image runs Airflow, Spark `3.5.8`, and dbt. The `spark:3.5.8-java17` service image and host dbt are gone. Approved after `transform_lakehouse` and `reconcile_gold` ran on it. D-006 implemented stack now names that image. Evidence in [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | 2026-11-12 | D-006 approved: Airflow 3.4.0 LocalExecutor on the Compose `orchestration` profile. Task logs in MinIO. Celery and Flower are not a follow-up. Evidence in [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | 2026-11-11 | D-017 selects JupyterLab + Superset for Phase 8. State stays `proposed` until the P8-01 Trino 484 PoC. QuickSight stays the AWS counterpart |

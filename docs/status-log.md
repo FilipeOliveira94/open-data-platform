@@ -4,6 +4,27 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-20 — P3-13 incremental lakehouse refresh
+
+ADR-0024 approved. Bronze promotes only data objects of complete executions whose key is absent from `lakehouse_state.bronze_promotions` or whose ETag changed, reading and staging one object at a time (`lakehouse/bronze.py`, `lakehouse/refresh.py`). One `MERGE INTO` per dataset appends the rows; a rewritten object's old rows are deleted in the same commit. Staging keys and work directories carry the run label. `lakehouse_state.pending_layers` keeps Silver and Gold pending until their write succeeds, and `bronze_refreshes` records each run. `--full-rebuild` (`make live-rebuild`) rebuilds every table. Every ingestion DAG emits an `odp-raw://{source_id}` Asset; `transform_lakehouse` is scheduled on them with `batch_asset_events=True`, and the P3-04 `TriggerDagRunOperator` is gone. A step with nothing to do exits 99 and its task is skipped.
+
+The local raw executions from before P3-12 have no marker and no longer enter Bronze. The two `postgres_oltp` windows that existed only that way, `[2026-10-17, 2026-10-24)` and `[2026-11-19, 2026-11-20)`, were re-extracted under `p3-13-reland-*`.
+
+| Run | Result |
+| --- | --- |
+| `make live-rebuild` | 565 s. 28 objects, 1_565_638 rows. Bronze 251.7 s (18 checks passed), Silver 255.4 s (20 passed), stage-quarantine 15.1 s, dbt-build 26.5 s (PASS=287) |
+| `make live-refresh`, nothing new | 13 s. 102 keys listed, no body read, no table written, every step skipped |
+| `make live-refresh` after `postgres_oltp` `[2026-10-17, 2026-10-18)` (`p3-13-daily-2026-10-17`) | 151 s. 4 objects, 5 rows; Bronze 50.7 s, Silver 50.3 s (4 tables), dbt-build 26.2 s. `MERGE` committed as Iceberg `append`, one file, none rewritten; geolocation snapshots unchanged |
+| Clickstream execution re-ingested with 60, then 100 events | `MERGE` with delete; Bronze 60, then 100, equal to the registry |
+| `make live-refresh`, Silver and Gold pending only | 67 s. Bronze skipped promotion, Silver 1 table, Gold rebuilt |
+| Airflow, default batching | Four Asset events gave four transform runs; the last two wrote nothing |
+| Airflow, `batch_asset_events=True` | Three `ingest_postgres_oltp` runs during refresh A gave one follow-up run consuming 3 events (12 objects) |
+| Airflow, manual refresh with nothing new | 8.2 s, six tasks skipped |
+
+`uv run pytest tests/unit`: 411 passed. `uv run ruff check src tests airflow docker/airflow` and `ruff format --check` passed. Not measured: a `MERGE` into a large Bronze table (no new Olist release landed).
+
+---
+
 ### 2026-11-20 — P3-12 update-pattern semantics and source refresh policy
 
 Every ingestion entry point (Olist, DummyJSON, IBGE, storefront, PostgreSQL) deletes the execution's `_COMPLETE` marker before its first object and writes it after its last one (`ingestion/writer.py`). The marker lists object names and `completed_at`, no row values. Bronze (`lakehouse/bronze.py`) adds `_execution_completed_ts`: the marker time when its names equal the objects found, else null. Silver (`lakehouse/silver/common.py`) selects Bronze rows by `update_pattern`: the latest complete execution for `snapshot` and `full_refresh`; every complete execution for `append_only`, first ingested row per key; every window for `incremental_window`, unchanged. Without a complete execution, an `assert_true` fails the Silver script before `CREATE OR REPLACE`. `append_only` is a new contract value; `demo_storefront.clickstream` moves to it in contract version 3. The Silver reconciliation check scopes Bronze the same way. `ingest_dummyjson_products` runs Monday 03:00 UTC and `ingest_ibge_localidades` day 1 03:00 UTC, both `catchup=False` and created paused; Olist and the storefront stay manual. The source refresh matrix in `ROADMAP.md` is filled.

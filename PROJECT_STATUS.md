@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-20 (P3-12 verified: update-pattern semantics and source refresh policy) |
+| Last updated | 2026-11-20 (P3-13 verified: incremental lakehouse refresh) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,17 +22,16 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-13** — Incremental lakehouse refresh. Not started.
+**P3-05** — Weekly batch schedule (PostgreSQL). Not started.
 
-A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. P3-11 is verified: every Spark writer now replaces its table in one Iceberg commit, and dbt Gold already did. P3-12 is verified: each ingestion closes its execution with a completion marker, and Silver selects Bronze rows by `update_pattern` ([data contracts](docs/architecture/data-contracts.md#update-patterns-p3-12)). DummyJSON runs weekly and IBGE monthly. Bronze still re-reads every raw execution on each run; P3-13 removes that. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
+A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. P3-11 is verified: every Spark writer now replaces its table in one Iceberg commit, and dbt Gold already did. P3-12 is verified: each ingestion closes its execution with a completion marker, and Silver selects Bronze rows by `update_pattern` ([data contracts](docs/architecture/data-contracts.md#update-patterns-p3-12)). DummyJSON runs weekly and IBGE monthly. P3-13 is verified ([ADR-0024](docs/decisions/0024-incremental-lakehouse-refresh.md), [result](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13)): Bronze promotes only new raw objects of complete executions with one `MERGE` per dataset, Silver and Gold run only while pending, and `transform_lakehouse` is scheduled on the raw Assets of every ingestion DAG with batched events. A refresh with nothing new writes no table. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
 
 P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse`. The 1-slot `lakehouse_gold` pool keeps `reconcile_gold` away from every transform step that writes tables. Every DAG is created paused. `run_python_args` stops the child's whole process group. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-13** — Incremental lakehouse refresh (ADR-0024). Acceptance: `ROADMAP.md` → P3-13.
-2. **P3-05** — Weekly batch schedule, after P3-13. Acceptance: `ROADMAP.md` → P3-05.
-3. **P3-06** — Window coverage, gap report, and backfill. Acceptance: `ROADMAP.md` → P3-06.
+1. **P3-05** — Weekly batch schedule. Acceptance: `ROADMAP.md` → P3-05.
+2. **P3-06** — Window coverage, gap report, and backfill. Acceptance: `ROADMAP.md` → P3-06.
 
 ---
 
@@ -52,7 +51,7 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 | P3-10 | Orchestration runtime hardening | Not started | — |
 | P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
 | P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
-| P3-13 | Incremental lakehouse refresh | Not started | — |
+| P3-13 | Incremental lakehouse refresh | Verified | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
 | P3-14 | Live run, result, and consistency check | Not started | — |
 | P3-15 | Phase 3 documentation and status | Not started | — |
 
@@ -67,7 +66,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [ ] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06).
 - [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
 - [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
-- [ ] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13).
+- [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing and Silver rebuilds of `incremental_window`/`append_only` datasets still do (ADR-0024).
 - [ ] Invalid records are identified and handled per documented rules.
 - [ ] Success and failure scenarios have tests or reproducible evidence.
 - [ ] A live run result is recorded and compared to the source windows (P3-14).
@@ -80,9 +79,10 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 | Validation | Detail |
 | --- | --- |
 | Date | 2026-11-20 |
-| Environment | Local Compose. PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` (Spark and dbt) |
-| Checks | `scripts/p3_12_refresh_check.sh` (full_refresh A → B → partial C → re-ingest D, the no-complete-execution guard, and append_only repeat and late batches), then a re-ingest of every snapshot source and `make live-bronze`, `live-silver`, `live-gold` |
-| Result | 19 of 19 checks passed: a removed product leaves Silver, a partial run is ignored, a re-ingest keeps the payload checksum, the guard keeps Silver at 2 rows, clickstream dedups 100 → 50 and places 20 late events by `event_time`. Rebuild: Bronze 18, Silver 20, dbt 287 checks passed; Silver geolocation 738_332, orders 99_441, DummyJSON 194, IBGE 5_571. Detail: [`docs/status-log.md`](docs/status-log.md) |
+| Environment | Local Compose. PostgreSQL, MinIO, Trino, Airflow 3.4 (`make airflow-up`), and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` |
+| Checks | `make live-rebuild`; `make live-refresh` with no new object, after one new `postgres_oltp` daily window, and with only Silver and Gold pending; `make live-bronze` after a raw object was re-ingested; on Airflow, three ingestion runs during one refresh and a manual refresh with nothing new |
+| Result | Full rebuild 565 s (Bronze 18, Silver 20, dbt 287 checks passed). No new object: 13 s, no table written, every step skipped (Airflow: 8.2 s, six tasks skipped). Daily window: 151 s, 4 objects and 5 rows appended by `MERGE` (Iceberg `append`, no file rewritten). Re-ingested object: old rows deleted in the same `MERGE`. Three events during a refresh: one follow-up run. Unit tests: 411 passed |
+
 ---
 
 ## Phase 2 baseline
@@ -155,7 +155,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-04 verified) |
+| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-04, P3-11, P3-12, P3-13 verified) |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
@@ -174,7 +174,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 - The `lakehouse_gold` pool is held per task, not per run. A waiting `dbt_reconcile` can take the slot between two transform writes and read a half-rebuilt lakehouse (no table changes while it reads). On 2026-11-20 that stretched one transform run to 20 min 22 s.
 - DAGs already in the `airflow` metadata database keep their paused state; `is_paused_upon_creation=True` applies only to new DAGs. A manual daily trigger gets the last complete UTC day, whatever `-l` says; `airflow dags trigger` without `-l` has no data interval and the extract fails.
 - Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window. P3-05 and P3-06 are the safety net; CDC is Phase 4.
-- Each daily run triggers the current full rebuild of Bronze, Silver, and Gold (about 10 minutes). Bronze reads every raw object of every source into Python memory on each run, so the work grows with total history (P3-13). With `catchup=True`, N missed days queue N full rebuilds.
+- Since P3-13 a refresh reads only new raw objects, but it still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table. A `MERGE` into a large Bronze table has not been measured. Raw executions without a `_COMPLETE` marker never enter Bronze.
 - Silver replaces each table with `DROP` → `CREATE` → `INSERT OVERWRITE`. During that window the table does not exist for Trino or dbt, and a failed insert leaves it empty (P3-11).
 - `full_refresh` sources (DummyJSON, IBGE) keep every record ever seen in Silver: a record removed at the source never leaves. `demo_storefront.clickstream` is labelled `snapshot` (P3-12).
 - The windowed batch extract does not see hard deletes. That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
