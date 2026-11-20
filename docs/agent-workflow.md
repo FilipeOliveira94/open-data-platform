@@ -40,7 +40,7 @@ Implement only the plan we just agreed on.
 - Do not run destructive commands, deploy cloud resources, or incur cloud costs without my explicit approval.
 - Run the relevant checks and report the actual output.
 - Update documentation and PROJECT_STATUS.md only for work that has actually been verified.
-- Do not commit; the close step commits.
+- Work on the issue branch from AGENTS.md §13. Do not commit; the close step commits and opens the PR.
 
 At the end, report changed files, checks run, results, acceptance criteria met and not met, limitations, and the next recommended task.
 ```
@@ -55,9 +55,9 @@ Review the current diff against the agreed plan and acceptance criteria. Do not 
 - Run the relevant validation commands and report their actual output.
 - Identify acceptance criteria that are not met or not verified.
 - Apply the AGENTS.md §12 "Issue Close Checklist".
-- Make one local Conventional Commit on main. Never push (AGENTS.md §13 Git).
+- Commit with Conventional Commits on the issue branch, push the branch, and open a PR to main. Never push or merge main (AGENTS.md §13 Git).
 
-Return a concise completion report, the commit SHA, and the next smallest useful task.
+Return a concise completion report, the PR link, the last commit SHA, and the next smallest useful task.
 ```
 
 ---
