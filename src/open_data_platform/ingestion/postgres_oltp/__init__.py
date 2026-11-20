@@ -40,7 +40,13 @@ from open_data_platform.ingestion.quarantine import (
     prepare_quarantine,
     write_quarantine_object,
 )
-from open_data_platform.ingestion.writer import RawWriteResult, write_raw_object
+from open_data_platform.ingestion.writer import (
+    RawWriteResult,
+    clear_completion_marker,
+    object_name_of,
+    write_completion_marker,
+    write_raw_object,
+)
 from open_data_platform.object_storage import client_from_env
 
 if TYPE_CHECKING:
@@ -234,6 +240,14 @@ def extract_postgres_oltp(
         object_name = window_object_name(dataset, start, end)
         try:
             sidecar = prepare_quarantine(contract, records)
+            clear_completion_marker(
+                client,
+                bucket=bucket,
+                source_id=SOURCE_ID,
+                dataset=dataset,
+                execution_id=execution_id,
+                ingestion_ts=written_at,
+            )
             result = write_raw_object(
                 client,
                 bucket=bucket,
@@ -254,6 +268,15 @@ def extract_postgres_oltp(
                 object_name=object_name,
                 ingestion_ts=result.metadata.ingestion_ts,
                 body=sidecar,
+            )
+            write_completion_marker(
+                client,
+                bucket=bucket,
+                source_id=SOURCE_ID,
+                dataset=dataset,
+                execution_id=execution_id,
+                ingestion_ts=written_at,
+                object_names=(object_name_of(result.key),),
             )
         except ValueError as exc:
             raise PostgresOltpError(str(exc)) from exc

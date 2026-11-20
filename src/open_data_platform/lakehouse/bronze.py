@@ -51,7 +51,12 @@ METADATA_COLUMNS: tuple[str, ...] = (
     "raw_object_key",
     "record_index",
     "dt",
+    "_execution_completed_ts",
 )
+
+# Name of the marker an ingestion writes after the last object of one
+# execution (``ingestion.writer.write_completion_marker``).
+COMPLETION_MARKER_NAME = "_COMPLETE"
 
 _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -75,11 +80,16 @@ class BronzeParseError(BronzeError):
 
 @dataclass(frozen=True, slots=True)
 class RawObject:
-    """Bytes and user-metadata for one raw object."""
+    """Bytes and user-metadata for one raw object.
+
+    ``execution_completed_ts`` is the ``completed_at`` of the execution's
+    completion marker, or ``None`` when the execution is incomplete.
+    """
 
     key: str
     body: bytes
     metadata: Mapping[str, str]
+    execution_completed_ts: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +198,7 @@ def rows_from_object(
             "raw_object_key": raw.key,
             "record_index": str(index),
             "dt": parsed.dt,
+            "_execution_completed_ts": raw.execution_completed_ts,
         }
         row.update(payload)
         missing = [name for name in columns if name not in row]
@@ -298,15 +309,24 @@ def promote_bronze(
     warehouse_name = require_bucket_name(warehouse_bucket)
     prepared: list[tuple[DataContract, tuple[dict[str, str | None], ...]]] = []
     for contract in contracts:
-        keys = list_raw_keys(
-            client,
-            bucket=raw_name,
-            source_id=contract.source_id,
-            dataset=contract.dataset,
+        keys, marker_keys = split_marker_keys(
+            list_raw_keys(
+                client,
+                bucket=raw_name,
+                source_id=contract.source_id,
+                dataset=contract.dataset,
+            )
         )
         if not keys:
             msg = f"no raw objects for {contract.source_id}.{contract.dataset}"
             raise BronzeError(msg)
+        markers = {
+            execution_prefix(key): client.get_object(Bucket=raw_name, Key=key)[
+                "Body"
+            ].read()
+            for key in marker_keys
+        }
+        completed = execution_completion(keys, markers)
         rows: list[dict[str, str | None]] = []
         for key in keys:
             response = client.get_object(Bucket=raw_name, Key=key)
@@ -315,7 +335,12 @@ def promote_bronze(
             rows.extend(
                 rows_from_object(
                     contract,
-                    RawObject(key=key, body=body, metadata=metadata),
+                    RawObject(
+                        key=key,
+                        body=body,
+                        metadata=metadata,
+                        execution_completed_ts=completed[execution_prefix(key)],
+                    ),
                 )
             )
         prepared.append((contract, tuple(rows)))
@@ -360,6 +385,68 @@ def list_raw_keys(
         if not isinstance(token, str) or token == "":
             break
     return tuple(sorted(keys))
+
+
+def split_marker_keys(
+    keys: Sequence[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Split listed keys into data object keys and completion marker keys."""
+    data: list[str] = []
+    markers: list[str] = []
+    for key in keys:
+        if key.rsplit("/", 1)[-1] == COMPLETION_MARKER_NAME:
+            markers.append(key)
+        else:
+            data.append(key)
+    return tuple(data), tuple(markers)
+
+
+def execution_prefix(key: str) -> str:
+    """The ``.../execution_id=X/`` prefix that holds one raw object or marker."""
+    return key.rsplit("/", 1)[0] + "/"
+
+
+def execution_completion(
+    data_keys: Sequence[str],
+    markers: Mapping[str, bytes],
+) -> dict[str, str | None]:
+    """Completion time per execution prefix, or ``None`` when incomplete.
+
+    An execution is complete when its prefix has a marker whose
+    ``object_names`` equal the data objects found under that prefix. A
+    missing marker, an unreadable marker, or a different object set (a
+    partial page set, a stray object) leaves the execution incomplete.
+    """
+    names_by_prefix: dict[str, set[str]] = {}
+    for key in data_keys:
+        names_by_prefix.setdefault(execution_prefix(key), set()).add(
+            key.rsplit("/", 1)[-1]
+        )
+    completion: dict[str, str | None] = {}
+    for prefix, names in names_by_prefix.items():
+        body = markers.get(prefix)
+        completion[prefix] = None if body is None else _marker_completed_at(body, names)
+    return completion
+
+
+def _marker_completed_at(body: bytes, names: set[str]) -> str | None:
+    try:
+        marker = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(marker, dict):
+        return None
+    listed = marker.get("object_names")
+    completed_at = marker.get("completed_at")
+    if not isinstance(listed, list) or not isinstance(completed_at, str):
+        return None
+    if not all(isinstance(name, str) for name in listed):
+        return None
+    if set(listed) != names or len(listed) != len(names):
+        return None
+    if completed_at == "":
+        return None
+    return completed_at
 
 
 def main(argv: list[str] | None = None) -> int:

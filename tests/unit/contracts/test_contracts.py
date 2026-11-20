@@ -107,7 +107,7 @@ def test_demo_storefront_clickstream_is_jsonl_without_a_join_key() -> None:
     assert clickstream.payload_format == "jsonl"
     assert clickstream.provenance_system == "generator"
     assert clickstream.source_family == "product_analysis"
-    assert clickstream.update_pattern == "snapshot"
+    assert clickstream.update_pattern == "append_only"
     assert clickstream.primary_key == ("event_id",)
     names = [field.name for field in clickstream.fields]
     assert names == [

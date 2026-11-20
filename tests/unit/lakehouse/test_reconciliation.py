@@ -118,6 +118,15 @@ def test_silver_checks_compare_bronze_keys_and_do_not_pin_sizes() -> None:
     assert "updated_at" not in postgres.split("GROUP BY", maxsplit=1)[1]
     municipios = _sql_with(checks, "ibge_localidades__municipios", grouped=True)
     assert 'GROUP BY "municipio-id"' in municipios
+    # P3-12: Bronze is scoped the way the Silver writer reads it.
+    for snapshot in (products, municipios, geolocation):
+        assert ') latest ON b."dt" = latest."dt"' in snapshot
+        assert "LIMIT 1" in snapshot
+    assert "latest" not in postgres
+    assert "_execution_completed_ts" not in postgres
+    clickstream = _sql_with(checks, "demo_storefront__clickstream", grouped=True)
+    assert '"_execution_completed_ts" IS NOT NULL) scoped' in clickstream
+    assert "latest" not in clickstream
     shape = "\n".join(sql for _ok, sql in shape_checks())
     assert "dimensions_width" in shape
     assert "meta_barcode" in shape

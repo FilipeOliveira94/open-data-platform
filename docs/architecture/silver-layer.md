@@ -63,13 +63,15 @@ Casts use Spark `TRY_*` helpers. A failed cast becomes null; the row remains if 
 
 Default survivor: last valid row by `_ingestion_ts`, `execution_id`, `raw_object_key`, then numeric `record_index` (all descending). “Valid” means every partition-key column is non-null after casting.
 
+Before deduplication, Silver selects Bronze rows by the contract `update_pattern` (P3-12): the latest complete execution for `snapshot` and `full_refresh`, every complete execution for `append_only`, and every window for `incremental_window`. The rules and the completion marker are in [Data contracts](data-contracts.md#update-patterns-p3-12).
+
 | Dataset rule | Policy |
 | --- | --- |
 | Contract `primary_key` | `ROW_NUMBER` partitioned by those columns |
 | `order_reviews` | Key is `(review_id, order_id)` (contract v2) |
 | `geolocation` | No primary key. Collapse **identical payload rows** only; do not collapse by ZIP prefix |
 | `postgres_oltp.*` | Order by `updated_at` first (overlapping extract windows) |
-| `demo_storefront.clickstream` | Partition by `event_id`; order by `event_time` first |
+| `demo_storefront.clickstream` | `append_only` (P3-12): partition by `event_id`; the first ingested row wins (ascending order), because events are immutable |
 
 The write is a full-table overwrite. There is no `MERGE` and no exactly-once claim.
 

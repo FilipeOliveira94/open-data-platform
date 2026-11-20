@@ -77,16 +77,102 @@ def test_postgres_orders_by_updated_at() -> None:
     assert "TRY_TO_TIMESTAMP(`updated_at`)" in sql
 
 
-def test_clickstream_orders_by_event_time_and_keeps_null_product() -> None:
+def test_clickstream_is_append_only_and_keeps_the_first_ingested_event() -> None:
     contract = _by_identity()[("demo_storefront", "clickstream")]
     sql = render_silver_sql(
         contract,
         "odp-warehouse",
         policy_for(contract),
     )
-    assert "ORDER BY `event_time` DESC" in sql
+    assert contract.update_pattern == "append_only"
     assert "PARTITION BY `event_id`" in sql
+    # Events are immutable: a repeated event_id keeps the first ingested row.
+    assert "ORDER BY `_ingestion_ts` ASC" in sql
+    # Every complete batch, not only the latest one.
+    assert "WHERE `_execution_completed_ts` IS NOT NULL" in sql
+    assert "LEFT SEMI JOIN" not in sql
+    # event_time is kept as a typed column, never replaced by ingestion time.
+    assert "CAST(`event_time` AS TIMESTAMP) AS `event_time`" in sql
     assert "CAST(`product_id` AS STRING) AS `product_id`" in sql
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        ("dummyjson_products", "products"),
+        ("ibge_localidades", "municipios"),
+        ("olist_brazilian_ecommerce", "orders"),
+        ("olist_marketing_funnel", "closed_deals"),
+    ],
+)
+def test_snapshot_sources_read_only_the_latest_complete_execution(
+    identity: tuple[str, str],
+) -> None:
+    contract = _by_identity()[identity]
+    sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
+    assert contract.update_pattern in {"snapshot", "full_refresh"}
+    bronze = f"bronze.`{identity[0]}__{identity[1]}`"
+    # Survivors come from one execution: a record absent from it leaves Silver.
+    selection = (
+        f"    FROM {bronze} b\n"
+        "    LEFT SEMI JOIN (\n"
+        "      SELECT `dt`, `execution_id`\n"
+        f"      FROM {bronze}\n"
+        "      WHERE `_execution_completed_ts` IS NOT NULL\n"
+    )
+    assert selection in sql
+    assert "      LIMIT 1\n" in sql
+    assert "ON b.`dt` = latest.`dt` AND b.`execution_id` = latest.`execution_id`" in sql
+    # The latest complete execution wins by marker time, then by identity.
+    assert "`dt` DESC, `execution_id` DESC\n      LIMIT 1" in sql
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        ("dummyjson_products", "products"),
+        ("demo_storefront", "clickstream"),
+    ],
+)
+def test_no_complete_execution_fails_before_the_replace(
+    identity: tuple[str, str],
+) -> None:
+    contract = _by_identity()[identity]
+    sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
+    guard = sql.index("SELECT assert_true(")
+    replace = sql.index("CREATE OR REPLACE TABLE")
+    # spark-sql -f stops at the failed guard; the previous snapshot stays.
+    assert guard < replace
+    assert f"'no complete execution in Bronze for {identity[0]}.{identity[1]}'" in sql
+
+
+def test_incremental_window_unions_every_window_and_ignores_markers() -> None:
+    contract = _by_identity()[("postgres_oltp", "orders")]
+    sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
+    assert contract.update_pattern == "incremental_window"
+    assert "    FROM bronze.`postgres_oltp__orders`\n  ) typed" in sql
+    assert "assert_true" not in sql
+    assert "LEFT SEMI JOIN" not in sql
+    assert "ORDER BY `updated_at` DESC" in sql
+
+
+def test_silver_sql_carries_no_row_values() -> None:
+    # Statement builders put names in SQL, never values (AGENTS.md §8).
+    for contract in load_contracts():
+        sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
+        assert "VALUES" not in sql.upper().replace("_VALUES", "")
+
+
+def test_unknown_update_pattern_is_rejected() -> None:
+    from dataclasses import replace
+
+    contract = _by_identity()[("dummyjson_products", "products")]
+    with pytest.raises(SilverError, match="unsupported update_pattern"):
+        render_silver_sql(
+            replace(contract, update_pattern="merge_everything"),
+            "odp-warehouse",
+            policy_for(contract),
+        )
 
 
 def test_dummyjson_expands_nested_json_columns() -> None:

@@ -162,7 +162,7 @@ DummyJSON `id`, storefront `product_id`, storefront `user_id`, and OLTP ids do n
 
 Gold reads `iceberg.silver.*`. P2-06 does not replace the Spark Silver writer. A later change may re-express the same cast, JSON expansion, and survivor SQL as dbt, and only then retire that writer.
 
-Every model is a full refresh. Dimensions are type 1: one current row per business key. A key that leaves Silver leaves Gold on the next overwrite. P2-06 does not add `valid_from` / `valid_to`.
+Every model is a full refresh. Dimensions are type 1: one current row per business key. A key that leaves Silver leaves Gold on the next overwrite. P2-06 does not add `valid_from` / `valid_to`. Hard deletes (P3-12): a product or municipality absent from the latest complete `full_refresh` execution leaves Silver and then Gold. A row deleted in PostgreSQL does not: the batch extract filters on `updated_at` and never sees a hard delete, so OLTP models keep it until the CDC path (Phase 4).
 
 A null foreign key stays. An orphan key stays. Rows are not dropped to make a rate look complete (D-013). Review comments are `pii` and stay on `fct_reviews`. CRM marts use the score, a comment-present flag, and the answer lag.
 

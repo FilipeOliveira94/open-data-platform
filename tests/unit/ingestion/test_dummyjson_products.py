@@ -187,7 +187,7 @@ def test_two_pages_land_under_dummyjson_products() -> None:
         "https://dummyjson.test/products?limit=2&skip=0",
         "https://dummyjson.test/products?limit=2&skip=2",
     ]
-    puts = client.put_object.call_args_list
+    puts = _data_puts(client)
     assert [call.kwargs["Key"] for call in puts] == [
         _PREFIX + "products-skip-000000.json",
         _PREFIX + "products-skip-000002.json",
@@ -213,7 +213,7 @@ def test_total_zero_writes_one_empty_page() -> None:
     assert len(results) == 1
     assert results[0].key.endswith("/products-skip-000000.json")
     assert transport.urls == ["https://dummyjson.test/products?limit=2&skip=0"]
-    assert client.put_object.call_args.kwargs["Body"] == _fixture("page-total-0.json")
+    assert _data_puts(client)[-1].kwargs["Body"] == _fixture("page-total-0.json")
 
 
 def test_same_execution_overwrites_the_page_key() -> None:
@@ -239,7 +239,7 @@ def test_same_execution_overwrites_the_page_key() -> None:
 
     assert first_result[0].key == second_result[0].key
     assert first_result[0].key.endswith("/" + page_object_name(0))
-    puts = client.put_object.call_args_list
+    puts = _data_puts(client)
     assert puts[0].kwargs["Key"] == puts[1].kwargs["Key"]
     assert puts[0].kwargs["Body"] == first
     assert puts[1].kwargs["Body"] == second
@@ -264,7 +264,7 @@ def test_null_and_duplicate_ids_stay_in_the_page() -> None:
 
     raw = next(
         call.kwargs
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].endswith("/products-skip-000000.json")
     )
     stored = json.loads(raw["Body"])
@@ -272,7 +272,7 @@ def test_null_and_duplicate_ids_stay_in_the_page() -> None:
     assert raw["Body"] == body
     sidecar = next(
         call.kwargs
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].startswith("quarantine/")
     )
     findings = [json.loads(line) for line in sidecar["Body"].splitlines()]
@@ -300,7 +300,7 @@ def test_envelope_mismatch_writes_nothing() -> None:
     with pytest.raises(DummyJsonProductsError, match="envelope does not match"):
         _ingest(client, transport)
 
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 def test_bad_second_page_stops_before_the_next_put() -> None:
@@ -317,10 +317,48 @@ def test_bad_second_page_stops_before_the_next_put() -> None:
     with pytest.raises(DummyJsonProductsError, match="item 0 does not match"):
         _ingest(client, transport)
 
-    assert client.put_object.call_count == 1
-    assert client.put_object.call_args.kwargs["Key"].endswith(
-        "products-skip-000000.json"
+    assert len(_data_puts(client)) == 1
+    assert _data_puts(client)[-1].kwargs["Key"].endswith("products-skip-000000.json")
+    # A partial page set never gets a completion marker.
+    assert _markers(client) == []
+
+
+def test_marker_is_cleared_first_and_written_after_the_last_page() -> None:
+    client = _client()
+    transport = _Pages(
+        {
+            0: _fixture("page-skip-0.json"),
+            2: _fixture("page-skip-2.json"),
+        }
     )
+
+    _ingest(client, transport)
+
+    marker_key = _PREFIX + "_COMPLETE"
+    cleared = [call.kwargs["Key"] for call in client.delete_object.call_args_list]
+    assert cleared[0] == marker_key
+    first_put = client.method_calls.index(
+        next(call for call in client.method_calls if call[0] == "put_object")
+    )
+    first_delete = client.method_calls.index(
+        next(call for call in client.method_calls if call[0] == "delete_object")
+    )
+    assert first_delete < first_put
+    last = client.put_object.call_args_list[-1].kwargs
+    assert last["Key"] == marker_key
+    assert _markers(client) == [
+        {
+            "completed_at": _markers(client)[0]["completed_at"],
+            "dataset": "products",
+            "execution_id": "run-001",
+            "object_count": 2,
+            "object_names": [
+                "products-skip-000000.json",
+                "products-skip-000002.json",
+            ],
+            "source_id": "dummyjson_products",
+        }
+    ]
 
 
 def test_short_final_page_accepts_the_returned_count_as_limit() -> None:
@@ -338,7 +376,7 @@ def test_short_final_page_accepts_the_returned_count_as_limit() -> None:
     results = _ingest(client, _Pages({0: body}), limit=30)
 
     assert len(results) == 1
-    assert client.put_object.call_args.kwargs["Body"] == body
+    assert _data_puts(client)[-1].kwargs["Body"] == body
 
 
 def test_omitted_brand_stays_in_the_stored_page() -> None:
@@ -356,7 +394,7 @@ def test_omitted_brand_stays_in_the_stored_page() -> None:
 
     _ingest(client, _Pages({0: body}), limit=30)
 
-    stored = json.loads(client.put_object.call_args.kwargs["Body"])
+    stored = json.loads(_data_puts(client)[-1].kwargs["Body"])
     assert "brand" not in stored["products"][0]
 
 
@@ -374,7 +412,7 @@ def test_page_size_must_match_total() -> None:
     with pytest.raises(DummyJsonProductsError, match="page size does not match"):
         _ingest(client, _Pages({0: body}))
 
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 def test_changed_total_stops_the_run() -> None:
@@ -389,7 +427,7 @@ def test_changed_total_stops_the_run() -> None:
             _Pages({0: json.dumps(first).encode(), 2: json.dumps(second).encode()}),
         )
 
-    assert client.put_object.call_count == 1
+    assert len(_data_puts(client)) == 1
 
 
 def test_total_above_the_page_budget_writes_nothing() -> None:
@@ -406,7 +444,7 @@ def test_total_above_the_page_budget_writes_nothing() -> None:
     with pytest.raises(DummyJsonProductsError, match="exceeds the page limit"):
         _ingest(client, _Pages({0: body}), max_pages=1)
 
-    assert client.put_object.call_count == 0
+    assert len(_data_puts(client)) == 0
 
 
 @pytest.mark.parametrize(
@@ -605,3 +643,28 @@ def test_default_transport_retries_429_on_localhost() -> None:
     assert body == b"{}"
     assert hits["n"] == 2
     assert seen == [0.0]
+
+
+def _is_marker(call: Any) -> bool:
+    return str(call.kwargs["Key"]).endswith("/_COMPLETE")
+
+
+def _data_puts(client: MagicMock) -> list[Any]:
+    """Raw and quarantine puts, without completion markers."""
+    return [call for call in client.put_object.call_args_list if not _is_marker(call)]
+
+
+def _data_deletes(client: MagicMock) -> list[Any]:
+    """Deletes of stale objects, without completion marker clears."""
+    return [
+        call for call in client.delete_object.call_args_list if not _is_marker(call)
+    ]
+
+
+def _markers(client: MagicMock) -> list[dict[str, Any]]:
+    """Bodies of the completion markers written, in order."""
+    return [
+        json.loads(call.kwargs["Body"])
+        for call in client.put_object.call_args_list
+        if _is_marker(call)
+    ]

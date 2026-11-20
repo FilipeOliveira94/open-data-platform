@@ -56,6 +56,13 @@ def test_shared_task_defaults_are_not_a_dag() -> None:
     assert "SELECT" not in text.upper()
 
 
+# P3-12: full_refresh sources run on a cron; the rest stay manual.
+SCHEDULED_TEXT = {
+    "ingest_dummyjson_products.py": 'CronTriggerTimetable("0 3 * * 1", timezone="UTC")',
+    "ingest_ibge_localidades.py": 'CronTriggerTimetable("0 3 1 * *", timezone="UTC")',
+}
+
+
 def test_ingestion_dags_call_package_entrypoints() -> None:
     common = _text("ingest_common.py")
     for name, module in ENTRYPOINTS.items():
@@ -67,7 +74,10 @@ def test_ingestion_dags_call_package_entrypoints() -> None:
             assert f'"{module}"' in text
             assert "python_task(" in text
         assert "default_args=DEFAULT_ARGS" in text
-        assert "schedule=None" in text
+        if name not in SCHEDULED_TEXT:
+            assert "schedule=None" in text
+        else:
+            assert SCHEDULED_TEXT[name] in text
         assert "catchup=False" in text
         assert "is_paused_upon_creation=True" in text
         assert "bash_command" not in text

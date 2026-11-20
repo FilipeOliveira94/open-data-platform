@@ -17,7 +17,7 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | Schema | `fields[]` with `name`, `type`, `nullable`, `classification`, `description` | Expected columns or object keys |
 | Invalid rows | `on_invalid` (`quarantine` or `fail_batch`) | Declared row-level policy |
 | Structural errors | `on_structural_error` | Always `fail_batch` (missing column, unreadable payload) |
-| Change pattern | `update_pattern` | `snapshot`, `full_refresh`, or `incremental_window` |
+| Change pattern | `update_pattern` | `snapshot`, `full_refresh`, `incremental_window`, or `append_only`. Downstream behavior: [Update patterns](#update-patterns-p3-12) |
 | Governance | `governance.source_family`, `governance.owner` | Ingest source family and owning role |
 | Provenance | `provenance.system` | Producer of the bytes |
 | Evolution | `changelog[]` | Note for each `contract_version` |
@@ -57,6 +57,33 @@ The sidecar is in the same bucket (`ODP_RAW_BUCKET`). Each line has `record_inde
 
 `on_invalid: fail_batch` writes neither object. No shipped contract uses that policy. A synthetic contract covers it in the unit tests.
 
+## Update patterns (P3-12)
+
+`update_pattern` defines what Bronze keeps, which Bronze rows Silver selects survivors from, what a re-ingest does, and what happens to a record that disappears from the source. The Silver writer is `render_silver_sql` in `lakehouse/silver/common.py`; the Silver reconciliation check in `lakehouse/reconciliation.py` reads Bronze the same way.
+
+### Completion marker
+
+An execution is the raw prefix `raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/`. Every ingestion entry point deletes that prefix's `_COMPLETE` marker before its first object and writes the marker after its last object (`ingestion.writer.clear_completion_marker` and `write_completion_marker`). The marker is JSON with `object_names`, `object_count`, and `completed_at`; it holds names, not row values. A run that fails halfway, such as a DummyJSON page set that stops after page 0, has no marker. A retry under the same identity clears and rewrites it.
+
+Bronze reads each marker and fills `_execution_completed_ts` on every row: the marker's `completed_at` when its `object_names` equal the data objects found under that prefix, otherwise null. A missing marker, an unreadable one, or a different object set leaves the execution incomplete. Bronze keeps every execution, complete or not, for audit.
+
+### Behavior by pattern
+
+| `update_pattern` | Silver reads | A new run of the same data | A record removed at the source | Sources |
+| --- | --- | --- | --- | --- |
+| `snapshot` | Only the latest complete execution: greatest `_execution_completed_ts`, then `dt`, then `execution_id`. Survivors are deduplicated by key inside it | Same rows and counts. Lineage columns point to the newer execution | Leaves Silver (a static release has none) | Olist, marketing funnel |
+| `full_refresh` | Same as `snapshot` | Replaces the previous execution in Silver | Leaves Silver, and Gold on its next build | DummyJSON, IBGE |
+| `incremental_window` | Every window, complete or not; latest `updated_at` per key (unchanged from P2-04) | Same key: no duplicate | Invisible on the batch path: a hard delete is never extracted, so the row stays in Silver and Gold. CDC (Phase 4) is the path that handles deletes | PostgreSQL |
+| `append_only` | Every complete execution; a repeated key keeps the first ingested row | A repeated event key is kept once | Not applicable: events are immutable | Storefront clickstream |
+
+For `snapshot`, `full_refresh`, and `append_only`, a Silver build with no complete execution in Bronze fails before the replace (`assert_true` ahead of `CREATE OR REPLACE TABLE`), so the table keeps its previous snapshot instead of becoming empty. `incremental_window` window completeness is left to the coverage manifest of P3-06.
+
+`append_only` keeps `event_time` as the event clock. A late event (ingested after events with a later `event_time`) keeps its own `event_time`, and Gold groups by it (`fct_storefront_events`), not by ingestion time.
+
+Raw objects written before P3-12 have no marker. Their executions are incomplete, so snapshot sources need one new ingestion run before Silver builds again. The 2026-11-20 lake rebuild re-ingested every snapshot source ([status log](../status-log.md)).
+
+Evidence: unit tests in `tests/unit/lakehouse/test_silver.py`, `test_bronze.py`, `test_reconciliation.py`, and the ingestion tests; the live check `scripts/p3_12_refresh_check.sh` (result in the [status log](../status-log.md)).
+
 ## Evolution
 
 Raise `contract_version` and append a `changelog` note in the same change as any field, nullability, key, or classification edit. Do not rewrite history in place. There is no migration engine in this issue.
@@ -70,7 +97,7 @@ Raise `contract_version` and append a `changelog` note in the same change as any
 | `dummyjson_products` | `products` (page envelope + item) | `full_refresh` | `dummyjson` |
 | `postgres_oltp` | `sellers`, `customers`, `orders`, `order_items` | `incremental_window` | `postgres` |
 | `ibge_localidades` | `municipios` (`view=nivelado`) | `full_refresh` | `ibge` |
-| `demo_storefront` | `clickstream` (one user action per JSONL line) | `snapshot` | `generator` |
+| `demo_storefront` | `clickstream` (one user action per JSONL line) | `append_only` (contract version 3; `snapshot` before P3-12) | `generator` |
 
 Olist column `product_name_lenght` and `product_description_lenght` keep the published spelling.
 

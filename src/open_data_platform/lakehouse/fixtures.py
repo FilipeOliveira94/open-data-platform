@@ -20,7 +20,11 @@ from open_data_platform.ingestion.demo_storefront import (
 )
 from open_data_platform.ingestion.dummyjson_products import page_object_name
 from open_data_platform.ingestion.ibge_localidades import OBJECT_NAME as IBGE_OBJECT
-from open_data_platform.ingestion.writer import write_raw_object
+from open_data_platform.ingestion.writer import (
+    object_name_of,
+    write_completion_marker,
+    write_raw_object,
+)
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
@@ -86,7 +90,7 @@ _PAGE_TABLE = "iceberg.bronze.dummyjson_products__products"
 def write_live_fixtures(client: BaseClient, *, bucket: str) -> None:
     """Land the four fixture objects. The same execution identity overwrites."""
     contracts = {(item.source_id, item.dataset): item for item in load_contracts()}
-    write_raw_object(
+    land_complete_execution(
         client,
         bucket=bucket,
         body=_category_csv_bytes(),
@@ -94,7 +98,6 @@ def write_live_fixtures(client: BaseClient, *, bucket: str) -> None:
         dataset=CSV_DATASET,
         execution_id=CSV_EXECUTION_ID,
         object_name=CSV_OBJECT,
-        ingestion_ts=LIVE_INGESTION_TS,
         content_type="text/csv",
     )
     ingest_demo_storefront(
@@ -107,7 +110,7 @@ def write_live_fixtures(client: BaseClient, *, bucket: str) -> None:
         ingestion_ts=LIVE_INGESTION_TS,
         contracts=tuple(contracts.values()),
     )
-    write_raw_object(
+    land_complete_execution(
         client,
         bucket=bucket,
         body=_municipios_bytes(contracts[(ARRAY_SOURCE, ARRAY_DATASET)]),
@@ -115,10 +118,9 @@ def write_live_fixtures(client: BaseClient, *, bucket: str) -> None:
         dataset=ARRAY_DATASET,
         execution_id=ARRAY_EXECUTION_ID,
         object_name=IBGE_OBJECT,
-        ingestion_ts=LIVE_INGESTION_TS,
         content_type="application/json",
     )
-    write_raw_object(
+    land_complete_execution(
         client,
         bucket=bucket,
         body=_products_page_bytes(contracts[(PAGE_SOURCE, PAGE_DATASET)]),
@@ -126,9 +128,49 @@ def write_live_fixtures(client: BaseClient, *, bucket: str) -> None:
         dataset=PAGE_DATASET,
         execution_id=PAGE_EXECUTION_ID,
         object_name=page_object_name(0),
-        ingestion_ts=LIVE_INGESTION_TS,
         content_type="application/json",
     )
+
+
+def land_complete_execution(
+    client: BaseClient,
+    *,
+    bucket: str,
+    body: bytes,
+    source_id: str,
+    dataset: str,
+    execution_id: str,
+    object_name: str,
+    content_type: str,
+    ingestion_ts: datetime = LIVE_INGESTION_TS,
+) -> str:
+    """Write one raw object and the completion marker of its execution.
+
+    The marker time equals ``ingestion_ts`` so reruns stay deterministic.
+    Returns the raw object key.
+    """
+    result = write_raw_object(
+        client,
+        bucket=bucket,
+        body=body,
+        source_id=source_id,
+        dataset=dataset,
+        execution_id=execution_id,
+        object_name=object_name,
+        ingestion_ts=ingestion_ts,
+        content_type=content_type,
+    )
+    write_completion_marker(
+        client,
+        bucket=bucket,
+        source_id=source_id,
+        dataset=dataset,
+        execution_id=execution_id,
+        ingestion_ts=ingestion_ts,
+        object_names=(object_name_of(result.key),),
+        completed_at=ingestion_ts,
+    )
+    return result.key
 
 
 def live_checks() -> tuple[tuple[str, str], ...]:

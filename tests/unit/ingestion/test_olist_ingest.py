@@ -248,7 +248,7 @@ def test_ingest_writes_eleven_traceable_objects(tmp_path: Path) -> None:
     )
 
     assert len(results) == 11
-    assert client.put_object.call_count == 11
+    assert len(_data_puts(client)) == 11
     keys = {result.key for result in results}
     assert (
         build_raw_object_key(
@@ -281,7 +281,7 @@ def test_ingest_writes_eleven_traceable_objects(tmp_path: Path) -> None:
         "execution_id": "run-001",
         "_ingestion_ts": "2026-10-22T15:00:00Z",
     }
-    put = client.put_object.call_args_list[0].kwargs
+    put = _data_puts(client)[0].kwargs
     assert put["ContentType"] == "text/csv"
     assert put["Metadata"]["source_id"]
 
@@ -310,7 +310,7 @@ def test_ingest_same_identity_overwrites_the_same_key(tmp_path: Path) -> None:
     assert [item.key for item in first] == [item.key for item in second]
     bodies = [
         call.kwargs["Body"]
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].endswith("/olist_orders_dataset.csv")
     ]
     assert bodies[0] != bodies[1]
@@ -342,7 +342,7 @@ def test_different_execution_id_uses_a_different_key(tmp_path: Path) -> None:
 
 
 def _put_keys(client: MagicMock) -> list[str]:
-    return [call.kwargs["Key"] for call in client.put_object.call_args_list]
+    return [call.kwargs["Key"] for call in _data_puts(client)]
 
 
 def test_header_mismatch_stops_at_that_file(tmp_path: Path) -> None:
@@ -437,8 +437,8 @@ def test_short_csv_row_writes_nothing(tmp_path: Path) -> None:
             sources=(source,),
         )
 
-    assert client.put_object.call_count == 0
-    assert client.delete_object.call_count == 0
+    assert len(_data_puts(client)) == 0
+    assert len(_data_deletes(client)) == 0
 
 
 def test_same_review_id_on_different_orders_is_not_quarantined(
@@ -462,9 +462,9 @@ def test_same_review_id_on_different_orders_is_not_quarantined(
         body=body,
     )
 
-    assert client.put_object.call_count == 1
-    assert client.put_object.call_args.kwargs["Body"] == body
-    deleted = client.delete_object.call_args.kwargs["Key"]
+    assert len(_data_puts(client)) == 1
+    assert _data_puts(client)[-1].kwargs["Body"] == body
+    deleted = _data_deletes(client)[-1].kwargs["Key"]
     assert deleted.endswith("/olist_order_reviews_dataset.csv.jsonl")
 
 
@@ -489,13 +489,13 @@ def test_duplicate_review_order_pair_is_quarantined(tmp_path: Path) -> None:
 
     raw = next(
         call.kwargs["Body"]
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].endswith("/olist_order_reviews_dataset.csv")
     )
     assert raw == body
     sidecar = next(
         call.kwargs["Body"]
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].startswith("quarantine/")
     )
     findings = [json.loads(line) for line in sidecar.splitlines()]
@@ -524,9 +524,9 @@ def test_repeated_zip_prefix_is_not_quarantined(tmp_path: Path) -> None:
         body=body,
     )
 
-    assert client.put_object.call_count == 1
-    assert client.put_object.call_args.kwargs["Body"] == body
-    deleted = client.delete_object.call_args.kwargs["Key"]
+    assert len(_data_puts(client)) == 1
+    assert _data_puts(client)[-1].kwargs["Body"] == body
+    deleted = _data_deletes(client)[-1].kwargs["Key"]
     assert deleted.endswith("/olist_geolocation_dataset.csv.jsonl")
 
 
@@ -549,13 +549,13 @@ def test_empty_required_csv_field_is_quarantined(tmp_path: Path) -> None:
 
     raw = next(
         call.kwargs["Body"]
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if not call.kwargs["Key"].startswith("quarantine/")
     )
     assert raw == body
     sidecar = next(
         call.kwargs["Body"]
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].startswith("quarantine/")
     )
     finding = json.loads(sidecar.splitlines()[0])
@@ -584,6 +584,10 @@ def test_missing_file_stops_at_that_file(tmp_path: Path) -> None:
     keys = _put_keys(client)
     assert len(keys) == 5
     assert all(not key.endswith("/olist_orders_dataset.csv") for key in keys)
+    # Datasets written before the failure are complete; orders is not.
+    marked = [body["dataset"] for body in _markers(client)]
+    assert "orders" not in marked
+    assert len(marked) == sum(1 for key in keys if key.startswith("raw/"))
 
 
 def test_utf8_bom_matches_the_contract_and_raw_keeps_the_bom(tmp_path: Path) -> None:
@@ -606,7 +610,7 @@ def test_utf8_bom_matches_the_contract_and_raw_keeps_the_bom(tmp_path: Path) -> 
 
     body = next(
         call.kwargs["Body"]
-        for call in client.put_object.call_args_list
+        for call in _data_puts(client)
         if call.kwargs["Key"].endswith("/product_category_name_translation.csv")
     )
     assert body.startswith(b"\xef\xbb\xbf")
@@ -751,3 +755,28 @@ def test_spec_objects_are_the_published_names() -> None:
     )
     assert isinstance(by_dataset["sellers"], str)
     assert OlistFile("olist_sellers_dataset.csv", "sellers") in ECOMMERCE.files
+
+
+def _is_marker(call: Any) -> bool:
+    return str(call.kwargs["Key"]).endswith("/_COMPLETE")
+
+
+def _data_puts(client: MagicMock) -> list[Any]:
+    """Raw and quarantine puts, without completion markers."""
+    return [call for call in client.put_object.call_args_list if not _is_marker(call)]
+
+
+def _data_deletes(client: MagicMock) -> list[Any]:
+    """Deletes of stale objects, without completion marker clears."""
+    return [
+        call for call in client.delete_object.call_args_list if not _is_marker(call)
+    ]
+
+
+def _markers(client: MagicMock) -> list[dict[str, Any]]:
+    """Bodies of the completion markers written, in order."""
+    return [
+        json.loads(call.kwargs["Body"])
+        for call in client.put_object.call_args_list
+        if _is_marker(call)
+    ]

@@ -132,10 +132,37 @@ def silver_relation_sql(contract: DataContract, policy: DedupPolicy) -> str:
         "FROM ("
         f"SELECT (SELECT COUNT(*) FROM {silver}) AS silver_count, "
         "(SELECT COUNT(*) FROM ("
-        f"SELECT 1 FROM {bronze} WHERE {present} GROUP BY {quoted_keys}"
+        f"SELECT 1 FROM {_bronze_scope(contract.update_pattern, bronze)} "
+        f"WHERE {present} GROUP BY {quoted_keys}"
         ")) AS bronze_groups)"
     )
     return _one_line(sql)
+
+
+def _bronze_scope(update_pattern: str, bronze: str) -> str:
+    """The Bronze rows the Silver writer reads, for the same update pattern.
+
+    Mirrors ``silver.common._bronze_selection``: the latest complete execution
+    for ``snapshot`` and ``full_refresh``, every complete execution for
+    ``append_only``, and every row for ``incremental_window``.
+    """
+    completed = '"_execution_completed_ts"'
+    if update_pattern == "incremental_window":
+        return bronze
+    if update_pattern == "append_only":
+        return f"(SELECT * FROM {bronze} WHERE {completed} IS NOT NULL) scoped"
+    if update_pattern in {"snapshot", "full_refresh"}:
+        return (
+            f"{bronze} b JOIN ("
+            f'SELECT "dt", "execution_id" FROM {bronze} '
+            f"WHERE {completed} IS NOT NULL "
+            f"ORDER BY from_iso8601_timestamp({completed}) DESC, "
+            '"dt" DESC, "execution_id" DESC LIMIT 1'
+            ') latest ON b."dt" = latest."dt" '
+            'AND b."execution_id" = latest."execution_id"'
+        )
+    msg = f"unsupported update_pattern: {update_pattern!r}"
+    raise ReconciliationError(msg)
 
 
 def shape_checks() -> tuple[tuple[str, str], ...]:

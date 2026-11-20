@@ -2,6 +2,10 @@
 
 Business logic stays in ``open_data_platform.ingestion.demo_storefront``.
 The default arguments match the documented local command.
+
+Refresh policy (P3-12): manual only. The generator exists for demos, and
+the contract is ``append_only``: each complete batch adds events, a repeated
+``event_id`` is kept once, and ``event_time`` places a late event.
 """
 
 from __future__ import annotations

@@ -363,3 +363,31 @@ def test_only_the_daily_dag_triggers_another_dag(dagbag) -> None:
         if type(task).__name__ == "TriggerDagRunOperator"
     }
     assert triggers == {(DAILY, "trigger_transform")}
+
+
+# P3-12 source refresh matrix: scheduled sources and their cron, in UTC.
+SCHEDULED_FULL_REFRESH = {
+    "ingest_dummyjson_products": "0 3 * * 1",
+    "ingest_ibge_localidades": "0 3 1 * *",
+}
+MANUAL_ONLY = ("ingest_olist", "ingest_demo_storefront", "ingest_postgres_oltp")
+
+
+def test_full_refresh_sources_follow_the_refresh_matrix(dagbag) -> None:
+    for dag_id, cron in SCHEDULED_FULL_REFRESH.items():
+        dag = dagbag.dags[dag_id]
+        assert type(dag.timetable).__name__ == "CronTriggerTimetable"
+        assert dag.timetable.expression == cron
+        assert str(dag.timetable.timezone) == "UTC"
+        # The run does not depend on a window: the next full fetch covers a
+        # missed one, so there is nothing to catch up.
+        assert dag.catchup is False
+        assert dag.max_active_runs == 1
+        assert dag.is_paused_upon_creation is True
+
+
+def test_manual_sources_have_no_schedule(dagbag) -> None:
+    for dag_id in MANUAL_ONLY:
+        dag = dagbag.dags[dag_id]
+        assert type(dag.timetable).__name__ == "NullTimetable"
+        assert dag.is_paused_upon_creation is True
