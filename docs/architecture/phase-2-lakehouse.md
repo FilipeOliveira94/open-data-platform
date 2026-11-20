@@ -64,13 +64,45 @@ The PostgreSQL extract is the only windowed incremental landing. Bronze and Silv
 | --- | --- | --- |
 | PostgreSQL raw | One JSON array per dataset and window. The same execution overwrites that object. A new `execution_id` keeps the previous object. | `updated_at >= start AND updated_at < end`, both bounds on UTC midnight. One-day and seven-day windows share the function. |
 | Other raw sources | Snapshot or full-refresh object for that execution. | None |
-| Bronze | `WriteMode.FULL_OVERWRITE`: `INSERT OVERWRITE` of the whole table. | Every object under `raw/{source_id}/{dataset}/` |
-| Silver | `FULL_OVERWRITE`: `DROP TABLE`, `CREATE TABLE`, `INSERT OVERWRITE` from all Bronze rows, then dedup. | The whole Bronze table |
+| Bronze | `WriteMode.FULL_OVERWRITE`: one `CREATE OR REPLACE TABLE … AS SELECT` of the whole table (P3-11). | Every object under `raw/{source_id}/{dataset}/` |
+| Silver | `FULL_OVERWRITE`: one `CREATE OR REPLACE TABLE … AS SELECT` from all Bronze rows, then dedup (P3-11; before it, `DROP TABLE`, `CREATE TABLE`, `INSERT OVERWRITE`). | The whole Bronze table |
 | Gold | dbt `materialized: table` and `on_table_exists: replace`. | The Silver input of each model |
 
 `INCREMENTAL_MERGE` and `APPEND_ONLY` are placeholders in `open_data_platform.lakehouse.write_mode`. Selecting either raises `WriteModeError` before SQL is rendered. A windowed or CDC commit in Bronze or Silver is not implemented. Schedules and backfills are Phase 3. CDC is Phase 4.
 
 A second Bronze or Silver run with the same raw objects produces the same rows. Several `execution_id` values in the prefix all remain in the table, subject to Silver dedup. There is no `MERGE` and no exactly-once claim.
+
+## Atomic table replace (P3-11)
+
+Every writer of a table that Trino, dbt, or a check reads replaces it in one commit. No writer drops a read table, so a reader sees the previous snapshot or the new one, never a missing, empty, or half-written table. A failed write commits nothing and leaves the previous snapshot.
+
+| Writer | Tables | Replace statement | Code |
+| --- | --- | --- | --- |
+| Bronze (Spark) | `bronze.*` | `CREATE OR REPLACE TABLE bronze.<t> USING iceberg LOCATION … AS SELECT CAST(<c> AS STRING) AS <c> … FROM <staging view>` | `lakehouse/bronze.py` `_table_sql` |
+| Silver (Spark) | `silver.*` | `CREATE OR REPLACE TABLE silver.<t> USING iceberg LOCATION … AS SELECT CAST(<c> AS <type>) AS <c> … FROM (<dedup over bronze.<t>>)` | `lakehouse/silver/common.py` `render_silver_sql` |
+| Quarantine staging (Spark) | `gold_staging.quarantine_findings` | `CREATE OR REPLACE TABLE gold_staging.quarantine_findings USING iceberg LOCATION … AS SELECT … FROM <staging view>` | `lakehouse/quarantine_stage.py` `render_load_sql` |
+| Gold (dbt-trino 1.11) | the seven Gold schemas | `materialized: table` with `on_table_exists: replace` renders `create or replace table … as select` in Trino | `dbt/dbt_project.yml` |
+
+- **Zero rows.** Bronze and quarantine replace with `AS SELECT * FROM (SELECT CAST(NULL AS <type>) AS <c> …) WHERE 1 = 0`, so the empty table keeps its columns and types.
+- **Types.** Spark rejects a column list in `CREATE TABLE … AS SELECT`, so each output column is cast to its contract type in the select. The table schema follows those casts.
+- **Schema change.** A new contract version that adds, drops, or retypes a column changes the rendered select. The replace commits the new schema in the same commit as the rows; there is no drop and no separate rebuild step. Readers that depend on a removed column fail on the new snapshot, not on a missing table.
+- **Catalog.** Spark uses `org.apache.iceberg.spark.SparkCatalog` over the JDBC catalog. Replace is atomic there; under `SparkSessionCatalog` it is not, so the catalog class is part of this guarantee.
+- **History.** A replace keeps the table's snapshot history and its location. Snapshots and old files stay until P5-07 expires them.
+- **Concurrency.** Atomic replace protects readers, not a second writer. The 1-slot `lakehouse_gold` pool still serializes Airflow writers (P3-04). A `make` target and a DAG run must not write the same table at the same time (P3-12).
+- **Tests.** `tests/unit/lakehouse/test_atomic_replace.py` renders every shipped contract and quarantine staging (with and without rows) and fails on `DROP TABLE`, `CREATE TABLE`, or `INSERT OVERWRITE`; it also pins `on_table_exists: replace`.
+- **Live evidence.** `scripts/p3_11_replace_check.sh` writes counts, durations, and query totals to `.local/p3-11/`. Results below.
+
+Live run on 2026-11-20, local Compose, runtime image `odp-runtime:airflow3.4.0-spark3.5.8`:
+
+| Check | Result |
+| --- | --- |
+| RTAS probe | Before the change, a probe table in the JDBC catalog was replaced twice with the same `LOCATION`, the second time with an added column. Spark kept 2 snapshots, and Trino read 2 rows with the new column |
+| Forced Silver failure | The rendered `olist_brazilian_ecommerce.geolocation` Silver SQL, copied into the work volume with `raise_error('p3_11_forced_failure')` in the final filter, failed in the write job (Spark exit 1, task `RuntimeException: p3_11_forced_failure`). Trino count 738_332 before and after; snapshot count 1 before and after |
+| Full rebuild under readers | A Trino loop counted `bronze` and `silver` `olist_brazilian_ecommerce__geolocation`, `gold_staging.quarantine_findings`, and `marketplace_operations.fct_orders` in one query while `make live-bronze` (309 s), `make live-silver` (260 s), `make stage-quarantine` (19 s), and `make dbt-build` (36 s) ran in sequence. 410 queries, 0 errors, 0 zero counts. Bronze checks 18 passed, Silver checks 20 passed, dbt PASS=287 |
+| Snapshot history | Snapshots before → after the rebuild: Bronze geolocation 11 → 12, Silver geolocation 1 → 2, quarantine 1 → 2, `fct_orders` 10 → 11. The Silver and quarantine tables had 1 snapshot because the earlier writer dropped them on every run |
+| dbt rendered SQL | `dbt/target/run` holds 55 `create or replace table` statements and no `drop table` |
+
+The loop measures what a reader sees between statements. It does not prove isolation for a reader that is already scanning when a commit lands; Iceberg snapshot reads give that, and this check does not exercise it separately.
 
 ## Live result
 

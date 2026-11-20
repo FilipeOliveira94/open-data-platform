@@ -190,7 +190,7 @@ def test_bronze_load_columns_stay_string() -> None:
     for contract in load_contracts():
         sql = render_bronze_sql([(contract, 0)], "odp-warehouse")
         for name in bronze_columns(contract):
-            assert f"`{name}` STRING" in sql
+            assert f"CAST(NULL AS STRING) AS `{name}`" in sql
 
 
 def test_trino_ident_quotes_hyphenated_names() -> None:

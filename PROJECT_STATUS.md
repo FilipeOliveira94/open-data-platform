@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-20 (P3-04 verified; catchup corrected; pipeline review added P3-11 to P3-13 and moved the close pair to P3-14/P3-15) |
+| Last updated | 2026-11-20 (P3-11 verified: atomic table replace for Bronze, Silver, and quarantine staging) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,17 +22,17 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-11** — Atomic table replace for readers. Not started.
+**P3-12** — Update-pattern semantics and source refresh policy. Not started.
 
-A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
+A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. P3-11 is verified: every Spark writer now replaces its table in one Iceberg commit, and dbt Gold already did. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
 
 P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse`. The 1-slot `lakehouse_gold` pool keeps `reconcile_gold` away from every transform step that writes tables. Every DAG is created paused. `run_python_args` stops the child's whole process group. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
 
 ## Next work
 
-1. **P3-11** — Atomic table replace. List every writer of a read table; Silver replaces its table in one Iceberg commit instead of `DROP` → `CREATE` → `INSERT`; a failed write leaves the previous snapshot readable. Acceptance: `ROADMAP.md` → P3-11.
-2. **P3-12** — Update-pattern semantics and source refresh policy. Acceptance: `ROADMAP.md` → P3-12.
-3. **P3-13** — Incremental lakehouse refresh (ADR-0024). Acceptance: `ROADMAP.md` → P3-13.
+1. **P3-12** — Update-pattern semantics and source refresh policy. Acceptance: `ROADMAP.md` → P3-12.
+2. **P3-13** — Incremental lakehouse refresh (ADR-0024). Acceptance: `ROADMAP.md` → P3-13.
+3. **P3-05** — Weekly batch schedule, after P3-13. Acceptance: `ROADMAP.md` → P3-05.
 
 ---
 
@@ -50,7 +50,7 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 | P3-08 | Execution metadata and failure logging | Not started | — |
 | P3-09 | Orchestration success/failure tests | Not started | — |
 | P3-10 | Orchestration runtime hardening | Not started | — |
-| P3-11 | Atomic table replace for readers | Not started | — |
+| P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
 | P3-12 | Update-pattern semantics and source refresh policy | Not started | — |
 | P3-13 | Incremental lakehouse refresh | Not started | — |
 | P3-14 | Live run, result, and consistency check | Not started | — |
@@ -65,7 +65,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [ ] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily).
 - [ ] Backfills do not corrupt data or create undue duplication.
 - [ ] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06).
-- [ ] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
+- [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
 - [ ] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
 - [ ] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13).
 - [ ] Invalid records are identified and handled per documented rules.
@@ -80,10 +80,9 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 | Validation | Detail |
 | --- | --- |
 | Date | 2026-11-20 |
-| Environment | Local Compose. PostgreSQL, MinIO, Trino, and Airflow on the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` |
-| Checks | `ingest_postgres_oltp_daily` scheduled, manual, and one-day backfill runs; the three `transform_lakehouse` runs they triggered; `reconcile_gold` triggered during a rebuild; a cleared re-run of the backfill window |
-| Result | All daily runs `success`. Backfill window `[2026-10-17, 2026-10-18)` landed 2/1/1/1, equal to `COUNT(*)` on `oltp`; the 2026-11-19 window was empty in both. Each triggered transform `success` on attempt 1, PASS=287. `dbt_reconcile` waited for the `lakehouse_gold` slot and ran between `bronze` and `silver` (PASS=56). The cleared re-run overwrote the same keys and reset the same transform run; Bronze sellers stayed 11, Silver 2/2/2/3, quarantine 1_603. `uv run pytest tests/unit` → 364 passed. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-
+| Environment | Local Compose. PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` (Spark and dbt) |
+| Checks | `scripts/p3_11_replace_check.sh`: a forced Silver write failure, then `make live-bronze`, `live-silver`, `stage-quarantine`, and `dbt-build` under a Trino count loop, then snapshot counts |
+| Result | Forced failure: Spark exit 1 on `p3_11_forced_failure`; Silver geolocation 738_332 rows and 1 snapshot before and after. Rebuild: 410 Trino queries over Bronze, Silver, quarantine, and Gold tables, 0 errors, 0 zero counts; steps took 309/260/19/36 s; Bronze 18 and Silver 20 checks passed, dbt PASS=287. Each table gained one snapshot. `uv run pytest tests/unit` → 371 passed; `make lint` passed. Detail: [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
 ---
 
 ## Phase 2 baseline
