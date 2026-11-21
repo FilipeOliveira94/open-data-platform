@@ -4,6 +4,16 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-21 — P3-06 window coverage, gap report, and backfill
+
+`src/open_data_platform/ingestion/coverage.py` adds the coverage ledger `ingestion_state.extract_coverage` in the catalog database ([ADR-0025](decisions/0025-extract-window-coverage-ledger.md)) and the gap report (`make coverage-report FREQUENCY=daily|weekly`). The PostgreSQL extract writes one row per dataset (source, dataset, execution id, frequency, window, DAG id, Airflow run id, row count) in one transaction after every `_COMPLETE` marker. A `CHECK` ties `frequency` to the window length; Filipe asked for the column during planning. The DAGs pass `--frequency`, `--dag-id`, and `--airflow-run-id`. Backfill parameters for the daily and weekly DAGs are in [Local Airflow](architecture/airflow-local.md#backfill-parameters).
+
+Live run on the local stack: a daily window extracted before the ledger existed showed as `gap [2026-11-19,2026-11-20)` (exit 1). A backfill of six daily windows (`2026-11-14` to `2026-11-19`, `--reprocess-behavior completed`) closed it with one `transform_lakehouse` run (107 s), and the report was clean. The six backfill runs started together: `airflow backfill create` does not inherit `max_active_runs=1`, so the docs say to pass `--max-active-runs 1`. Re-running the covered windows 2026-11-19 and 2026-11-20 left Silver `postgres_oltp` at sellers 6, customers 2, orders 2, order items 2, and the report clean with two re-run windows. A weekly backfill (`--from-date 2026-11-09`) covered `[2026-11-08, 2026-11-15)`.
+
+That weekly backfill found a P3-05 defect. Its run id `backfill__2026-11-16T00:00:00+00:00` equalled a daily backfill's, so both extracts shared one raw prefix: the weekly marker replaced the daily one, Bronze skipped the prefix as incomplete, and the weekly ledger rows overwrote the daily ones. The scheduled daily and weekly runs collide the same way every Monday 00:00Z. The PostgreSQL execution id is now `<dag_id>__<run_id>`; after re-running both windows, Bronze sellers went 20 → 23 and Silver stayed 6. The stray 2026-11-21 prefix stays in raw storage, ignored as incomplete.
+
+`uv run pytest tests/unit`: 444 passed. `make lint` passed.
+
 ### 2026-11-21 — P3-05 weekly PostgreSQL re-extract
 
 `airflow/dags/ingest_postgres_oltp_weekly.py` runs on `CronDataIntervalTimetable("0 0 * * 1", "UTC")` with `catchup=True`, `max_active_runs=1`, paused at creation, and `start_date` 2026-11-16 (first scheduled run 2026-11-23). It calls `postgres_extract_task` with the data interval shifted back one day, `[W-8, W-1)`, instead of the `[W-7, W)` in the acceptance text: Filipe approved the shift so the last day of the window does not share the 00:00Z edge with its daily run. The execution id is the weekly run id. A successful extract emits `raw_postgres_oltp`, which schedules `transform_lakehouse`.

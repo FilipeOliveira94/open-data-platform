@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-21 (P3-05 verified: weekly PostgreSQL re-extract) |
+| Last updated | 2026-11-21 (P3-06 verified: window coverage, gap report, backfill) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,7 +22,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-06** — Window coverage, gap report, and backfill. Not started.
+**P3-07** — Quality checks and quarantine. Not started.
+
+P3-06 is verified. Each PostgreSQL extract records its window per dataset in `ingestion_state.extract_coverage` ([ADR-0025](docs/decisions/0025-extract-window-coverage-ledger.md)); `make coverage-report FREQUENCY=daily|weekly` lists gaps and overlaps, and the backfill parameters are documented. The live run found that the daily and weekly run ids collide at Monday 00:00Z and in backfills; the PostgreSQL execution id is now `<dag_id>__<run_id>` ([Local Airflow](docs/architecture/airflow-local.md#verification-2026-11-21-p3-06)).
 
 P3-05 is verified. `ingest_postgres_oltp_weekly` runs Monday 00:00 UTC with catchup and re-extracts `[W-8, W-1)` (the data interval shifted back one day, approved by Filipe) through the same P1-06 extract, as the safety net for late commits. A late seller missed by the daily window reached Silver after the weekly run, without duplicating the daily rows ([Local Airflow](docs/architecture/airflow-local.md#verification-2026-11-21-p3-05)).
 
@@ -32,7 +34,7 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 
 ## Next work
 
-1. **P3-06** — Window coverage, gap report, and backfill. Acceptance: `ROADMAP.md` → P3-06.
+1. **P3-07** — Quality checks and quarantine. Acceptance: `ROADMAP.md` → P3-07.
 
 ---
 
@@ -45,7 +47,7 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 | P3-03 | Transform / dbt DAGs | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-04 | Daily batch schedule (PostgreSQL) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-05 | Weekly batch schedule (PostgreSQL) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#weekly-postgresql-re-extract-p3-05) |
-| P3-06 | Idempotent backfill support | Not started | — |
+| P3-06 | Window coverage, gap report, and backfill | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#window-coverage-gap-report-and-backfill-p3-06) |
 | P3-07 | Quality checks and quarantine | Not started | — |
 | P3-08 | Execution metadata and failure logging | Not started | — |
 | P3-09 | Orchestration success/failure tests | Not started | — |

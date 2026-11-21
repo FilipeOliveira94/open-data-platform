@@ -57,7 +57,8 @@ def test_shared_task_defaults_are_not_a_dag() -> None:
     assert "shell=True" not in text
     assert "cwd=REPO" in text
     assert 'EXECUTION_ID = "{{ params.execution_id or run_id }}"' in text
-    assert "dag_id" not in text
+    assert "dag_id=" not in text
+    assert "DAG(" not in text
     assert "SELECT" not in text.upper()
 
 
@@ -95,7 +96,11 @@ def test_ingestion_dags_call_package_entrypoints() -> None:
 
 def test_execution_id_defaults_to_the_airflow_run() -> None:
     common = _text("ingest_common.py")
-    assert '"--execution-id",\n            EXECUTION_ID,' in common
+    assert '"--execution-id",\n            POSTGRES_EXECUTION_ID,' in common
+    assert (
+        'POSTGRES_EXECUTION_ID = "{{ params.execution_id or '
+        "(dag.dag_id ~ '__' ~ run_id) }}\"" in common
+    )
     for name in {*ENTRYPOINTS, *EXTRACT_HELPER_DAGS}:
         if name == "seed_postgres_oltp.py":
             assert "EXECUTION_ID" not in _text(name)
@@ -115,7 +120,7 @@ def test_daily_extract_dag_derives_the_window_and_emits_the_raw_asset() -> None:
     assert "params.window_start" not in text
     # The transform is scheduled on the raw Asset (ADR-0024), not triggered.
     assert "import TriggerDagRunOperator" not in text
-    assert "postgres_extract_task(WINDOW_START, WINDOW_END)" in text
+    assert 'postgres_extract_task(WINDOW_START, WINDOW_END, "daily")' in text
     assert "SELECT" not in text.upper()
     manual = _text("ingest_postgres_oltp.py")
     assert "TriggerDagRunOperator" not in manual
@@ -130,7 +135,7 @@ def test_weekly_extract_dag_lags_the_interval_and_emits_the_raw_asset() -> None:
     assert "data_interval_start.subtract(days=1).isoformat()" in text
     assert "data_interval_end.subtract(days=1).isoformat()" in text
     assert "TriggerDagRunOperator" not in text
-    assert "postgres_extract_task(WINDOW_START, WINDOW_END)" in text
+    assert 'postgres_extract_task(WINDOW_START, WINDOW_END, "weekly")' in text
     assert "SELECT" not in text.upper()
 
 
@@ -160,3 +165,27 @@ def test_platform_env_checks_are_parallel_after_imports() -> None:
     assert "imports >> [contracts, minio_raw, minio_write, postgres_oltp]" in text
     assert "SELECT" not in text.upper()
     assert "open_data_platform.ingestion" not in text
+
+
+def test_extract_records_frequency_dag_and_run_in_the_coverage_ledger() -> None:
+    common = _text("ingest_common.py")
+    for flag in ('"--frequency"', '"--dag-id"', '"{{ dag.dag_id }}"'):
+        assert flag in common
+    assert '"--airflow-run-id",\n            "{{ run_id }}"' in common
+    assert '"manual"' in _text("ingest_postgres_oltp.py")
+
+
+def test_coverage_cadences_match_the_dag_start_dates() -> None:
+    from datetime import timedelta
+
+    from open_data_platform.ingestion.coverage import CADENCES, DAILY, WEEKLY
+
+    daily = CADENCES[DAILY].first_start
+    weekly = CADENCES[WEEKLY].first_start + timedelta(days=1)
+    assert f"datetime({daily.year}, {daily.month}, {daily.day}, tzinfo=UTC)" in _text(
+        "ingest_postgres_oltp_daily.py"
+    )
+    assert (
+        f"datetime({weekly.year}, {weekly.month}, {weekly.day}, tzinfo=UTC)"
+        in _text("ingest_postgres_oltp_weekly.py")
+    )

@@ -25,6 +25,15 @@ REPO = "/opt/odp/repo"
 # A non-empty value overwrites the keys of that execution.
 EXECUTION_ID = "{{ params.execution_id or run_id }}"
 
+# Three DAGs extract the same PostgreSQL source, and Airflow run ids repeat
+# across DAGs: the daily and weekly runs at Monday 00:00Z are both
+# ``scheduled__<W>T00:00:00+00:00``, and a backfill of each gives
+# ``backfill__<date>``. The same execution id puts both extracts in one raw
+# prefix: the second clears the first's ``_COMPLETE`` marker and lists only its
+# own object, so Bronze sees the prefix as incomplete. The DAG id keeps the
+# executions apart (P3-06).
+POSTGRES_EXECUTION_ID = "{{ params.execution_id or (dag.dag_id ~ '__' ~ run_id) }}"
+
 # One slot: tasks that write lakehouse tables and the reconciliation tests
 # never run at the same time. Compose ``airflow-init`` creates the pool.
 LAKEHOUSE_GOLD_POOL = "lakehouse_gold"
@@ -151,10 +160,14 @@ def python_task(
     )
 
 
-def postgres_extract_task(window_start: str, window_end: str) -> PythonOperator:
+def postgres_extract_task(
+    window_start: str, window_end: str, frequency: str
+) -> PythonOperator:
     """Return the P1-06 extract task for the given (templated) window bounds.
 
-    A successful extract emits the ``postgres_oltp`` raw Asset.
+    ``frequency`` (``daily``, ``weekly``, or ``manual``) is recorded with the
+    DAG id and run id in the coverage ledger (P3-06). A successful extract
+    emits the ``postgres_oltp`` raw Asset.
     """
     return python_task(
         "extract",
@@ -167,7 +180,13 @@ def postgres_extract_task(window_start: str, window_end: str) -> PythonOperator:
             "--window-end",
             window_end,
             "--execution-id",
-            EXECUTION_ID,
+            POSTGRES_EXECUTION_ID,
+            "--frequency",
+            frequency,
+            "--dag-id",
+            "{{ dag.dag_id }}",
+            "--airflow-run-id",
+            "{{ run_id }}",
         ],
         outlets=[raw_asset("postgres_oltp")],
     )

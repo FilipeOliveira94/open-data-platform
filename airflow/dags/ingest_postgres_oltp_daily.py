@@ -51,4 +51,4 @@ with DAG(
     params={"execution_id": execution_id_param()},
     doc_md=__doc__,
 ):
-    postgres_extract_task(WINDOW_START, WINDOW_END)
+    postgres_extract_task(WINDOW_START, WINDOW_END, "daily")

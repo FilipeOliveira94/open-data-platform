@@ -16,7 +16,7 @@ Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-sch
 
 `platform_health` is the P3-01 smoke DAG: one `BashOperator` that prints `platform_health ready`, with no schedule. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
 
-P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 adds `ingest_postgres_oltp_daily`, the daily schedule on the PostgreSQL extract. Since P3-13 every ingestion DAG emits a raw Asset that schedules `transform_lakehouse`. P3-05 adds `ingest_postgres_oltp_weekly`, a trailing seven-day re-extract for late commits. Phase 4 sets the CDC schedule. Backfill parameters stay P3-06.
+P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 adds `ingest_postgres_oltp_daily`, the daily schedule on the PostgreSQL extract. Since P3-13 every ingestion DAG emits a raw Asset that schedules `transform_lakehouse`. P3-05 adds `ingest_postgres_oltp_weekly`, a trailing seven-day re-extract for late commits. Phase 4 sets the CDC schedule. P3-06 adds the [window coverage ledger, gap report, and backfill parameters](#window-coverage-gap-report-and-backfill-p3-06).
 
 Since P3-04 every DAG sets `is_paused_upon_creation=True`. A DAG that appears for the first time is paused, and a run created while it is paused stays `queued`. Unpause a DAG before you trigger it:
 
@@ -106,7 +106,7 @@ Since P3-04 `run_python_args` starts the child with `start_new_session=True`, so
 
 `ingest_postgres_oltp` passes `window_start` and `window_end` through. It does not calculate a daily or weekly window and does not trigger `transform_lakehouse`. The daily window is `ingest_postgres_oltp_daily` (below). `seed_postgres_oltp` truncates `oltp.sellers`, `oltp.customers`, `oltp.orders`, and `oltp.order_items`, then loads `tests/fixtures/postgres_oltp/synthetic.json`. It is not upstream of the extract DAG.
 
-`execution_id` defaults to the Airflow `run_id`. A new run keeps the previous raw object. A trigger conf that sets `execution_id` overwrites the keys of that id.
+`execution_id` defaults to the Airflow `run_id`. A new run keeps the previous raw object. A trigger conf that sets `execution_id` overwrites the keys of that id. The three PostgreSQL extract DAGs default to `<dag_id>__<run_id>` instead (P3-06): run ids repeat across DAGs, and two DAGs that extract the same source must not share a raw prefix (see [Window coverage](#window-coverage-gap-report-and-backfill-p3-06)).
 
 Each DAG must be unpaused first (see above).
 
@@ -296,7 +296,7 @@ How each kind of run gets its window in Airflow 3.4:
 | Scheduled | The interval that just ended. Run id `scheduled__<D>T00:00:00+00:00`, logical date `D-1` |
 | `airflow dags trigger -l <date>` | The last complete UTC day before the trigger time. The CLI infers the interval from `run_after` (now), not from `-l`. `-l` only sets the logical date |
 | `airflow dags trigger` without `-l` | No data interval. The extract fails |
-| `airflow backfill create --from-date D --to-date D` | `[D, D+1)`. Backfill parameters are P3-06 |
+| `airflow backfill create --from-date D --to-date D` | `[D, D+1)`. See [Backfill](#backfill-parameters) |
 
 The transform runs only after a successful extract, because only a successful task emits the Asset event. See [Lakehouse refresh trigger](#lakehouse-refresh-trigger-p3-13) for how several events coalesce.
 
@@ -324,7 +324,7 @@ Since P3-13 `transform_lakehouse` promotes only the new raw objects and rebuilds
 | Catchup | `True`, `start_date` 2026-11-16. The first scheduled run is 2026-11-23 and extracts `[2026-11-15, 2026-11-22)`. Missed weeks run one at a time, oldest first |
 | `max_active_runs` | 1 |
 | Paused at creation | Yes |
-| Execution id | `params.execution_id or run_id`: the weekly DAG's own run id, never a daily one |
+| Execution id | `params.execution_id or (dag.dag_id ~ '__' ~ run_id)` since P3-06. Until then it was `params.execution_id or run_id`, which repeats the daily run id at Monday 00:00Z (both `scheduled__<W>T00:00:00+00:00`) and for backfills |
 | After the extract | Asset event `odp-raw://postgres_oltp`, which schedules `transform_lakehouse` (P3-13) |
 
 Why one day of lag. With `[W-7, W)` the last day of the window, Sunday, would have the same 00:00Z edge as its daily run: a Sunday row committed after Monday 00:00Z would miss both. With `[W-8, W-1)` every day in the window had at least one full day after its daily run before the weekly run reads it. Consecutive windows tile without gap or overlap (`test_weekly_windows_tile_without_gaps`). Filipe approved the shift on 2026-11-21; the roadmap text said `[W-7, W)`.
@@ -339,12 +339,64 @@ Pipeline design checklist:
 | Deletes | A hard delete is never extracted. The row stays in Silver and Gold (P3-12). CDC (Phase 4) is the delete path |
 | What a run reads | PostgreSQL: seven days of `updated_at`. Bronze: only the weekly objects (P3-13). Silver rebuilds the `postgres_oltp` tables from Bronze, which grows with history (P3-13 behavior). Raw keeps each day twice: once daily, once weekly |
 | Reader view | Unchanged: atomic replace (P3-11) |
-| Ownership and concurrency | Monday 00:00Z starts the daily and the weekly run together. Both only read PostgreSQL and write different raw prefixes (`execution_id` differs). Their two Asset events lead to at most one extra transform run (`batch_asset_events=True`) |
+| Ownership and concurrency | Monday 00:00Z starts the daily and the weekly run together. Both only read PostgreSQL and write different raw prefixes because the execution id carries the DAG id (P3-06; the P3-05 claim that the run ids differ was wrong, see [the collision](#execution-id-collision-found-by-p3-06)). Their two Asset events lead to at most one extra transform run (`batch_asset_events=True`) |
 | Trigger | The schedule or a manual trigger with `-l`. Downstream: the raw Asset |
 | Failure | A failed extract writes no `_COMPLETE` marker and emits no Asset event. Retries (2) keep the run id and overwrite the same keys. Silver reads every window, complete or not, for `incremental_window`; a partial weekly object only repeats rows |
 | Evidence | `scripts/p3_05_weekly_check.sh`, below |
 
 A manual trigger needs `-l`. `airflow dags trigger ingest_postgres_oltp_weekly -l <now>` gets the last complete Monday week before the trigger time as its data interval; on 2026-11-21 that is `[2026-11-09, 2026-11-16)`, so the extract window is `[2026-11-08, 2026-11-15)`. Without `-l` the bounds render empty and the extract fails before it connects.
+
+## Window coverage, gap report, and backfill (P3-06)
+
+[ADR-0025](../decisions/0025-extract-window-coverage-ledger.md). Each successful PostgreSQL extract records one row per dataset in `ingestion_state.extract_coverage` (catalog database `ICEBERG_CATALOG_DB`). The DAGs pass `--frequency`, `--dag-id {{ dag.dag_id }}`, and `--airflow-run-id {{ run_id }}`.
+
+| Column | Meaning |
+| --- | --- |
+| `source_id`, `dataset`, `execution_id` | Primary key. A cleared or reprocessed run keeps its run id and overwrites its own row; a new run of the same window adds a row |
+| `frequency` | `daily` (1-day window), `weekly` (7-day window), or `manual` (the `ingest_postgres_oltp` DAG and a `make` or CLI extract). A `CHECK` rejects a daily or weekly row with the wrong window length, and the extract rejects it before it connects |
+| `window_start`, `window_end` | The half-open extract window, UTC midnight |
+| `dag_id`, `airflow_run_id` | Null outside Airflow |
+| `row_count` | Rows fetched for the window, quarantined ones included |
+| `recorded_at` | When the ledger row was written |
+
+The extract writes the rows in one transaction, after every dataset has its `_COMPLETE` marker. A failed extract records nothing, so the window shows as a gap. If the ledger write fails after the raw write, the task fails and the retry rewrites the same raw keys.
+
+### Gap report
+
+`make coverage-report FREQUENCY=daily` (or `weekly`) runs `python -m open_data_platform.ingestion.coverage report --frequency <f>`. The report rebuilds the expected windows of the cadence from its first window up to the last recorded window end:
+
+| Cadence | First window | Expected windows |
+| --- | --- | --- |
+| `daily` | `[2026-11-19, 2026-11-20)`, the DAG `start_date` | `[D, D+1)` for every day |
+| `weekly` | `[2026-11-15, 2026-11-22)`, the first interval shifted back one day | `[W-8, W-1)` for every Monday `W` |
+
+| Finding | Rule | Error |
+| --- | --- | --- |
+| Gap | An expected window without a row for one of the four datasets | Yes |
+| Overlap | Two different recorded windows of the same frequency that intersect (for example a weekly backfill on a non-Monday) | Yes |
+| Re-run | The same window recorded by more than one execution | No, counted |
+| Before start | A window that starts before the first window (a backfill before `start_date`) | No, listed |
+
+Daily and weekly windows overlap by design (P3-05) and are never compared with each other. `manual` rows are not part of either report. The command prints window dates, dataset names, and counts. It exits 0 when clean, 1 on a gap or an overlap, and 2 when the ledger cannot be read. The cadence start dates live in `coverage.CADENCES`; a unit test fails if they drift from the DAG `START_DATE`.
+
+### Backfill parameters
+
+Airflow 3.4 selects a past window only through `airflow backfill create`. `airflow dags trigger -l` sets the logical date, but the data interval still comes from the trigger time (see [Daily PostgreSQL schedule](#daily-postgresql-schedule-p3-04)).
+
+| DAG | Command | Window per logical date `L` |
+| --- | --- | --- |
+| `ingest_postgres_oltp_daily` | `airflow backfill create --dag-id ingest_postgres_oltp_daily --from-date A --to-date B` | One run per day `L` in `[A, B]` (both inclusive), window `[L, L+1)` |
+| `ingest_postgres_oltp_weekly` | `airflow backfill create --dag-id ingest_postgres_oltp_weekly --from-date A --to-date B` | One run per Monday `L` in `[A, B]`, window `[L-1, L+6)` (Sunday to Saturday) |
+
+| Option | Effect |
+| --- | --- |
+| `--reprocess-behavior none` (default) | Creates runs only for logical dates without a run. A covered window is skipped |
+| `--reprocess-behavior failed` | Also re-runs failed runs |
+| `--reprocess-behavior completed` | Also re-runs successful runs. The existing run is cleared and keeps its run id, so the extract overwrites its raw keys and ledger rows |
+| `--max-active-runs 1` | Pass it. The backfill does not inherit the DAG's `max_active_runs=1`: without the flag, the six daily runs below started within 60 ms of each other. Parallel extracts are safe (distinct raw keys and ledger rows), but one at a time, oldest first, matches catchup |
+| `--dry-run` | Lists the logical dates without creating runs |
+
+Each backfill run emits the `raw_postgres_oltp` Asset. `transform_lakehouse` (`max_active_runs=1`, `batch_asset_events=True`) runs once for the first event, and one follow-up consumes every event queued meanwhile. A backfill of N windows therefore gives far fewer than N refreshes, and each refresh promotes only raw objects not promoted before (ADR-0024).
 
 ## Lakehouse refresh trigger (P3-13)
 
@@ -441,3 +493,28 @@ An earlier pass of the same script on 2026-11-12, a day with no seller before th
 Not run: a scheduled weekly run. The first one is 2026-11-23 00:00Z.
 
 Unit checks: `uv run pytest tests/unit` → 417 passed, with five new DagBag tests for the weekly timetable, intervals, rendered window, tiling, and empty bounds. `make lint` passed.
+
+## Verification (2026-11-21, P3-06)
+
+On the local stack (Airflow, Trino, Spark profile), with the daily and weekly DAGs unpaused. `make coverage-report` ran in the runtime image. Counts and durations come from `ingestion_state.extract_coverage`, `lakehouse_state.bronze_refreshes`, the Airflow `task_instance` table, and Trino. Silver `postgres_oltp` before the first step: sellers 6, customers 2, orders 2, order items 2.
+
+| Step | Result |
+| --- | --- |
+| Empty ledger | `make coverage-report FREQUENCY=daily`: `expected_windows=0`, clean, exit 0 |
+| (a) `backfill create` daily `--from-date 2026-11-20 --to-date 2026-11-20 --reprocess-behavior completed` | The existing `scheduled__2026-11-21T00:00:00+00:00` run was cleared and re-run under the same run id (extract 1.1 s). Four ledger rows for `[2026-11-20, 2026-11-21)`, 0 rows each. The transform promoted 0 objects (same key, same ETag) |
+| Gap report after (a) | `gaps=1`: `gap [2026-11-19,2026-11-20) missing=sellers,customers,orders,order_items` (that window ran before the ledger existed). Exit 1 |
+| (b) `backfill create` daily `--from-date 2026-11-14 --to-date 2026-11-19 --reprocess-behavior completed` | Six runs (five new, one reprocessed) for `[2026-11-14, 2026-11-20)`. All six started within 60 ms of each other: the backfill does not inherit `max_active_runs=1`. Extracts 1.1 to 1.2 s |
+| Refreshes for (b) | One `transform_lakehouse` run, 18:19:58 → 18:21:45 (107 s): Bronze promoted 6 objects per dataset and appended 0 rows (empty windows); Silver 54.8 s, `dbt_build` 30.4 s. Six windows, one refresh |
+| Gap report after (b) | Daily clean, exit 0: 2 expected windows, 0 gaps, 0 overlaps, 5 windows before start |
+| (d) `backfill create` weekly `--from-date 2026-11-09 --to-date 2026-11-09 --max-active-runs 1` | `backfill__2026-11-16T00:00:00+00:00`, window `[2026-11-08, 2026-11-15)` = `[L-1, L+6)`, sellers 3. It found the collision below |
+| Repair: daily 2026-11-15 and weekly 2026-11-09 with `--reprocess-behavior completed` after the execution id fix | Execution ids `ingest_postgres_oltp_daily__backfill__2026-11-16T00:00:00+00:00` and `ingest_postgres_oltp_weekly__backfill__…`. Two events, two refreshes: the weekly event arrived while the first refresh ran and started one follow-up. Bronze sellers 20 → 23 (the 3 weekly rows). Silver sellers stayed 6, the 3 `p3-05-late-` sellers once each |
+| (c) `backfill create` daily `--from-date 2026-11-19 --to-date 2026-11-20 --reprocess-behavior completed --max-active-runs 1` | Both covered windows re-run in order under new execution ids (`<dag_id>__<run_id>`). Two refreshes: the first listed before the second extract had finished `order_items`; the follow-up promoted that object. Bronze appended 0 rows |
+| After (c) | Silver unchanged: sellers 6, customers 2, orders 2, order items 2. Daily report: 0 gaps, 0 overlaps, `rerun [2026-11-19,2026-11-20)` and `rerun [2026-11-20,2026-11-21)`, clean, exit 0. Weekly report: 0 gaps, 1 window before start, clean |
+
+### Execution id collision found by P3-06
+
+Until this issue, the PostgreSQL DAGs used `params.execution_id or run_id`. Airflow run ids are unique per DAG, not across DAGs. The daily backfill for logical date 2026-11-15 and the weekly backfill for 2026-11-09 were both `backfill__2026-11-16T00:00:00+00:00`, and both ran on ingestion date 2026-11-21. The weekly extract wrote into the daily prefix `raw/postgres_oltp/<dataset>/dt=2026-11-21/execution_id=backfill__2026-11-16T00:00:00+00:00/`. It cleared the daily `_COMPLETE` marker and wrote one that listed only its own object. Bronze treats a prefix whose objects differ from its marker as incomplete, so the 3 weekly sellers were not promoted, while the task ended `success`. The weekly ledger rows also overwrote the daily rows of that execution id. The same collision happens on the scheduled path every Monday 00:00Z: both runs are `scheduled__<W>T00:00:00+00:00`. The first would have been 2026-11-23.
+
+The fix is `POSTGRES_EXECUTION_ID = "{{ params.execution_id or (dag.dag_id ~ '__' ~ run_id) }}"` in `ingest_common.py`, used only by `postgres_extract_task`. The other ingestion DAGs each own one source and keep `run_id`. A DagBag test renders the daily and weekly extract at the same Monday instant and asserts distinct execution ids. The stray prefix from 2026-11-21 stays in raw storage: Bronze ignores it as incomplete, and its daily object was already promoted on 2026-11-21 18:19Z.
+
+Unit checks: `uv run pytest tests/unit` and `make lint` passed (counts in [`docs/status-log.md`](../status-log.md)).
