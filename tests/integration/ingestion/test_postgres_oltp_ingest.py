@@ -1,16 +1,30 @@
-"""MinIO and PostgreSQL round-trip for a windowed OLTP extract."""
+"""MinIO and PostgreSQL round-trip for a windowed OLTP extract.
+
+The test seeds a temporary database, never ``POSTGRES_DB``: the seed
+truncates the ``oltp`` tables. The coverage ledger lives in the same
+temporary database. Raw objects go to the integration test bucket.
+"""
 
 from __future__ import annotations
 
 import json
 import os
 import uuid
-from datetime import UTC, datetime
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import psycopg
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
+from psycopg import sql
 
+from open_data_platform.ingestion.coverage import (
+    DAILY,
+    Cadence,
+    PostgresCoverageLedger,
+    coverage_report,
+)
 from open_data_platform.ingestion.postgres_oltp import (
     DATASETS,
     PostgresOltpError,
@@ -36,16 +50,39 @@ _PRIMARY_KEYS = {
 }
 
 
-def _postgres_or_skip() -> Any:
+def _admin(env: dict[str, str]) -> psycopg.Connection:
+    return psycopg.connect(
+        host=env.get("POSTGRES_HOST", "").strip() or "localhost",
+        port=int(env.get("POSTGRES_PORT", "").strip() or "5432"),
+        user=env["POSTGRES_USER"],
+        password=env["POSTGRES_PASSWORD"],
+        dbname="postgres",
+        autocommit=True,
+        connect_timeout=5,
+    )
+
+
+@pytest.fixture
+def scratch_env() -> Iterator[dict[str, str]]:
+    """Environment whose ``POSTGRES_DB`` and catalog are a temporary database."""
     required = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
     missing = [name for name in required if not os.environ.get(name)]
     if missing:
         pytest.skip(f"Missing PostgreSQL settings: {', '.join(missing)}")
+    env = dict(os.environ)
+    name = f"odp_it_{uuid.uuid4().hex[:12]}"
     try:
-        return connect_from_env(os.environ)
-    except PostgresOltpError as exc:
-        reason = exc.__cause__ or exc
-        pytest.skip(f"PostgreSQL not reachable: {reason}")
+        admin = _admin(env)
+    except psycopg.OperationalError as exc:
+        pytest.skip(f"PostgreSQL not reachable: {type(exc).__name__}")
+    with admin:
+        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+        try:
+            yield {**env, "POSTGRES_DB": name, "ICEBERG_CATALOG_DB": name}
+        finally:
+            admin.execute(
+                sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name))
+            )
 
 
 def _minio_or_skip() -> tuple[Any, str]:
@@ -65,7 +102,7 @@ def _minio_or_skip() -> tuple[Any, str]:
         client.list_buckets()
     except (EndpointConnectionError, ClientError, BotoCoreError, OSError) as exc:
         pytest.skip(f"MinIO not reachable: {exc}")
-    return client, os.environ.get("ODP_RAW_BUCKET", "odp-raw")
+    return client
 
 
 def _fixture_rows(dataset: str, start: datetime, end: datetime) -> list[dict[str, Any]]:
@@ -90,24 +127,23 @@ def _stored_rows(
     return rows
 
 
-def _delete_execution(client: Any, bucket: str, execution_id: str) -> None:
-    paginator = client.get_paginator("list_objects_v2")
-    for prefix in ("raw/postgres_oltp/", "quarantine/postgres_oltp/"):
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-            for item in page.get("Contents", []):
-                key = item["Key"]
-                if f"/execution_id={execution_id}/" in key:
-                    client.delete_object(Bucket=bucket, Key=key)
-
-
-def test_windowed_extract_round_trip_overwrites_the_same_object() -> None:
-    connection = _postgres_or_skip()
-    client = None
-    bucket = ""
+def test_windowed_extract_round_trip_overwrites_the_same_object(
+    scratch_env: dict[str, str],
+    test_raw_bucket: str,
+    purge_executions: Callable[[Any, str, str], None],
+) -> None:
+    try:
+        connection = connect_from_env(scratch_env)
+    except PostgresOltpError as exc:
+        pytest.skip(f"PostgreSQL not reachable: {exc}")
+    ledger = PostgresCoverageLedger(scratch_env)
+    bucket = test_raw_bucket
     execution_a = f"p106-{uuid.uuid4().hex}"
     execution_b = f"p106-{uuid.uuid4().hex}"
     try:
-        client, bucket = _minio_or_skip()
+        client = _minio_or_skip()
+        purge_executions(client, bucket, execution_a)
+        purge_executions(client, bucket, execution_b)
         apply_oltp_schema(connection)
         seed_synthetic(connection)
         seed_synthetic(connection)
@@ -119,6 +155,8 @@ def test_windowed_extract_round_trip_overwrites_the_same_object() -> None:
             window_start=_DAY_START,
             window_end=_DAY_END,
             ingestion_ts=_INGESTION_TS,
+            coverage=ledger,
+            frequency=DAILY,
         )
         weekly = extract_postgres_oltp(
             client,
@@ -158,6 +196,8 @@ def test_windowed_extract_round_trip_overwrites_the_same_object() -> None:
             window_start=_DAY_START,
             window_end=_DAY_END,
             ingestion_ts=_INGESTION_TS,
+            coverage=ledger,
+            frequency=DAILY,
         )
         assert rewritten[0].key == daily[0].key
         sellers = _stored_rows(client, rewritten, "sellers")
@@ -172,12 +212,33 @@ def test_windowed_extract_round_trip_overwrites_the_same_object() -> None:
             window_start=_DAY_START,
             window_end=_DAY_END,
             ingestion_ts=_INGESTION_TS,
+            coverage=ledger,
+            frequency=DAILY,
         )
         assert separate[0].key != rewritten[0].key
         assert execution_b in separate[0].key
+
+        # Coverage ledger (P3-06): a re-run of one execution overwrites its
+        # rows; a second execution of the same window is a re-run, not a gap.
+        recorded = ledger.load("postgres_oltp", DAILY)
+        assert sorted((item.execution_id, item.dataset) for item in recorded) == sorted(
+            (execution, dataset)
+            for execution in (execution_a, execution_b)
+            for dataset in DATASETS
+        )
+        for item in recorded:
+            assert (item.window_start, item.window_end) == (_DAY_START, _DAY_END)
+            assert item.row_count == len(
+                _fixture_rows(item.dataset, _DAY_START, _DAY_END)
+            )
+        report = coverage_report(
+            DAILY,
+            recorded,
+            datasets=DATASETS,
+            cadence=Cadence(_DAY_START, timedelta(days=1)),
+        )
+        assert report.clean
+        assert report.expected_windows == 1
+        assert report.rerun_windows == ((_DAY_START, _DAY_END),)
     finally:
-        if client is not None:
-            _delete_execution(client, bucket, execution_a)
-            _delete_execution(client, bucket, execution_b)
-            seed_synthetic(connection)
         connection.close()

@@ -2,7 +2,7 @@
 
 Scope: every issue marked **Verified** in [`ROADMAP.md`](../../ROADMAP.md) on 2026-11-21 (Phases 0–3: P0-09 to P3-13). The question was whether each implemented solution is sound from a data engineering standpoint. Decisions and ADRs were not taken as proof: a finding stands even when an ADR accepted the behavior.
 
-Method: code reading of `src/`, `airflow/dags/`, `docker/spark/`, `dbt/`, and `tests/`. Commands run: `uv run pytest tests/unit` (444 passed) and `uv run pytest tests/integration` against the local Compose stack (5 passed, 1 failed, see T1). No pipeline, DAG, or refresh was run for this review. Findings marked *confirmed by reading* trace the code path; none of them was reproduced on the stack. The issues that fix them carry the live evidence.
+Method: code reading of `src/`, `airflow/dags/`, `docker/spark/`, `dbt/`, and `tests/`. Commands run before any test change: `uv run pytest tests/unit` (444 passed) and `uv run pytest tests/integration` against the local Compose stack (5 passed, 1 failed, see T1). No pipeline, DAG, or refresh was run for this review. Findings marked *confirmed by reading* trace the code path; none of them was reproduced on the stack. The issues that fix them carry the live evidence.
 
 ## Pipeline and model findings
 
@@ -30,27 +30,30 @@ Method: code reading of `src/`, `airflow/dags/`, `docker/spark/`, `dbt/`, and `t
 
 ## Test findings
 
+T1, T2, T4, T6, and T8 were fixed in the same PR as this review, in a separate commit. R1 and R7 each got a `pytest.mark.xfail(strict=True)` unit test that reproduces the defect: `test_a_failed_bronze_check_is_checked_again_before_silver_builds` and `test_a_stopped_dag_reports_its_trailing_gaps`. P3-16 makes them pass, and strict mode then fails the suite until the marker is removed. After the fix: `pytest tests/unit` 446 passed and 2 xfailed; `pytest tests/integration` on local Compose 6 passed, with no test object left in `odp-raw` or `odp-test-raw` and no scratch database left.
+
 | Finding | Affected verified issue | What is wrong | Effort | Fix issue |
 | --- | --- | --- | --- | --- |
-| T1 Olist integration test broken since 2026-10-26 | P1-04, P1-10 | `test_olist_ingest_round_trip_overwrites_the_same_object` appends `replacement\n`, a one-column row, to a header-only CSV. Since P1-10 (`1636d49`) that is a structural error, and the test fails with `CSV row 0 does not match contract for orders`. Nobody saw it: integration tests are not in CI and skip without Compose settings | Low | P3-16 (fix), P6-04 (fail CI on skip) |
-| T2 Integration tests write to the real raw bucket and leave markers | P1-04–P1-08 | The tests use `ODP_RAW_BUCKET` (`odp-raw`) and delete only the data objects, leaving each `_COMPLETE` marker. Three runs during this review left 48 markers; they were deleted. A marker without data is ignored by Bronze, but a test whose cleanup fails leaves a complete synthetic execution that the next refresh promotes | Low | P3-16 |
-| T3 Unit tests encode the gate bypass | P3-13 | `test_bronze_checks_skip_when_no_table_was_written` and `test_silver_checks_skip_when_silver_wrote_nothing` (`tests/unit/lakehouse/test_refresh.py`) assert the skip that causes R1. No test runs two refreshes with a failed check between them | Low | P3-16 |
-| T4 Atomic-replace test covers only the rebuild path | P3-11, P3-13 | `test_bronze_replaces_each_table_in_one_statement` renders `render_bronze_sql`, the full-rebuild SQL. The scheduled `MERGE` script has no "no `DROP TABLE`" assertion | Low | P3-16 |
+| T1 Olist integration test broken since 2026-10-26 | P1-04, P1-10 | `test_olist_ingest_round_trip_overwrites_the_same_object` appends `replacement\n`, a one-column row, to a header-only CSV. Since P1-10 (`1636d49`) that is a structural error, and the test fails with `CSV row 0 does not match contract for orders`. Nobody saw it: integration tests are not in CI and skip without Compose settings | Low | Fixed: the test appends a row with the contract's column count. P6-04 makes a skipped integration test fail CI |
+| T2 Integration tests write to the real raw bucket and leave markers | P1-04–P1-08 | The tests use `ODP_RAW_BUCKET` (`odp-raw`) and delete only the data objects, leaving each `_COMPLETE` marker. Three runs during this review left 48 markers; they were deleted. A marker without data is ignored by Bronze, but a test whose cleanup fails leaves a complete synthetic execution that the next refresh promotes | Low | Fixed: `tests/integration/conftest.py` gives a test bucket (`ODP_TEST_RAW_BUCKET`, default `odp-test-raw`, rejected if equal to the raw bucket) and deletes every raw, marker, and quarantine object of the test's executions at teardown |
+| T3 Unit tests encode the gate bypass | P3-13 | `test_bronze_checks_skip_when_no_table_was_written` and `test_silver_checks_skip_when_silver_wrote_nothing` (`tests/unit/lakehouse/test_refresh.py`) assert the skip that causes R1. No test ran two refreshes with a failed check between them | Low | Strict xfail test for R1 added; P3-16 changes the two tests with the fix |
+| T4 Atomic-replace test covers only the rebuild path | P3-11, P3-13 | `test_bronze_replaces_each_table_in_one_statement` renders `render_bronze_sql`, the full-rebuild SQL. The scheduled `MERGE` script had no "no `DROP TABLE`" assertion | Low | Fixed: `test_scheduled_bronze_merge_never_drops_or_replaces_the_table` |
 | T5 Dead write-mode placeholders | P3-13 | `WriteMode.INCREMENTAL_MERGE` and `WriteMode.APPEND_ONLY` are placeholders, still tested by `test_incremental_placeholders_fail_loudly`. `APPEND_ONLY` shares its name with the `append_only` update pattern, which Silver implements differently. Remove them or implement them in P4-04 | Low | P4-04 |
-| T6 Coverage ledger has no integration test | P3-06 | `tests/integration/ingestion/test_postgres_oltp_ingest.py` does not pass a ledger. The ledger is covered by unit tests with fakes and by the P3-06 live run | Low | P6-04 |
+| T6 Coverage ledger has no integration test | P3-06 | `tests/integration/ingestion/test_postgres_oltp_ingest.py` did not pass a ledger. The ledger was covered by unit tests with fakes and by the P3-06 live run | Low | Fixed: the test records three daily extracts in the ledger and checks rows, counts, and a clean report with one re-run window |
 | T7 No test of Gold metric logic | P2-06, P2-07 | Reconciliation compares Gold with Gold or with Silver totals (20 of 56 files read Silver). No test builds a mart from a small fixture, so a grain error such as R2 passes every check | Medium | P3-17 |
+| T8 PostgreSQL integration test truncates the local OLTP tables | P1-06 | The test ran `seed_synthetic`, which truncates `oltp.*`, on `POSTGRES_DB` before and after the test. Running it reset the local source to the fixture. The review run did this on 2026-11-21: the three `p3-05-late-*` sellers and any other manual rows are gone from local PostgreSQL and remain only in the lake | Low | Fixed: the test creates a scratch database `odp_it_<hex>` for the OLTP tables and the ledger, and drops it at teardown |
 
 ## Where the fixes go
 
 | Fix issue | Findings | Position |
 | --- | --- | --- |
-| P3-16 Quality gate state and extract-window corrections (new) | R1, R7, R8, R13, R14, T1, T2, T3, T4 | Phase 3, first after P3-06 |
+| P3-16 Quality gate state and extract-window corrections (new) | R1, R7, R8, R13, R14, T3 | Phase 3, first after P3-06 |
 | P3-17 Gold metric grain corrections (new) | R2, R3, R19, T7 | Phase 3, before P3-14 |
 | P3-18 Exact decimal type for money fields (new) | R4 | Phase 3, before P3-14 |
 | P3-07, P3-08, P3-10 (amended) | R9, R10, R5, R16 | Phase 3 |
 | P4-01, P4-04 (amended) | R12, R11, T5 | Phase 4 |
 | P5-07 (amended) | R15 | Phase 5 |
-| P6-02, P6-04 (already scoped), P6-06 (amended), P6-09 write-audit-publish (new) | R17, T1, T6, R18, R6 | Phase 6 |
+| P6-02, P6-04 (already scoped), P6-06 (amended), P6-09 write-audit-publish (new) | R17, T1 (CI on skip), R18, R6 | Phase 6 |
 
 ## Documentation drift found
 
