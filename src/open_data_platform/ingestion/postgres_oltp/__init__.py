@@ -29,6 +29,15 @@ from typing import TYPE_CHECKING, Protocol
 import psycopg
 
 from open_data_platform.contracts.load import load_contracts
+from open_data_platform.ingestion.coverage import (
+    FREQUENCIES,
+    MANUAL,
+    CoverageError,
+    CoverageRecord,
+    CoverageSink,
+    PostgresCoverageLedger,
+    validate_frequency,
+)
 from open_data_platform.ingestion.paths import build_raw_object_key
 from open_data_platform.ingestion.pipeline_log import (
     configure_cli_logging,
@@ -210,20 +219,33 @@ def extract_postgres_oltp(
     ingestion_ts: datetime | None = None,
     datasets: Sequence[str] | None = None,
     contracts: tuple[DataContract, ...] | None = None,
+    coverage: CoverageSink | None = None,
+    frequency: str = MANUAL,
+    dag_id: str | None = None,
+    airflow_run_id: str | None = None,
 ) -> tuple[RawWriteResult, ...]:
     """Extract each selected dataset for ``[window_start, window_end)``.
 
     The same ``execution_id``, ingestion date, and window overwrite the same
     keys. A structural failure stops the remaining datasets. Objects already
     written for this execution stay in place.
+
+    After every dataset has its completion marker, ``coverage`` receives one
+    record per dataset in one call (P3-06). A failed extract records nothing,
+    so its window shows as a gap until a retry succeeds.
     """
     _require_token("bucket", bucket)
     _require_execution_id(execution_id)
     start, end = validate_window(window_start, window_end)
+    try:
+        validate_frequency(frequency, start, end)
+    except CoverageError as exc:
+        raise PostgresOltpError(str(exc)) from exc
     selected = _resolve_datasets(datasets)
     written_at = _require_ingestion_ts(ingestion_ts)
     by_dataset = _contracts_by_dataset(contracts)
     results: list[RawWriteResult] = []
+    covered: list[CoverageRecord] = []
     log_stage(
         "extract_started",
         source_id=SOURCE_ID,
@@ -290,6 +312,30 @@ def extract_postgres_oltp(
             finding_count=finding_count(sidecar),
         )
         results.append(result)
+        covered.append(
+            CoverageRecord(
+                source_id=SOURCE_ID,
+                dataset=dataset,
+                execution_id=execution_id,
+                frequency=frequency,
+                window_start=start,
+                window_end=end,
+                row_count=len(records),
+                dag_id=dag_id,
+                airflow_run_id=airflow_run_id,
+            )
+        )
+    if coverage is not None:
+        try:
+            coverage.record(covered)
+        except CoverageError as exc:
+            raise PostgresOltpError(str(exc)) from exc
+        log_stage(
+            "coverage_recorded",
+            source_id=SOURCE_ID,
+            frequency=frequency,
+            dataset_count=len(covered),
+        )
     log_stage("extract_finished", source_id=SOURCE_ID, object_count=len(results))
     return tuple(results)
 
@@ -326,6 +372,14 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="UTC ISO-8601 timestamp. The same value overwrites the same keys.",
     )
+    extract.add_argument(
+        "--frequency",
+        default=MANUAL,
+        choices=FREQUENCIES,
+        help="Cadence recorded in the coverage ledger (P3-06).",
+    )
+    extract.add_argument("--dag-id", default="", help="Airflow DAG id, if any.")
+    extract.add_argument("--airflow-run-id", default="", help="Airflow run id, if any.")
     args = parser.parse_args(argv)
     configure_cli_logging()
     try:
@@ -337,6 +391,9 @@ def main(argv: list[str] | None = None) -> int:
                 window_end=args.window_end,
                 execution_id=args.execution_id,
                 ingestion_ts=args.ingestion_ts,
+                frequency=args.frequency,
+                dag_id=args.dag_id,
+                airflow_run_id=args.airflow_run_id,
             )
     except (PostgresOltpError, KeyError) as exc:
         log_failure(exc)
@@ -361,6 +418,9 @@ def _run_extract(
     window_end: str,
     execution_id: str,
     ingestion_ts: str | None,
+    frequency: str = MANUAL,
+    dag_id: str = "",
+    airflow_run_id: str = "",
 ) -> None:
     env = os.environ
     bucket = env.get("ODP_RAW_BUCKET", "").strip()
@@ -373,6 +433,11 @@ def _run_extract(
     validate_window(start, end)
     _require_execution_id(execution_id)
     parsed_ts = _parse_instant(ingestion_ts, "ingestion-ts") if ingestion_ts else None
+    try:
+        validate_frequency(frequency, start, end)
+        ledger = PostgresCoverageLedger(env)
+    except CoverageError as exc:
+        raise PostgresOltpError(str(exc)) from exc
     connection = connect_from_env(env)
     try:
         client = client_from_env(env)
@@ -384,6 +449,10 @@ def _run_extract(
             window_start=start,
             window_end=end,
             ingestion_ts=parsed_ts,
+            coverage=ledger,
+            frequency=frequency,
+            dag_id=dag_id.strip() or None,
+            airflow_run_id=airflow_run_id.strip() or None,
         )
     finally:
         connection.close()

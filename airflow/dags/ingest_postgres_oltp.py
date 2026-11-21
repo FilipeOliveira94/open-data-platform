@@ -37,4 +37,6 @@ with DAG(
     },
     doc_md=__doc__,
 ):
-    postgres_extract_task("{{ params.window_start }}", "{{ params.window_end }}")
+    postgres_extract_task(
+        "{{ params.window_start }}", "{{ params.window_end }}", "manual"
+    )

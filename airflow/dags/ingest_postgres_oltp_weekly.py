@@ -4,9 +4,10 @@ Purpose: the safety net for late commits. The daily DAG extracts
 ``[D-1, D)`` at ``D 00:00Z``; a row whose ``updated_at`` falls in that day
 but whose transaction commits after the run is never in a daily window.
 This DAG re-extracts seven days through the same P1-06 extract
-(``postgres_extract_task``), under its own execution id (the run id of
-this DAG), and Silver keeps the latest ``updated_at`` per key, so rows the
-daily runs already landed are not duplicated.
+(``postgres_extract_task``), under its own execution id (this DAG's id
+and run id; the run id alone repeats the daily one at Monday 00:00Z),
+and Silver keeps the latest ``updated_at`` per key, so rows the daily
+runs already landed are not duplicated.
 
 Window: the run at Monday ``W 00:00Z`` has the data interval
 ``[W-7, W)`` (``CronDataIntervalTimetable`` at ``0 0 * * 1`` in UTC). The
@@ -58,4 +59,4 @@ with DAG(
     params={"execution_id": execution_id_param()},
     doc_md=__doc__,
 ):
-    postgres_extract_task(WINDOW_START, WINDOW_END)
+    postgres_extract_task(WINDOW_START, WINDOW_END, "weekly")

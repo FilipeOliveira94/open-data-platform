@@ -276,6 +276,7 @@ def test_daily_dag_runs_every_missed_window_in_order(dagbag) -> None:
 
 def _render_extract(dag, context: dict[str, object]) -> list[str]:
     task = dag.get_task("extract")
+    context = {"dag": dag, **context}
     return [str(task.render_template(arg, context)) for arg in task.op_args]
 
 
@@ -304,6 +305,12 @@ def test_daily_window_renders_into_a_valid_extract_window(dagbag) -> None:
         "--window-end",
         "2026-10-18T00:00:00+00:00",
         "--execution-id",
+        f"{DAILY}__{run_id}",
+        "--frequency",
+        "daily",
+        "--dag-id",
+        DAILY,
+        "--airflow-run-id",
         run_id,
     ]
     start = datetime.fromisoformat(vector[4])
@@ -411,6 +418,12 @@ def test_weekly_window_lags_the_interval_by_one_day(dagbag) -> None:
         "--window-end",
         "2026-11-22T00:00:00+00:00",
         "--execution-id",
+        f"{WEEKLY}__{run_id}",
+        "--frequency",
+        "weekly",
+        "--dag-id",
+        WEEKLY,
+        "--airflow-run-id",
         run_id,
     ]
     start = datetime.fromisoformat(vector[4])
@@ -533,3 +546,42 @@ def test_manual_sources_have_no_schedule(dagbag) -> None:
         dag = dagbag.dags[dag_id]
         assert type(dag.timetable).__name__ == "NullTimetable"
         assert dag.is_paused_upon_creation is True
+
+
+def test_daily_and_weekly_runs_at_the_same_instant_get_distinct_executions(
+    dagbag,
+) -> None:
+    """Both DAGs run at Monday 00:00Z with the same run id (P3-06 defect)."""
+    import pendulum
+
+    monday = pendulum.datetime(2026, 11, 23, tz="UTC")
+    run_id = "scheduled__2026-11-23T00:00:00+00:00"
+    daily = _render_extract(
+        dagbag.dags[DAILY],
+        {
+            "data_interval_start": monday.subtract(days=1),
+            "data_interval_end": monday,
+            "params": {"execution_id": ""},
+            "run_id": run_id,
+        },
+    )
+    weekly = _render_extract(
+        dagbag.dags[WEEKLY],
+        {
+            "data_interval_start": monday.subtract(weeks=1),
+            "data_interval_end": monday,
+            "params": {"execution_id": ""},
+            "run_id": run_id,
+        },
+    )
+    assert daily[8] != weekly[8]
+    explicit = _render_extract(
+        dagbag.dags[DAILY],
+        {
+            "data_interval_start": monday.subtract(days=1),
+            "data_interval_end": monday,
+            "params": {"execution_id": "rerun-7"},
+            "run_id": run_id,
+        },
+    )
+    assert explicit[8] == "rerun-7"

@@ -657,3 +657,107 @@ def _markers(client: MagicMock) -> list[dict[str, Any]]:
         for call in client.put_object.call_args_list
         if _is_marker(call)
     ]
+
+
+class _CoverageSink:
+    def __init__(self, client: MagicMock | None = None) -> None:
+        self.calls: list[list[Any]] = []
+        self.puts_at_call: list[int] = []
+        self._client = client
+
+    def record(self, records: Sequence[Any]) -> None:
+        self.calls.append(list(records))
+        if self._client is not None:
+            self.puts_at_call.append(len(self._client.put_object.call_args_list))
+
+
+def test_coverage_is_recorded_once_after_every_marker() -> None:
+    contracts = _contracts()
+    connection = _ScriptedConnection(
+        [
+            _table(contracts["sellers"], _row(contracts["sellers"])),
+            _table(
+                contracts["customers"],
+                _row(contracts["customers"]),
+                _row(contracts["customers"], customer_id="customer-2"),
+            ),
+        ]
+    )
+    client = _client()
+    sink = _CoverageSink(client)
+
+    _extract(
+        connection,
+        client,
+        datasets=("sellers", "customers"),
+        coverage=sink,
+        frequency="daily",
+        dag_id="ingest_postgres_oltp_daily",
+        airflow_run_id="scheduled__2026-10-18",
+    )
+
+    assert len(sink.calls) == 1
+    records = sink.calls[0]
+    assert [(r.dataset, r.row_count) for r in records] == [
+        ("sellers", 1),
+        ("customers", 2),
+    ]
+    assert {(r.window_start, r.window_end) for r in records} == {(_DAY_START, _DAY_END)}
+    assert {r.frequency for r in records} == {"daily"}
+    assert {r.airflow_run_id for r in records} == {"scheduled__2026-10-18"}
+    # Every put (data, quarantine, marker) happened before the ledger call.
+    assert sink.puts_at_call == [len(client.put_object.call_args_list)]
+    assert sum(_is_marker(call) for call in client.put_object.call_args_list) == 2
+
+
+def test_failed_extract_records_no_coverage() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract)), psycopg.OperationalError("boom")]
+    )
+    sink = _CoverageSink()
+
+    with pytest.raises(PostgresOltpError):
+        _extract(connection, datasets=("sellers", "customers"), coverage=sink)
+
+    assert sink.calls == []
+
+
+def test_frequency_must_match_the_window_before_any_query() -> None:
+    connection = _ScriptedConnection([])
+
+    with pytest.raises(PostgresOltpError, match="weekly window must be 7"):
+        _extract(connection, frequency="weekly", coverage=_CoverageSink())
+
+    assert connection.queries == []
+
+
+def test_cli_rejects_a_frequency_that_does_not_match_the_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _env(monkeypatch)
+
+    def explode(_env: dict[str, str]) -> None:
+        msg = "connected"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(
+        "open_data_platform.ingestion.postgres_oltp.connect_from_env",
+        explode,
+    )
+
+    code = main(
+        [
+            "extract",
+            "--window-start",
+            "2026-10-17T00:00:00Z",
+            "--window-end",
+            "2026-10-18T00:00:00Z",
+            "--execution-id",
+            "run-001",
+            "--frequency",
+            "weekly",
+        ]
+    )
+
+    assert code == 1
