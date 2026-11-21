@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` (2026-11-21, P3-04 and P3-05 verified) |
 | Date opened | 2026-10-15 |
 | Date decided | — |
 | Owner | Platform architect |
@@ -37,7 +37,9 @@ Implement **one** PostgreSQL incremental extract path parameterized by time/wate
 
 ## Evidence / validation
 
-Daily half (P3-04), 2026-11-20, recorded in [Local Airflow](../architecture/airflow-local.md) and [`docs/status-log.md`](../status-log.md): `ingest_postgres_oltp_daily` (`CronDataIntervalTimetable("0 0 * * *", "UTC")`, catchup off) passed its data interval to the P1-06 extract. A scheduled run, a manual run, and a one-day backfill for `[2026-10-17, 2026-10-18)` finished `success`. The backfill landed 2/1/1/1 rows, equal to `COUNT(*)` on `oltp` for that window. Each run triggered `transform_lakehouse`, which finished `success` (PASS=287). The weekly half (P3-05) is not built, so this ADR stays `proposed`.
+Daily half (P3-04), 2026-11-20, recorded in [Local Airflow](../architecture/airflow-local.md) and [`docs/status-log.md`](../status-log.md): `ingest_postgres_oltp_daily` (`CronDataIntervalTimetable("0 0 * * *", "UTC")`, catchup off) passed its data interval to the P1-06 extract. A scheduled run, a manual run, and a one-day backfill for `[2026-10-17, 2026-10-18)` finished `success`. The backfill landed 2/1/1/1 rows, equal to `COUNT(*)` on `oltp` for that window. Each run triggered `transform_lakehouse`, which finished `success` (PASS=287). (The daily DAG has run with catchup on since 2026-11-20 05:20Z.)
+
+Weekly half (P3-05), 2026-11-21, recorded in [Local Airflow](../architecture/airflow-local.md#weekly-postgresql-re-extract-p3-05) and [`docs/status-log.md`](../status-log.md). Grain and purpose: `ingest_postgres_oltp_weekly` (`CronDataIntervalTimetable("0 0 * * 1", "UTC")`, catchup on) re-extracts the trailing seven days `[W-8, W-1)` through the same extract. It does not produce a separate weekly grain. It is the safety net for late commits, rows whose `updated_at` falls in a day the daily run already read. A late seller missed by the daily window reached Silver after a manual weekly run, the row the daily run had landed stayed one row, and a cleared re-run changed no count.
 
 ## Revisit when
 

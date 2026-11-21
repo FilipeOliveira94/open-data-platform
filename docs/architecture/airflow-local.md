@@ -16,7 +16,7 @@ Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-sch
 
 `platform_health` is the P3-01 smoke DAG: one `BashOperator` that prints `platform_health ready`, with no schedule. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
 
-P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 adds `ingest_postgres_oltp_daily`, the daily schedule on the PostgreSQL extract, which then triggers `transform_lakehouse`. P3-05 sets the weekly schedule. Phase 4 sets the CDC schedule. Backfill parameters stay P3-06.
+P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 adds `ingest_postgres_oltp_daily`, the daily schedule on the PostgreSQL extract. Since P3-13 every ingestion DAG emits a raw Asset that schedules `transform_lakehouse`. P3-05 adds `ingest_postgres_oltp_weekly`, a trailing seven-day re-extract for late commits. Phase 4 sets the CDC schedule. Backfill parameters stay P3-06.
 
 Since P3-04 every DAG sets `is_paused_upon_creation=True`. A DAG that appears for the first time is paused, and a run created while it is paused stays `queued`. Unpause a DAG before you trigger it:
 
@@ -308,9 +308,43 @@ Idempotency:
 - Every caught-up run emits an Asset event. Events that arrive while a refresh runs start one follow-up refresh, which promotes every new window at once (P3-13).
 - The `dt=` segment is the real ingestion date. A retry that crosses UTC midnight writes the same window under the next `dt`. The content is the same and Silver deduplicates it.
 
-Late commits are accepted and documented. A row whose `updated_at` falls before midnight but whose transaction commits after the 00:00Z run is not in that day's window. The weekly window (P3-05) and backfills (P3-06) are the safety net. Streaming CDC (Phase 4) is the exact path.
+Late commits are accepted and documented. A row whose `updated_at` falls before midnight but whose transaction commits after the 00:00Z run is not in that day's window. The [weekly re-extract](#weekly-postgresql-re-extract-p3-05) and backfills (P3-06) are the safety net. Streaming CDC (Phase 4) is the exact path.
 
 Since P3-13 `transform_lakehouse` promotes only the new raw objects and rebuilds only the Silver datasets they changed. Measured costs are in [Bronze layer](bronze-layer.md#incremental-refresh-p3-13).
+
+## Weekly PostgreSQL re-extract (P3-05)
+
+`ingest_postgres_oltp_weekly` re-extracts seven days of the OLTP tables through the same P1-06 extract and `postgres_extract_task` as the daily DAG. Purpose, against the daily grain: the daily run at `D 00:00Z` reads `[D-1, D)` once, so a row whose `updated_at` falls in that day but whose transaction commits after the run is never in a daily window. The weekly run reads those days again after they had time to settle.
+
+| Setting | Value |
+| --- | --- |
+| Timetable | `CronDataIntervalTimetable("0 0 * * 1", timezone="UTC")`, Monday 00:00Z |
+| Data interval | `[W-7, W)` for the run at Monday `W 00:00Z` |
+| Extract window | The data interval shifted back one day: `[W-8, W-1)`, Sunday 00:00Z to Sunday 00:00Z (Sunday through Saturday). Rendered as `data_interval_start.subtract(days=1)` and `data_interval_end.subtract(days=1)` |
+| Catchup | `True`, `start_date` 2026-11-16. The first scheduled run is 2026-11-23 and extracts `[2026-11-15, 2026-11-22)`. Missed weeks run one at a time, oldest first |
+| `max_active_runs` | 1 |
+| Paused at creation | Yes |
+| Execution id | `params.execution_id or run_id`: the weekly DAG's own run id, never a daily one |
+| After the extract | Asset event `odp-raw://postgres_oltp`, which schedules `transform_lakehouse` (P3-13) |
+
+Why one day of lag. With `[W-7, W)` the last day of the window, Sunday, would have the same 00:00Z edge as its daily run: a Sunday row committed after Monday 00:00Z would miss both. With `[W-8, W-1)` every day in the window had at least one full day after its daily run before the weekly run reads it. Consecutive windows tile without gap or overlap (`test_weekly_windows_tile_without_gaps`). Filipe approved the shift on 2026-11-21; the roadmap text said `[W-7, W)`.
+
+Pipeline design checklist:
+
+| Question | Answer |
+| --- | --- |
+| Change type | `incremental_window`. The weekly execution repeats rows the daily executions already landed. Silver keeps the latest `updated_at` per key, so a repeated row stays one row; a tie keeps identical values and only the lineage columns may point at the weekly execution |
+| Window and watermark | From the data interval only, no stored watermark. A missed week is caught up. Overlap with the daily windows is the point of the DAG. Not covered: a row committed after the weekly run that covers its `updated_at`; backfill (P3-06) and CDC (Phase 4) cover it |
+| Re-run and backfill | A cleared run keeps its run id and overwrites the same raw keys; identical content keeps the ETag and Bronze does not promote it again. A new run of the same week writes a new execution; Silver deduplicates. Both proven below |
+| Deletes | A hard delete is never extracted. The row stays in Silver and Gold (P3-12). CDC (Phase 4) is the delete path |
+| What a run reads | PostgreSQL: seven days of `updated_at`. Bronze: only the weekly objects (P3-13). Silver rebuilds the `postgres_oltp` tables from Bronze, which grows with history (P3-13 behavior). Raw keeps each day twice: once daily, once weekly |
+| Reader view | Unchanged: atomic replace (P3-11) |
+| Ownership and concurrency | Monday 00:00Z starts the daily and the weekly run together. Both only read PostgreSQL and write different raw prefixes (`execution_id` differs). Their two Asset events lead to at most one extra transform run (`batch_asset_events=True`) |
+| Trigger | The schedule or a manual trigger with `-l`. Downstream: the raw Asset |
+| Failure | A failed extract writes no `_COMPLETE` marker and emits no Asset event. Retries (2) keep the run id and overwrite the same keys. Silver reads every window, complete or not, for `incremental_window`; a partial weekly object only repeats rows |
+| Evidence | `scripts/p3_05_weekly_check.sh`, below |
+
+A manual trigger needs `-l`. `airflow dags trigger ingest_postgres_oltp_weekly -l <now>` gets the last complete Monday week before the trigger time as its data interval; on 2026-11-21 that is `[2026-11-09, 2026-11-16)`, so the extract window is `[2026-11-08, 2026-11-15)`. Without `-l` the bounds render empty and the extract fails before it connects.
 
 ## Lakehouse refresh trigger (P3-13)
 
@@ -388,3 +422,22 @@ Unit checks for this issue: `uv run pytest tests/unit` → 364 passed. `uv run r
 | `AirflowTaskTimeout` hierarchy | Derives from `BaseException`, as does `AirflowTaskTerminated`. Confirmed |
 | `airflow dags trigger -l` | Diverged from the plan. The flag sets the logical date only. The data interval comes from the trigger time, so `-l 2026-10-17…` does not select that window. A specific past window used `airflow backfill create` |
 | `airflow dags trigger` without `-l` | No logical date and no data interval. The daily extract would fail on empty bounds |
+
+## Verification (2026-11-21, P3-05)
+
+`scripts/p3_05_weekly_check.sh` ran on the local stack (Airflow profile, Trino). `scripts/p3_05_late_commit.py` plants synthetic sellers with bound parameters and prints counts only; the Trino queries hold window bounds and table names, no key or value. Output went to `.local/p3-05/`.
+
+| Step | Result |
+| --- | --- |
+| On-time seller, `updated_at` 2026-11-13 06:00Z, committed before the daily run | PostgreSQL window `[2026-11-13, 2026-11-14)`: 1 seller |
+| `airflow backfill create` daily for 2026-11-13 | `backfill__2026-11-14T00:00:00+00:00` success in 1.5 s. Asset-triggered transform success in 106 s. Silver window: 1 seller; Bronze window: 1 row |
+| Late seller, `updated_at` 2026-11-13 12:00Z, committed after the daily run | PostgreSQL window: 2 sellers. Silver window still 1: the daily window missed it |
+| `airflow dags trigger ingest_postgres_oltp_weekly -l 2026-11-21T15:51:03+00:00` | `manual__2026-11-21T15:51:08.631343+00:00` success; extract 1.9 s. Raw key `sellers_2026-11-08_2026-11-15.json`. Asset-triggered transform success in 105 s |
+| After the weekly run | Silver sellers 5 → 6, 6 distinct keys. Silver window 2 = PostgreSQL window 2. Bronze window 3 rows: the on-time seller from the daily and the weekly execution, the late seller once. Customers, orders, and order items: 2 rows, 2 keys each, unchanged |
+| `airflow tasks clear` of the same weekly run | Extract attempt 2 success in 1.1 s, same key. Transform success in 6.7 s. Silver and Bronze counts unchanged |
+
+An earlier pass of the same script on 2026-11-12, a day with no seller before the late commit, also passed. It planted one more synthetic seller (`updated_at` 2026-11-12 12:00Z). The three synthetic sellers stay in PostgreSQL, raw, Silver, and Gold. Their ids start with `p3-05-late-`.
+
+Not run: a scheduled weekly run. The first one is 2026-11-23 00:00Z.
+
+Unit checks: `uv run pytest tests/unit` → 417 passed, with five new DagBag tests for the weekly timetable, intervals, rendered window, tiling, and empty bounds. `make lint` passed.

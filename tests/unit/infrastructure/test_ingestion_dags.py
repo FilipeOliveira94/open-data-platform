@@ -1,4 +1,4 @@
-"""Contract checks for the ingestion DAG files (P3-02, P3-04). No Compose required."""
+"""Contract checks for the ingestion DAG files (P3-02 to P3-05). No Compose required."""
 
 from __future__ import annotations
 
@@ -24,18 +24,23 @@ DAG_FILES = {
     "transform_lakehouse.py",
     "reconcile_gold.py",
     "ingest_postgres_oltp_daily.py",
+    "ingest_postgres_oltp_weekly.py",
     *ENTRYPOINTS,
 }
 
 # The PostgreSQL extract vector lives in ingest_common.postgres_extract_task.
-EXTRACT_HELPER_DAGS = {"ingest_postgres_oltp.py", "ingest_postgres_oltp_daily.py"}
+EXTRACT_HELPER_DAGS = {
+    "ingest_postgres_oltp.py",
+    "ingest_postgres_oltp_daily.py",
+    "ingest_postgres_oltp_weekly.py",
+}
 
 
 def _text(name: str) -> str:
     return (DAG_DIR / name).read_text(encoding="utf-8")
 
 
-def test_dag_directory_matches_the_p3_02_to_p3_04_set() -> None:
+def test_dag_directory_matches_the_p3_02_to_p3_05_set() -> None:
     names = {path.name for path in DAG_DIR.iterdir() if path.name != "__pycache__"}
     assert names == DAG_FILES
 
@@ -114,6 +119,19 @@ def test_daily_extract_dag_derives_the_window_and_emits_the_raw_asset() -> None:
     assert "SELECT" not in text.upper()
     manual = _text("ingest_postgres_oltp.py")
     assert "TriggerDagRunOperator" not in manual
+
+
+def test_weekly_extract_dag_lags_the_interval_and_emits_the_raw_asset() -> None:
+    text = _text("ingest_postgres_oltp_weekly.py")
+    assert 'CronDataIntervalTimetable("0 0 * * 1", timezone="UTC")' in text
+    assert "catchup=True" in text
+    assert "max_active_runs=1" in text
+    assert "is_paused_upon_creation=True" in text
+    assert "data_interval_start.subtract(days=1).isoformat()" in text
+    assert "data_interval_end.subtract(days=1).isoformat()" in text
+    assert "TriggerDagRunOperator" not in text
+    assert "postgres_extract_task(WINDOW_START, WINDOW_END)" in text
+    assert "SELECT" not in text.upper()
 
 
 def test_extract_and_seed_stay_separate() -> None:
