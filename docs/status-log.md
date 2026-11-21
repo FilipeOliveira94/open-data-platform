@@ -4,6 +4,16 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-21 — Review of verified issues
+
+Every issue marked verified (Phases 0–3) was reviewed for data engineering soundness, without taking an ADR as proof. Findings, with code paths, severity, and the fix issue: [`docs/reviews/2026-11-21-verified-issues-review.md`](reviews/2026-11-21-verified-issues-review.md).
+
+19 pipeline and model findings (R1–R19) and 7 test findings (T1–T7). Highest: a failed `bronze_checks` or `silver_checks` is bypassed by the next refresh with no new raw objects, which skips the check and builds the next layer (R1); `mart_review_drivers` counts a review once per order item (R2); `on_time_handoff_rate` counts cancelled and unshipped orders as late (R3); money is `DOUBLE` (R4); the Bronze `MERGE` scans the whole unpartitioned table (R5); the gap report misses trailing windows (R7). These come from reading the code. None was reproduced on the stack for this review.
+
+Commands: `uv run pytest tests/unit` passed 444. `uv run pytest tests/integration` against local Compose passed 5 and failed 1: `test_olist_ingest_round_trip_overwrites_the_same_object` has failed since the P1-10 structural check (`1636d49`, 2026-10-26), because it appends a one-column row (T1). Those runs left 48 `_COMPLETE` markers of the test executions in `odp-raw` (T2); they were deleted.
+
+Roadmap: new P3-16, P3-17, P3-18 (before P3-14) and P6-09; P3-07, P3-08, P3-09, P3-10, P3-15, P4-01, P4-04, P5-07, P6-04, P6-06, and P6-07 amended. The Phase 3 missed-window acceptance is reopened. No issue status changed. `PROJECT_STATUS.md` risks no longer list the Silver `DROP` and `full_refresh` limits that P3-11 and P3-12 closed.
+
 ### 2026-11-21 — P3-06 window coverage, gap report, and backfill
 
 `src/open_data_platform/ingestion/coverage.py` adds the coverage ledger `ingestion_state.extract_coverage` in the catalog database ([ADR-0025](decisions/0025-extract-window-coverage-ledger.md)) and the gap report (`make coverage-report FREQUENCY=daily|weekly`). The PostgreSQL extract writes one row per dataset (source, dataset, execution id, frequency, window, DAG id, Airflow run id, row count) in one transaction after every `_COMPLETE` marker. A `CHECK` ties `frequency` to the window length; Filipe asked for the column during planning. The DAGs pass `--frequency`, `--dag-id`, and `--airflow-run-id`. Backfill parameters for the daily and weekly DAGs are in [Local Airflow](architecture/airflow-local.md#backfill-parameters).

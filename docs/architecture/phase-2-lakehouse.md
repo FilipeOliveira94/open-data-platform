@@ -46,7 +46,7 @@ raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_na
 
 Bronze, Silver, and Gold Iceberg tables have no partition spec. `CREATE TABLE` sets `format-version` 2 and a location. It does not set `PARTITIONED BY`. dbt does not set `partitioned_by`.
 
-Bronze keeps `dt` as a `STRING` column copied from the raw key. The write replaces the whole table, so the column is not an Iceberg partition.
+Bronze keeps `dt` as a `STRING` column copied from the raw key. It is not an Iceberg partition. Since P3-13 the scheduled Bronze write is one `MERGE` per dataset, and without a partition that `MERGE` joins against the whole table; P3-08 partitions Bronze by `dt` to bound it ([review R5](../reviews/2026-11-21-verified-issues-review.md)).
 
 Silver `PARTITION BY` is the window of `ROW_NUMBER` used to keep one survivor per key. The contract primary key is that list, except geolocation, which uses the payload columns. That clause does not create an Iceberg partition.
 
