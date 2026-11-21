@@ -47,6 +47,7 @@ Short index of architecture choices for the Open Data Platform. **Rationale, alt
 | D-020 | Raw storage layout | Object-store `raw/{source_id}/{dataset}/dt=…/execution_id=…/`; metadata `source_id`, `execution_id`, `_ingestion_ts`; `data/raw/` is local staging only | Package helpers + unit tests (P1-02) | `approved` | [ADR-0020](docs/decisions/0020-raw-storage-layout.md) |
 | D-021 | BrasilAPI CEP | Not a platform source. Geography is Olist geolocation plus IBGE, Gold schema `brazil_geography` | No CEP dataset (P1-09 withdrawn) | `approved` | [ADR-0021](docs/decisions/0021-withdraw-brasilapi-cep.md) |
 | D-024 | Incremental lakehouse refresh | Promotion registry (raw key + ETag) in the catalog PostgreSQL; Bronze `MERGE` append of new complete objects; Silver rebuilds pending datasets; Gold while pending; Asset-scheduled transform; `--full-rebuild` for recovery | `lakehouse_state` schema, `lakehouse/refresh.py`, raw Assets on every ingestion DAG with batched events (P3-13) | `approved` | [ADR-0024](docs/decisions/0024-incremental-lakehouse-refresh.md) |
+| D-025 | Extract window coverage ledger | `ingestion_state.extract_coverage` in the catalog PostgreSQL, one row per dataset per successful extract, `frequency` checked against the window length; gap report per frequency | `ingestion/coverage.py`, `make coverage-report`, PostgreSQL execution id `<dag_id>__<run_id>` (P3-06) | `approved` | [ADR-0025](docs/decisions/0025-extract-window-coverage-ledger.md) |
 
 `—` means not yet implemented or not yet verified in the repository.
 
