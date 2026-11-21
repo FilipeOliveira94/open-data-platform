@@ -16,7 +16,7 @@ Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-sch
 
 `platform_health` is the P3-01 smoke DAG: one `BashOperator` that prints `platform_health ready`, with no schedule. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
 
-P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 adds `ingest_postgres_oltp_daily`, the daily schedule on the PostgreSQL extract, which then triggers `transform_lakehouse`. P3-05 adds `ingest_postgres_oltp_weekly`, a trailing seven-day re-extract for late commits. Phase 4 sets the CDC schedule. Backfill parameters stay P3-06.
+P3-02 adds the ingestion wrappers. They have no schedule. P3-03 adds `transform_lakehouse` (no schedule) and `reconcile_gold` (weekly). P3-04 adds `ingest_postgres_oltp_daily`, the daily schedule on the PostgreSQL extract. Since P3-13 every ingestion DAG emits a raw Asset that schedules `transform_lakehouse`. P3-05 adds `ingest_postgres_oltp_weekly`, a trailing seven-day re-extract for late commits. Phase 4 sets the CDC schedule. Backfill parameters stay P3-06.
 
 Since P3-04 every DAG sets `is_paused_upon_creation=True`. A DAG that appears for the first time is paused, and a run created while it is paused stays `queued`. Unpause a DAG before you trigger it:
 

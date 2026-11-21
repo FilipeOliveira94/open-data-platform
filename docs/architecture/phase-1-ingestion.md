@@ -44,8 +44,8 @@ CDC does not replace scheduled batch. Daily and weekly refreshes share the Postg
 
 | Use case | Phase 1 | Later |
 | --- | --- | --- |
-| Daily batch | `extract_postgres_oltp` with a one-day window. Both bounds are UTC midnight. The predicate is `updated_at >= start AND updated_at < end`. | Airflow daily schedule (P3-04). ADR-0007 stays `proposed`. |
-| Weekly batch | The same function with a seven-day window. | Airflow weekly schedule (P3-05). |
+| Daily batch | `extract_postgres_oltp` with a one-day window. Both bounds are UTC midnight. The predicate is `updated_at >= start AND updated_at < end`. | Verified: `ingest_postgres_oltp_daily` reads `[D-1, D)` at 00:00Z with catchup (P3-04). ADR-0007 is `approved`. See [Local Airflow](airflow-local.md#daily-postgresql-schedule-p3-04). |
+| Weekly batch | The same function with a seven-day window. | Verified: `ingest_postgres_oltp_weekly` re-extracts `[W-8, W-1)` every Monday 00:00Z as the safety net for late commits (P3-05). See [Local Airflow](airflow-local.md#weekly-postgresql-re-extract-p3-05). |
 | Streaming | Not in this phase. | Logical replication, Debezium, Kafka, and Spark Structured Streaming (Phase 4). ADR-0008 and ADR-0014 stay `proposed`. |
 
 The clickstream, Olist snapshots, DummyJSON, and IBGE are batch landings. They are not the daily, weekly, or CDC paths.
