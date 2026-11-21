@@ -27,6 +27,7 @@ EXPECTED_DAGS = {
     "transform_lakehouse",
     "reconcile_gold",
     "ingest_postgres_oltp_daily",
+    "ingest_postgres_oltp_weekly",
 }
 
 POOL = "lakehouse_gold"
@@ -50,6 +51,7 @@ TRANSFORM_ORDER = (
 )
 
 DAILY = "ingest_postgres_oltp_daily"
+WEEKLY = "ingest_postgres_oltp_weekly"
 
 INGEST_ENTRYPOINTS = {
     "ingest_olist": ("open_data_platform.ingestion.olist",),
@@ -91,8 +93,8 @@ def test_every_dag_imports_without_errors(dagbag) -> None:
 def test_wrapper_tasks_share_the_p3_02_defaults(dagbag) -> None:
     for dag_id in EXPECTED_DAGS - {"platform_health"}:
         dag = dagbag.dags[dag_id]
-        # The daily extract catches up missed windows (P3-04).
-        assert dag.catchup is (dag_id == DAILY)
+        # The daily and weekly extracts catch up missed windows (P3-04, P3-05).
+        assert dag.catchup is (dag_id in {DAILY, WEEKLY})
         for task in dag.tasks:
             assert task.retries == 2, (dag_id, task.task_id)
             assert task.retry_delay == timedelta(minutes=2)
@@ -337,6 +339,124 @@ def test_daily_window_without_interval_renders_empty_bounds(dagbag) -> None:
         patch.undo()
 
 
+def test_weekly_dag_runs_monday_utc_midnight_with_catchup(dagbag) -> None:
+    from airflow.timetables.interval import CronDataIntervalTimetable
+
+    dag = dagbag.dags[WEEKLY]
+    timetable = _core_timetable(dag)
+    assert isinstance(timetable, CronDataIntervalTimetable)
+    assert timetable.summary == "0 0 * * 1"
+    assert str(timetable._timezone) == "UTC"
+    assert dag.catchup is True
+    assert dag.start_date == datetime(2026, 11, 16, tzinfo=UTC)
+    assert dag.max_active_runs == 1
+    assert dag.is_paused_upon_creation is True
+    assert set(dag.params.keys()) == {"execution_id"}
+    assert dag.task_ids == ["extract"]
+    vector = _vector(dag.get_task("extract"))
+    assert vector[:3] == ["-m", "open_data_platform.ingestion.postgres_oltp", "extract"]
+
+
+def test_weekly_intervals_are_monday_to_monday_in_order(dagbag) -> None:
+    import pendulum
+    from airflow.timetables.base import TimeRestriction
+
+    dag = dagbag.dags[WEEKLY]
+    timetable = _core_timetable(dag)
+    utc = pendulum.timezone("UTC")
+    restriction = TimeRestriction(
+        earliest=pendulum.instance(dag.start_date), latest=None, catchup=dag.catchup
+    )
+    first = timetable.next_dagrun_info(
+        last_automated_data_interval=None, restriction=restriction
+    )
+    assert first.data_interval.start == pendulum.datetime(2026, 11, 16, tz=utc)
+    assert first.data_interval.end == pendulum.datetime(2026, 11, 23, tz=utc)
+    assert first.run_after == first.data_interval.end
+    # After a gap the scheduler runs each missed week, oldest first.
+    nxt = timetable.next_dagrun_info(
+        last_automated_data_interval=first.data_interval, restriction=restriction
+    )
+    assert nxt.data_interval.start == pendulum.datetime(2026, 11, 23, tz=utc)
+    assert nxt.data_interval.end == pendulum.datetime(2026, 11, 30, tz=utc)
+    # A manual run gets the last complete week before its run_after.
+    manual = timetable.infer_manual_data_interval(
+        run_after=pendulum.datetime(2026, 11, 21, 15, 0, tz=utc)
+    )
+    assert manual.start == pendulum.datetime(2026, 11, 9, tz=utc)
+    assert manual.end == pendulum.datetime(2026, 11, 16, tz=utc)
+
+
+def test_weekly_window_lags_the_interval_by_one_day(dagbag) -> None:
+    import pendulum
+
+    from open_data_platform.ingestion.postgres_oltp import (
+        validate_window,
+        window_object_name,
+    )
+
+    run_id = "scheduled__2026-11-23T00:00:00+00:00"
+    vector = _render_extract(
+        dagbag.dags[WEEKLY],
+        {
+            "data_interval_start": pendulum.datetime(2026, 11, 16, tz="UTC"),
+            "data_interval_end": pendulum.datetime(2026, 11, 23, tz="UTC"),
+            "params": {"execution_id": ""},
+            "run_id": run_id,
+        },
+    )
+    assert vector[3:] == [
+        "--window-start",
+        "2026-11-15T00:00:00+00:00",
+        "--window-end",
+        "2026-11-22T00:00:00+00:00",
+        "--execution-id",
+        run_id,
+    ]
+    start = datetime.fromisoformat(vector[4])
+    end = datetime.fromisoformat(vector[6])
+    assert validate_window(start, end) == (start, end)
+    assert end - start == timedelta(days=7)
+    assert window_object_name("orders", start, end) == (
+        "orders_2026-11-15_2026-11-22.json"
+    )
+
+
+def test_weekly_windows_tile_without_gaps(dagbag) -> None:
+    import pendulum
+
+    dag = dagbag.dags[WEEKLY]
+    bounds = []
+    for week in range(3):
+        start = pendulum.datetime(2026, 11, 16, tz="UTC").add(weeks=week)
+        vector = _render_extract(
+            dag,
+            {
+                "data_interval_start": start,
+                "data_interval_end": start.add(weeks=1),
+                "params": {"execution_id": ""},
+                "run_id": "r",
+            },
+        )
+        bounds.append((vector[4], vector[6]))
+    for previous, current in zip(bounds, bounds[1:], strict=False):
+        assert previous[1] == current[0]
+
+
+def test_weekly_window_without_interval_renders_empty_bounds(dagbag) -> None:
+    vector = _render_extract(
+        dagbag.dags[WEEKLY],
+        {
+            "data_interval_start": None,
+            "data_interval_end": None,
+            "params": {"execution_id": ""},
+            "run_id": "manual__x",
+        },
+    )
+    assert vector[4] == ""
+    assert vector[6] == ""
+
+
 RAW_OUTLETS = {
     "ingest_olist": {"olist_brazilian_ecommerce", "olist_marketing_funnel"},
     "ingest_dummyjson_products": {"dummyjson_products"},
@@ -344,6 +464,7 @@ RAW_OUTLETS = {
     "ingest_demo_storefront": {"demo_storefront"},
     "ingest_postgres_oltp": {"postgres_oltp"},
     DAILY: {"postgres_oltp"},
+    WEEKLY: {"postgres_oltp"},
 }
 
 

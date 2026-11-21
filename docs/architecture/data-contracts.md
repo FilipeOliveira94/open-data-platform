@@ -76,6 +76,8 @@ Bronze reads each marker and fills `_execution_completed_ts` on every row: the m
 | `incremental_window` | Every window, complete or not; latest `updated_at` per key (unchanged from P2-04) | Same key: no duplicate | Invisible on the batch path: a hard delete is never extracted, so the row stays in Silver and Gold. CDC (Phase 4) is the path that handles deletes | PostgreSQL |
 | `append_only` | Every complete execution; a repeated key keeps the first ingested row | A repeated event key is kept once | Not applicable: events are immutable | Storefront clickstream |
 
+`incremental_window` windows may overlap. Since P3-05 the weekly PostgreSQL re-extract (`ingest_postgres_oltp_weekly`, window `[W-8, W-1)`) lands each day a second time to pick up late commits; Silver keeps one row per key, and a hard delete stays invisible on this path ([Local Airflow](airflow-local.md#weekly-postgresql-re-extract-p3-05)).
+
 For `snapshot`, `full_refresh`, and `append_only`, a Silver build with no complete execution in Bronze fails before the replace (`assert_true` ahead of `CREATE OR REPLACE TABLE`), so the table keeps its previous snapshot instead of becoming empty. `incremental_window` window completeness is left to the coverage manifest of P3-06.
 
 `append_only` keeps `event_time` as the event clock. A late event (ingested after events with a later `event_time`) keeps its own `event_time`, and Gold groups by it (`fct_storefront_events`), not by ingestion time.

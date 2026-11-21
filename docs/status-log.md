@@ -4,6 +4,16 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-21 — P3-05 weekly PostgreSQL re-extract
+
+`airflow/dags/ingest_postgres_oltp_weekly.py` runs on `CronDataIntervalTimetable("0 0 * * 1", "UTC")` with `catchup=True`, `max_active_runs=1`, paused at creation, and `start_date` 2026-11-16 (first scheduled run 2026-11-23). It calls `postgres_extract_task` with the data interval shifted back one day, `[W-8, W-1)`, instead of the `[W-7, W)` in the acceptance text: Filipe approved the shift so the last day of the window does not share the 00:00Z edge with its daily run. The execution id is the weekly run id. A successful extract emits `raw_postgres_oltp`, which schedules `transform_lakehouse`.
+
+`scripts/p3_05_weekly_check.sh` (helper `scripts/p3_05_late_commit.py`, bound parameters, counts only) passed on the local stack. One seller with `updated_at` 2026-11-13 06:00Z was committed and landed by the daily backfill `backfill__2026-11-14T00:00:00+00:00`. A second seller in the same day, committed after that run, stayed out of Silver. The manual weekly run `manual__2026-11-21T15:51:08.631343+00:00` (`-l` 2026-11-21T15:51:03Z) extracted `[2026-11-08, 2026-11-15)` in 1.9 s; its transform took 105 s. Silver sellers went 5 → 6 with 6 distinct keys, the Silver day count equalled PostgreSQL (2), and Bronze held 3 rows for the day (the on-time seller in both executions). `airflow tasks clear` of the weekly run re-extracted the same key; its transform took 6.7 s and no count changed. A first pass on 2026-11-12 with no on-time row also passed. Three synthetic `p3-05-late-*` sellers stay in PostgreSQL and the lake. A hard delete stays invisible (P3-12). Not run: a scheduled weekly run.
+
+`uv run pytest tests/unit`: 417 passed. `make lint` passed.
+
+---
+
 ### 2026-11-20 — P3-13 incremental lakehouse refresh
 
 ADR-0024 approved. Bronze promotes only data objects of complete executions whose key is absent from `lakehouse_state.bronze_promotions` or whose ETag changed, reading and staging one object at a time (`lakehouse/bronze.py`, `lakehouse/refresh.py`). One `MERGE INTO` per dataset appends the rows; a rewritten object's old rows are deleted in the same commit. Staging keys and work directories carry the run label. `lakehouse_state.pending_layers` keeps Silver and Gold pending until their write succeeds, and `bronze_refreshes` records each run. `--full-rebuild` (`make live-rebuild`) rebuilds every table. Every ingestion DAG emits an `odp-raw://{source_id}` Asset; `transform_lakehouse` is scheduled on them with `batch_asset_events=True`, and the P3-04 `TriggerDagRunOperator` is gone. A step with nothing to do exits 99 and its task is skipped.
