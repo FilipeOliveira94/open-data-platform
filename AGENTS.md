@@ -152,8 +152,8 @@ The user makes final architectural decisions and approves significant changes.
 
 Before the closing commit of an issue, check each item and update only what the verified evidence supports:
 
-- `ROADMAP.md`: the issue status, a Changelog line, and Last updated.
-- `PROJECT_STATUS.md`: the phase table, Next work consistent with the current acceptance criteria, and Last updated.
+- `ROADMAP.md`: the issue status, one line in the Changelog section (what changed, no evidence; the evidence goes in `docs/status-log.md`), and Last updated.
+- `PROJECT_STATUS.md`: the phase table, Current objective (the next issue and the latest result, not a history), Next work consistent with the current acceptance criteria, and Last updated. Do not copy log entries into it.
 - `docs/status-log.md`: a new entry.
 - An ADR or `DECISIONS.md` entry changes to `approved` only with evidence from a verified issue.
 - `README.md` changes only at phase close.

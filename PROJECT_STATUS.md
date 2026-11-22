@@ -26,15 +26,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 P3-16 is verified. Each Bronze and Silver check is recorded per dataset in `lakehouse_state.layer_checks`. An open check runs again on the next refresh even with no new raw objects, and Silver and Gold do not build on it. The gap report lists windows missed after the last recorded one. The OLTP tables keep `updated_at` with a trigger, the daily extract waits a 15-minute settle lag, one window is read from one snapshot, and a retry keeps its `dt=` ([quality gate](docs/architecture/airflow-local.md#quality-gate-p3-16), [verification](docs/architecture/airflow-local.md#verification-2026-11-22-p3-16)).
 
-A review of every verified issue on 2026-11-21 ([review](docs/reviews/2026-11-21-verified-issues-review.md)) found 19 pipeline and model findings and 8 test findings. The two highest: a failed Bronze or Silver check is bypassed by the next refresh that has no new raw objects, so Gold can be built from data that failed its checks (R1); and `mart_review_drivers` counts a review once per order item (R2). The Olist integration test had failed since 2026-10-26 without notice, because integration tests are not in CI; it and the other unsafe integration tests were fixed with the review. New issues P3-16 to P3-18 run before the close pair; P6-09 adds write-audit-publish. The Phase 3 missed-window acceptance is reopened: the gap report does not list windows after the last recorded one.
+A review of every verified issue on 2026-11-21 ([review](docs/reviews/2026-11-21-verified-issues-review.md)) found 19 pipeline and model findings and 8 test findings. The two highest: a failed Bronze or Silver check is bypassed by the next refresh that has no new raw objects, so Gold can be built from data that failed its checks (R1); and `mart_review_drivers` counts a review once per order item (R2). The Olist integration test had failed since 2026-10-26 without notice, because integration tests are not in CI; it and the other unsafe integration tests were fixed with the review. New issues P3-16 to P3-18 run before the close pair; P6-09 adds write-audit-publish. P3-16 closed R1 and the trailing-gap part of the missed-window acceptance.
 
-P3-06 is verified. Each PostgreSQL extract records its window per dataset in `ingestion_state.extract_coverage` ([ADR-0025](docs/decisions/0025-extract-window-coverage-ledger.md)); `make coverage-report FREQUENCY=daily|weekly` lists gaps and overlaps, and the backfill parameters are documented. The live run found that the daily and weekly run ids collide at Monday 00:00Z and in backfills; the PostgreSQL execution id is now `<dag_id>__<run_id>` ([Local Airflow](docs/architecture/airflow-local.md#verification-2026-11-21-p3-06)).
-
-P3-05 is verified. `ingest_postgres_oltp_weekly` runs Monday 00:00 UTC with catchup and re-extracts `[W-8, W-1)` (the data interval shifted back one day, approved by Filipe) through the same P1-06 extract, as the safety net for late commits. A late seller missed by the daily window reached Silver after the weekly run, without duplicating the daily rows ([Local Airflow](docs/architecture/airflow-local.md#verification-2026-11-21-p3-05)).
-
-A review after P3-04 found four pipeline defects: the daily schedule skipped missed days (fixed in P3-04, `catchup=True`), Silver drops the table readers use, `update_pattern` has no downstream behavior, and every refresh re-reads all raw history. P3-11 to P3-13 address the last three before the weekly schedule. P3-11 is verified: every Spark writer now replaces its table in one Iceberg commit, and dbt Gold already did. P3-12 is verified: each ingestion closes its execution with a completion marker, and Silver selects Bronze rows by `update_pattern` ([data contracts](docs/architecture/data-contracts.md#update-patterns-p3-12)). DummyJSON runs weekly and IBGE monthly. P3-13 is verified ([ADR-0024](docs/decisions/0024-incremental-lakehouse-refresh.md), [result](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13)): Bronze promotes only new raw objects of complete executions with one `MERGE` per dataset, Silver and Gold run only while pending, and `transform_lakehouse` is scheduled on the raw Assets of every ingestion DAG with batched events. A refresh with nothing new writes no table. Every pipeline issue now answers the pipeline design checklist in `ROADMAP.md`.
-
-P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse`. The 1-slot `lakehouse_gold` pool keeps `reconcile_gold` away from every transform step that writes tables. Every DAG is created paused. `run_python_args` stops the child's whole process group. Airflow, Spark, and dbt run in one image. Local Airflow is [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Phase 2 remains [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md).
+Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13): the progress table below and [`docs/status-log.md`](docs/status-log.md).
 
 ## Next work
 
@@ -103,7 +97,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 Phase 2 is **verified**. Index: [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md). Live result: [`docs/architecture/phase-2-live-run.md`](docs/architecture/phase-2-live-run.md) (2026-11-11).
 
-Spark writes Bronze and Silver through the Iceberg JDBC catalog. Trino reads them. dbt-trino builds Gold. That run: catalog probe count 2, Bronze 18/18, Silver 20/20 `ok`, `dbt build` PASS=287, reconciliation PASS=56. Headline anchors match the 2026-11-05 / 2026-11-06 baseline. Bronze and Silver rebuild the whole table (`FULL_OVERWRITE`). Gold replaces each table. There is no Iceberg partition spec and no target file size. `INSERT OVERWRITE` leaves previous Parquet files (P5-07).
+Spark writes Bronze and Silver through the Iceberg JDBC catalog. Trino reads them. dbt-trino builds Gold. That run: catalog probe count 2, Bronze 18/18, Silver 20/20 `ok`, `dbt build` PASS=287, reconciliation PASS=56. Headline anchors match the 2026-11-05 / 2026-11-06 baseline. At Phase 2 close Bronze and Silver rebuilt the whole table (`FULL_OVERWRITE`); P3-13 made the refresh incremental. Gold replaces each table. There is no Iceberg partition spec and no target file size. `INSERT OVERWRITE` leaves previous Parquet files (P5-07).
 
 Closed Phase 2 narrative: [`ROADMAP.md`](ROADMAP.md) (Phase 2), [`docs/status-log.md`](docs/status-log.md).
 
@@ -164,8 +158,9 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 ## Program roadmap
 
-| Phase | Scope | Status |
-| --- | --- | --- |
+Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase overview.
+
+--- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
@@ -182,14 +177,12 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 ## Risks and limitations
 
-- D-006 and D-007 are `approved`. The daily (P3-04) and weekly (P3-05) schedules are built.
 - `docker compose --profile orchestration stop` with no service names also stops PostgreSQL and MinIO. Stop the three Airflow services by name. The `spark` and Trino services are on the `lakehouse` profile and stay up.
 - Spark `local[*]` runs inside the Airflow scheduler container and shares its CPU and memory. A full `transform_lakehouse` run took 10 min 12 s; the 30-minute timeout applies per task.
 - The `lakehouse_gold` pool is held per task, not per run. A waiting `dbt_reconcile` can take the slot between two transform writes and read a half-rebuilt lakehouse (no table changes while it reads). On 2026-11-20 that stretched one transform run to 20 min 22 s.
 - DAGs already in the `airflow` metadata database keep their paused state; `is_paused_upon_creation=True` applies only to new DAGs. A manual daily trigger gets the last complete UTC day, whatever `-l` says; `airflow dags trigger` without `-l` has no data interval and the extract fails.
 - Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window; the weekly re-extract (P3-05) picks them up. A row committed after the weekly run that covers its `updated_at` is still missed: P3-06 backfill and CDC (Phase 4). The first scheduled weekly run is 2026-11-23; only manual weekly runs have been exercised. Three synthetic `p3-05-late-*` sellers stay in the lake; the 2026-11-21 integration-test run removed them from local PostgreSQL (review T8).
 - Since P3-13 a refresh reads only new raw objects, but it still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table. The Bronze `MERGE` joins against the whole unpartitioned table, so its scan grows with history (review R5, P3-08). Raw executions without a `_COMPLETE` marker never enter Bronze.
-- Until P3-16, a failed `bronze_checks` or `silver_checks` does not stop the next refresh: with no new raw objects the check step skips and the next layer builds (review R1). After a failed check, pause `transform_lakehouse` until the cause is fixed.
 - Until P3-17, `mart_review_drivers` counts a review once per order item and `on_time_handoff_rate` counts cancelled and unshipped orders as late (review R2, R3). Until P3-18, money columns are `DOUBLE`.
 - Silver and Gold are visible to readers before their checks run, and Gold models are replaced one at a time (review R6, P6-09).
 - Integration tests write to `ODP_TEST_RAW_BUCKET` (default `odp-test-raw`) and seed a scratch PostgreSQL database. Before that fix, the PostgreSQL integration test truncated the local `oltp` tables (review T8); a run on 2026-11-21 reset local PostgreSQL to the fixture.
@@ -219,36 +212,4 @@ Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only).
 
 ## Log
 
-Recent entries only. Older history: [`docs/status-log.md`](docs/status-log.md).
-
-### 2026-11-21 — P3-05 verified
-
-`ingest_postgres_oltp_weekly` re-extracts `[W-8, W-1)` every Monday 00:00 UTC with catchup. `scripts/p3_05_weekly_check.sh` passed: late commit caught, no duplicate, idempotent re-run. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#verification-2026-11-21-p3-05).
-
-### 2026-11-20 — P3-04 verified
-
-`ingest_postgres_oltp_daily` runs at 00:00 UTC on `CronDataIntervalTimetable`, passes the run's data interval to the P1-06 extract, and then triggers `transform_lakehouse` (run id `ingest_postgres_oltp_daily__<run_id>`, reset on re-run). The 1-slot `lakehouse_gold` pool holds `dbt_reconcile` and the four transform steps that write tables. Every DAG is created paused. `run_python_args` starts the child in its own session and stops the whole process group. Live: scheduled, manual, and backfill daily runs, three triggered transforms at PASS=287, pool serialization with `reconcile_gold`, and an idempotent cleared re-run. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Next issue is P3-05.
-
-### 2026-11-14 — Agent rules consolidated
-
-The Cursor rules are now in `AGENTS.md`, which `CLAUDE.md` imports. `docs/agent-workflow.md` holds the plan, implement, and close prompts. The genesis document is `docs/project-genesis.md`. No issue status changed. Detail: [`docs/status-log.md`](docs/status-log.md).
-
-### 2026-11-13 — P3-03 verified
-
-`transform_lakehouse` runs Bronze → checks → Silver → checks → quarantine staging → `dbt build` through `open_data_platform.lakehouse.medallion_build`, the same module the `live-*` Make targets call. `reconcile_gold` runs the 56 reconciliation tests weekly. One runtime image now holds Airflow, Spark, and dbt; `spark:3.5.8-java17` is a build stage only and dbt is off the host. DAG run: Bronze 18/18, Silver 20/20, quarantine 1_603, PASS=287, reconciliation PASS=56, anchors equal to P2-09. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Next issue is P3-04.
-
-### 2026-11-12 — P3-02 verified
-
-Ingestion DAGs call the Phase 1 CLIs. `execution_id` defaults to the Airflow run id. `platform_env`, the five ingestion runs, and `seed_postgres_oltp` finished `success`. The PostgreSQL window matched `oltp` (1/1/1/2). Storefront 100 lines, DummyJSON 194 products, IBGE 5_571 municipalities, Olist 11 CSV objects. Seed left sellers 5, customers 2, orders 2, and order items 2. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md). Next issue is P3-03.
-
-### 2026-11-12 — P3-01 verified
-
-Airflow `3.4.0` (`apache/airflow:3.4.0-python3.12`) runs on the `orchestration` profile with LocalExecutor. `platform_health` wrote one task log to MinIO, and the object remained after the Airflow services stopped. D-006 is `approved`. Celery and Flower are not a follow-up. Next issue is P3-02. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md).
-
-### 2026-11-11 — README and partition candidate
-
-The README opens with the path from a published number back to the source. Core features are one row each, with state, phase, and core stack. Iceberg partitions for Silver and Gold are a candidate in [`ROADMAP.md`](ROADMAP.md), not an issue. No stack command was run.
-
-### 2026-11-11 — P2-10 verified
-
-Phase 2 documentation is in [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md). It cites the 2026-11-11 live run. No Compose command was run for this issue. Next issue is P3-01.
+Chronological entries live in [`docs/status-log.md`](docs/status-log.md). Do not copy them here.
