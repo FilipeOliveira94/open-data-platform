@@ -36,12 +36,15 @@ Contract logical types become Iceberg types. Metadata columns (`source_id`, `exe
 | `string` | `STRING` |
 | `integer` | `BIGINT` |
 | `number` | `DOUBLE` |
+| `decimal` (`precision`, `scale`) | `DECIMAL(p,s)` (P3-18) |
 | `boolean` | `BOOLEAN` |
 | `timestamp` | `TIMESTAMP` |
 | `date` | `DATE` |
 | `json` (default) | `STRING` unless the source module expands it |
 
 Casts use Spark `TRY_*` helpers. A failed cast becomes null; the row remains if the partition key is still non-null. Olist CSV timestamps use `yyyy-MM-dd HH:mm:ss` first. ISO sources parse ISO-8601 text. Closed-deal booleans accept `True` / `False` text.
+
+A `decimal` cast runs only on plain text that fits as written: `CASE WHEN col RLIKE '^-?(0|[1-9][0-9]{0,9})([.][0-9]{1,2})?$' THEN TRY_CAST(col AS DECIMAL(12,2)) END` for `(12,2)` (`decimal_sql` in `silver/common.py`). A plain Spark cast rounds `'9.999'` to `10.00`; the guard makes that value NULL, like any other failed cast, so Silver never holds a number the source did not send. The same value is a `type_mismatch` finding at ingestion ([data contracts](data-contracts.md#money-p3-18)). Old PostgreSQL raw objects carry the float text of an amount (`10.5`) and new ones its exact text (`10.50`); both cast to the same `DECIMAL`, so a window extracted before and after P3-18 does not change a row.
 
 ### DummyJSON JSON expansion
 
