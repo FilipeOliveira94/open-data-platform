@@ -109,19 +109,32 @@ class Cadence:
 
     ``first_start`` is the start of the first window the DAG covers; each
     window is ``length`` long and the next starts where it ends.
+    ``run_delay`` is how long after its end a window is read: a window is due,
+    and missing it is a gap, once ``end + run_delay`` has passed.
     """
 
     first_start: datetime
     length: timedelta
+    run_delay: timedelta = timedelta(0)
 
+
+# The daily run reads [D-1, D) only after D + SETTLE_LAG (P3-16), so a
+# transaction that wrote just before midnight has committed. The trigger on
+# ``oltp`` keeps ``updated_at`` at the statement time; a transaction still
+# open past the lag lands in the weekly re-extract.
+SETTLE_LAG = timedelta(minutes=15)
 
 # Must match the DAG files (a unit test reads their START_DATE):
-# - ``ingest_postgres_oltp_daily``: START_DATE 2026-11-19, window = interval.
+# - ``ingest_postgres_oltp_daily``: START_DATE 2026-11-19, window = interval,
+#   read after the settle lag.
 # - ``ingest_postgres_oltp_weekly``: START_DATE 2026-11-16 (a Monday), window
-#   = interval shifted back one day, so the first is [2026-11-15, 2026-11-22).
+#   = interval shifted back one day, so the first is [2026-11-15, 2026-11-22),
+#   read one day after its end.
 CADENCES: dict[str, Cadence] = {
-    DAILY: Cadence(datetime(2026, 11, 19, tzinfo=UTC), timedelta(days=1)),
-    WEEKLY: Cadence(datetime(2026, 11, 15, tzinfo=UTC), timedelta(days=7)),
+    DAILY: Cadence(datetime(2026, 11, 19, tzinfo=UTC), timedelta(days=1), SETTLE_LAG),
+    WEEKLY: Cadence(
+        datetime(2026, 11, 15, tzinfo=UTC), timedelta(days=7), timedelta(days=1)
+    ),
 }
 
 
@@ -287,13 +300,19 @@ def coverage_report(
     records: Sequence[CoverageRecord],
     *,
     datasets: Sequence[str],
+    as_of: datetime,
     cadence: Cadence | None = None,
 ) -> CoverageReport:
     """Compare the expected windows of ``frequency`` with ``records``.
 
     Only records of ``frequency`` count. The expected windows run from the
-    cadence's first window to the last recorded window end.
+    cadence's first window to the last window due at ``as_of`` (its end plus
+    the cadence ``run_delay``), or to the last recorded window end when that
+    is later. A DAG that stopped therefore shows its trailing windows as gaps.
     """
+    if as_of.tzinfo is None:
+        msg = "as_of must be timezone-aware"
+        raise CoverageError(msg)
     if cadence is None:
         if frequency not in CADENCES:
             msg = f"no cadence for frequency {frequency!r}"
@@ -311,19 +330,13 @@ def coverage_report(
     in_range = sorted(w for w in by_window if w[0] >= cadence.first_start)
     before = tuple(sorted(w for w in by_window if w[0] < cadence.first_start))
     reruns = tuple(sorted(w for w, ids in executions.items() if len(ids) > 1))
-    if not in_range:
-        return CoverageReport(
-            frequency=frequency,
-            first_window=first,
-            last_window=None,
-            expected_windows=0,
-            before_start=before,
-            rerun_windows=reruns,
-        )
-    last_end = max(end for _, end in in_range)
+    last_end = max((end for _, end in in_range), default=cadence.first_start)
     expected: list[Window] = []
     start = cadence.first_start
-    while start + cadence.length <= last_end:
+    while (
+        start + cadence.length <= last_end
+        or start + cadence.length + cadence.run_delay <= as_of
+    ):
         expected.append((start, start + cadence.length))
         start += cadence.length
     wanted = tuple(datasets)
@@ -341,7 +354,7 @@ def coverage_report(
     return CoverageReport(
         frequency=frequency,
         first_window=first,
-        last_window=max(in_range, key=lambda w: w[1]),
+        last_window=max(in_range, key=lambda w: w[1]) if in_range else None,
         expected_windows=len(expected),
         gaps=gaps,
         overlaps=overlaps,
@@ -382,7 +395,10 @@ def _utc(value: object) -> datetime:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI: ``report --frequency daily|weekly``. Exit 1 on a gap or overlap."""
+    """CLI: ``report --frequency daily|weekly``. Exit 1 on a gap or overlap.
+
+    The report is as of now: every window due by now counts.
+    """
     from open_data_platform.ingestion.postgres_oltp import DATASETS, SOURCE_ID
 
     parser = argparse.ArgumentParser(description="Window coverage gap report.")
@@ -394,7 +410,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         ledger = PostgresCoverageLedger(os.environ)
         records = ledger.load(SOURCE_ID, args.frequency)
-        result = coverage_report(args.frequency, records, datasets=DATASETS)
+        result = coverage_report(
+            args.frequency, records, datasets=DATASETS, as_of=datetime.now(UTC)
+        )
     except (CoverageError, KeyError) as exc:
         log_failure(exc)
         return 2

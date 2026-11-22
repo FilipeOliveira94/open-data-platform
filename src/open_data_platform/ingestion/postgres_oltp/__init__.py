@@ -12,6 +12,16 @@ in that array and is copied to the quarantine key. A value that cannot be
 encoded, including a naive timestamp or a non-finite number, fails the batch
 before the write. Scheduling and catchup stay outside this module. The
 synthetic seed replaces the four ``oltp`` tables.
+
+P3-16:
+
+- The datasets of one window are read in one ``REPEATABLE READ READ ONLY``
+  transaction, so ``orders`` and ``order_items`` come from one snapshot.
+- The extract refuses to run before ``window_end + SETTLE_LAG``. A writer
+  whose transaction is still open then lands in the weekly re-extract.
+- A ``BEFORE UPDATE`` trigger on each table (``schema.sql``) sets
+  ``updated_at`` when an UPDATE does not change it. The extract checks the
+  triggers exist and fails when one is missing (an old schema).
 """
 
 from __future__ import annotations
@@ -21,7 +31,7 @@ import json
 import os
 import re
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -32,6 +42,7 @@ from open_data_platform.contracts.load import load_contracts
 from open_data_platform.ingestion.coverage import (
     FREQUENCIES,
     MANUAL,
+    SETTLE_LAG,
     CoverageError,
     CoverageRecord,
     CoverageSink,
@@ -69,6 +80,16 @@ WATERMARK = "updated_at"
 DATASETS: tuple[str, ...] = ("sellers", "customers", "orders", "order_items")
 _IDENT_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _FIXTURE_NAME = "synthetic.json"
+# BEFORE UPDATE trigger that maintains the watermark (schema.sql).
+UPDATED_AT_TRIGGER = "set_updated_at"
+SNAPSHOT_SQL = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"
+TRIGGER_CHECK_SQL = (
+    "SELECT c.relname FROM pg_catalog.pg_trigger t "
+    "JOIN pg_catalog.pg_class c ON c.oid = t.tgrelid "
+    "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+    "WHERE n.nspname = %s AND t.tgname = %s "
+    "AND NOT t.tgisinternal AND t.tgenabled <> 'D'"
+)
 
 
 class PostgresOltpError(ValueError):
@@ -223,12 +244,19 @@ def extract_postgres_oltp(
     frequency: str = MANUAL,
     dag_id: str | None = None,
     airflow_run_id: str | None = None,
+    now: datetime | None = None,
+    settle_lag: timedelta = SETTLE_LAG,
 ) -> tuple[RawWriteResult, ...]:
     """Extract each selected dataset for ``[window_start, window_end)``.
 
     The same ``execution_id``, ingestion date, and window overwrite the same
-    keys. A structural failure stops the remaining datasets. Objects already
-    written for this execution stay in place.
+    keys. Every dataset is read first, in one read-only snapshot; a read
+    failure writes nothing. A structural failure stops the remaining
+    datasets. Objects already written for this execution stay in place.
+    ``connection`` must have no open transaction.
+
+    The window is read only once ``now`` (default: the current time) is at
+    least ``window_end + settle_lag``.
 
     After every dataset has its completion marker, ``coverage`` receives one
     record per dataset in one call (P3-06). A failed extract records nothing,
@@ -241,9 +269,12 @@ def extract_postgres_oltp(
         validate_frequency(frequency, start, end)
     except CoverageError as exc:
         raise PostgresOltpError(str(exc)) from exc
+    _require_settled(end, settle_lag, now)
     selected = _resolve_datasets(datasets)
     written_at = _require_ingestion_ts(ingestion_ts)
     by_dataset = _contracts_by_dataset(contracts)
+    for dataset in selected:
+        _require_extract_contract(by_dataset[dataset])
     results: list[RawWriteResult] = []
     covered: list[CoverageRecord] = []
     log_stage(
@@ -254,10 +285,12 @@ def extract_postgres_oltp(
         window_end=end.date().isoformat(),
         dataset_count=len(selected),
     )
+    fetched = _fetch_snapshot(
+        connection, [by_dataset[dataset] for dataset in selected], start, end
+    )
     for dataset in selected:
         contract = by_dataset[dataset]
-        _require_extract_contract(contract)
-        columns, rows = _fetch_window(connection, contract, start, end)
+        columns, rows = fetched[dataset]
         body, records = _encode_rows(dataset, contract, columns, rows)
         object_name = window_object_name(dataset, start, end)
         try:
@@ -360,6 +393,10 @@ def main(argv: list[str] | None = None) -> int:
         "seed",
         help="Replace the oltp tables with the synthetic fixture.",
     )
+    commands.add_parser(
+        "apply-schema",
+        help="Create missing oltp tables and (re)create the updated_at triggers.",
+    )
     extract = commands.add_parser(
         "extract",
         help="Write one JSON array per dataset for a half-open window.",
@@ -385,6 +422,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "seed":
             _run_seed()
+        elif args.command == "apply-schema":
+            _run_apply_schema()
         else:
             _run_extract(
                 window_start=args.window_start,
@@ -410,6 +449,17 @@ def _run_seed() -> None:
         seed_synthetic(connection)
     finally:
         connection.close()
+
+
+def _run_apply_schema() -> None:
+    env = os.environ
+    _postgres_settings(env)
+    connection = connect_from_env(env)
+    try:
+        apply_oltp_schema(connection)
+    finally:
+        connection.close()
+    log_stage("schema_applied", source_id=SOURCE_ID)
 
 
 def _run_extract(
@@ -554,6 +604,58 @@ def _resolve_datasets(datasets: Sequence[str] | None) -> tuple[str, ...]:
         raise PostgresOltpError(msg)
     selected = set(datasets)
     return tuple(name for name in DATASETS if name in selected)
+
+
+def _require_settled(
+    window_end: datetime, settle_lag: timedelta, now: datetime | None
+) -> None:
+    current = datetime.now(UTC) if now is None else now
+    if current.tzinfo is None:
+        msg = "now must include a timezone"
+        raise PostgresOltpError(msg)
+    ready = window_end + settle_lag
+    if current < ready:
+        msg = (
+            f"window ending {window_end.isoformat()} is read from "
+            f"{ready.isoformat()} (settle lag {settle_lag})"
+        )
+        raise PostgresOltpError(msg)
+
+
+def _fetch_snapshot(
+    connection: DbConnection,
+    contracts: Sequence[DataContract],
+    window_start: datetime,
+    window_end: datetime,
+) -> dict[str, tuple[list[str], list[Sequence[object]]]]:
+    """Read every dataset in one ``REPEATABLE READ`` read-only transaction."""
+    # Identifier checks run before the first statement reaches the database.
+    for item in contracts:
+        _select_sql(item)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(SNAPSHOT_SQL)
+            cursor.execute(TRIGGER_CHECK_SQL, (SCHEMA, UPDATED_AT_TRIGGER))
+            guarded = {str(row[0]) for row in cursor.fetchall()}
+    except psycopg.Error as exc:
+        _rollback(connection)
+        msg = "PostgreSQL snapshot setup failed"
+        raise PostgresOltpError(msg) from exc
+    missing = [item.dataset for item in contracts if item.dataset not in guarded]
+    if missing:
+        _rollback(connection)
+        msg = (
+            f"oltp tables without the {UPDATED_AT_TRIGGER} trigger: "
+            f"{', '.join(missing)}; run the apply-schema command"
+        )
+        raise PostgresOltpError(msg)
+    fetched = {
+        item.dataset: _fetch_window(connection, item, window_start, window_end)
+        for item in contracts
+    }
+    # Read-only: ending the transaction releases the snapshot.
+    _rollback(connection)
+    return fetched
 
 
 def _fetch_window(
@@ -799,7 +901,24 @@ def _table(dataset: str) -> str:
 
 
 def _statements(script: str) -> tuple[str, ...]:
-    statements = tuple(part.strip() for part in script.split(";") if part.strip())
+    """Split on ``;`` outside ``$$``-quoted bodies (the trigger function)."""
+    parts = script.split("$$")
+    if len(parts) % 2 == 0:
+        msg = "schema script has an unterminated $$ body"
+        raise PostgresOltpError(msg)
+    found: list[str] = []
+    current = ""
+    for index, part in enumerate(parts):
+        if index % 2:
+            current += f"$${part}$$"
+            continue
+        pieces = part.split(";")
+        current += pieces[0]
+        for piece in pieces[1:]:
+            found.append(current)
+            current = piece
+    found.append(current)
+    statements = tuple(item.strip() for item in found if item.strip())
     if not statements:
         msg = "schema script is empty"
         raise PostgresOltpError(msg)

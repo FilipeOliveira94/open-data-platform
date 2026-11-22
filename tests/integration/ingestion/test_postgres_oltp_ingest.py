@@ -183,9 +183,12 @@ def test_windowed_extract_round_trip_overwrites_the_same_object(
             )
 
         with connection.cursor() as cursor:
+            # An explicit updated_at keeps the row in the window; without it
+            # the P3-16 trigger moves the row to the time of the UPDATE.
             cursor.execute(
-                "UPDATE oltp.sellers SET seller_city = %s WHERE seller_id = %s",
-                ("recife", "seller-17"),
+                "UPDATE oltp.sellers SET seller_city = %s, updated_at = %s "
+                "WHERE seller_id = %s",
+                ("recife", _DAY_START + timedelta(seconds=1), "seller-17"),
             )
         connection.commit()
         rewritten = extract_postgres_oltp(
@@ -235,10 +238,191 @@ def test_windowed_extract_round_trip_overwrites_the_same_object(
             DAILY,
             recorded,
             datasets=DATASETS,
+            as_of=_DAY_END,
             cadence=Cadence(_DAY_START, timedelta(days=1)),
         )
         assert report.clean
         assert report.expected_windows == 1
         assert report.rerun_windows == ((_DAY_START, _DAY_END),)
+    finally:
+        connection.close()
+
+
+def _updated_at(connection: psycopg.Connection, seller_id: str) -> datetime:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT updated_at FROM oltp.sellers WHERE seller_id = %s", (seller_id,)
+        )
+        row = cursor.fetchone()
+    connection.commit()
+    assert row is not None
+    return row[0]
+
+
+def test_trigger_maintains_updated_at_when_an_update_omits_it(
+    scratch_env: dict[str, str],
+) -> None:
+    """P3-16 (review R8): the database, not the writer, keeps the watermark."""
+    try:
+        connection = connect_from_env(scratch_env)
+    except PostgresOltpError as exc:
+        pytest.skip(f"PostgreSQL not reachable: {exc}")
+    try:
+        apply_oltp_schema(connection)
+        apply_oltp_schema(connection)  # idempotent: CREATE OR REPLACE
+        seed_synthetic(connection)
+        seeded = _updated_at(connection, "seller-17")
+        assert seeded == _DAY_START  # INSERT keeps the fixture value
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT clock_timestamp()")
+            before = cursor.fetchone()[0]
+            cursor.execute(
+                "UPDATE oltp.sellers SET seller_city = %s WHERE seller_id = %s",
+                ("olinda", "seller-17"),
+            )
+        connection.commit()
+        bumped = _updated_at(connection, "seller-17")
+        assert bumped >= before > seeded
+
+        explicit = _DAY_START + timedelta(hours=2)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE oltp.sellers SET seller_city = %s, updated_at = %s "
+                "WHERE seller_id = %s",
+                ("recife", explicit, "seller-17"),
+            )
+        connection.commit()
+        assert _updated_at(connection, "seller-17") == explicit
+    finally:
+        connection.close()
+
+
+class _CommitAfterOrders:
+    """Connection proxy: once ``orders`` is read, another session commits."""
+
+    def __init__(self, inner: psycopg.Connection, side_effect: Callable[[], None]):
+        self._inner = inner
+        self._side_effect = side_effect
+        self.fired = False
+
+    def cursor(self) -> _CommitAfterOrdersCursor:
+        return _CommitAfterOrdersCursor(self._inner.cursor(), self)
+
+    def commit(self) -> None:
+        self._inner.commit()
+
+    def rollback(self) -> None:
+        self._inner.rollback()
+
+
+class _CommitAfterOrdersCursor:
+    def __init__(self, inner: Any, owner: _CommitAfterOrders) -> None:
+        self._inner = inner
+        self._owner = owner
+
+    @property
+    def description(self) -> Any:
+        return self._inner.description
+
+    def __enter__(self) -> _CommitAfterOrdersCursor:
+        self._inner.__enter__()
+        return self
+
+    def __exit__(self, *exc: object) -> object:
+        return self._inner.__exit__(*exc)
+
+    def execute(self, query: str, params: Any = None) -> object:
+        result = self._inner.execute(query, params)
+        if '"oltp"."orders"' in query and not self._owner.fired:
+            self._owner.fired = True
+            self._owner._side_effect()
+        return result
+
+    def fetchall(self) -> Any:
+        return self._inner.fetchall()
+
+
+def test_one_window_is_read_from_one_snapshot(
+    scratch_env: dict[str, str],
+    test_raw_bucket: str,
+    purge_executions: Callable[[Any, str, str], None],
+) -> None:
+    """P3-16 (review R13): a commit between two reads does not split a window."""
+    try:
+        connection = connect_from_env(scratch_env)
+        writer = connect_from_env(scratch_env)
+    except PostgresOltpError as exc:
+        pytest.skip(f"PostgreSQL not reachable: {exc}")
+    execution = f"p316-{uuid.uuid4().hex}"
+    try:
+        client = _minio_or_skip()
+        purge_executions(client, test_raw_bucket, execution)
+        apply_oltp_schema(connection)
+        seed_synthetic(connection)
+        in_window = _DAY_START + timedelta(hours=12)
+
+        def concurrent_write() -> None:
+            with writer.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE oltp.order_items SET price = price + 1, updated_at = %s "
+                    "WHERE order_id = %s",
+                    (in_window, "order-17"),
+                )
+            writer.commit()
+
+        proxy = _CommitAfterOrders(connection, concurrent_write)
+        results = extract_postgres_oltp(
+            client,
+            proxy,  # type: ignore[arg-type]
+            bucket=test_raw_bucket,
+            execution_id=execution,
+            window_start=_DAY_START,
+            window_end=_DAY_END,
+            ingestion_ts=_INGESTION_TS,
+            datasets=("orders", "order_items"),
+        )
+        assert proxy.fired
+        items = _stored_rows(client, results, "order_items")
+        expected = _fixture_rows("order_items", _DAY_START, _DAY_END)
+        # The extract saw order_items as of the orders read, not the commit.
+        assert [row["price"] for row in items] == [row["price"] for row in expected]
+        with writer.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM oltp.order_items WHERE updated_at = %s",
+                (in_window,),
+            )
+            assert cursor.fetchone()[0] == 1
+        writer.commit()
+    finally:
+        writer.close()
+        connection.close()
+
+
+def test_extract_fails_when_a_table_lost_its_trigger(
+    scratch_env: dict[str, str],
+    test_raw_bucket: str,
+) -> None:
+    try:
+        connection = connect_from_env(scratch_env)
+    except PostgresOltpError as exc:
+        pytest.skip(f"PostgreSQL not reachable: {exc}")
+    try:
+        client = _minio_or_skip()
+        apply_oltp_schema(connection)
+        seed_synthetic(connection)
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TRIGGER set_updated_at ON oltp.orders")
+        connection.commit()
+        with pytest.raises(PostgresOltpError, match="without the set_updated_at"):
+            extract_postgres_oltp(
+                client,
+                connection,
+                bucket=test_raw_bucket,
+                execution_id=f"p316-{uuid.uuid4().hex}",
+                window_start=_DAY_START,
+                window_end=_DAY_END,
+                ingestion_ts=_INGESTION_TS,
+            )
     finally:
         connection.close()

@@ -4,6 +4,21 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-22 — P3-16 quality gate state and extract-window corrections
+
+The promotion registry gains `lakehouse_state.layer_checks` (layer, dataset, status `pending`/`failed`/`passed`, expected Bronze rows, marking and checking run). A Bronze registration opens the Bronze check in the transaction that marks Silver pending; a Silver write opens the Silver check in the transaction that clears its flag. `bronze-checks` and `silver-checks` run every open check of their layer and record each result. `silver` refuses a dataset with an open Bronze check; `stage-quarantine` and `dbt-build` refuse while any check is open. `bronze` and `silver` end as "ran" while a check is open, so the check task is not skipped. Check tasks have `retries=0` (review R1, T3).
+
+`coverage_report` takes `as_of`; expected windows run to the last window due (end plus the cadence run delay: 15 minutes daily, one day weekly), so a stopped DAG reports trailing gaps (R7). `schema.sql` adds the `set_updated_at` `BEFORE UPDATE` trigger (`clock_timestamp()` when an UPDATE leaves `updated_at` unchanged); the extract fails without it, and the new `apply-schema` command adds it without reseeding. The extract reads every dataset of a window in one `REPEATABLE READ, READ ONLY` transaction before writing, and refuses a window before its end plus 15 minutes; the daily DAG has a `settle` sensor (reschedule mode). The PostgreSQL DAGs pass `--ingestion-ts {{ dag_run.run_after.isoformat() }}` (R8, R13, R14).
+
+`scripts/p3_16_gate_check.sh` on the local stack, 2026-11-22 03:17Z:
+- The extract on the old schema failed on the missing trigger, and `apply-schema` created 4 triggers.
+- r1: Bronze wrote 2 tables (30 s). With `orders.expected_rows` raised from 9 to 10, `bronze-checks` failed on `orders` only.
+- r2: no new raw object. `bronze` ran, `bronze-checks` failed again, `silver` failed with `silver blocked` and wrote no table, and `dbt-build` was not pending.
+- r3: with the value restored, the check passed, Silver wrote 4 tables (54 s), the Silver checks passed 4, and dbt PASS=287 (41 s).
+- r4 skipped.
+
+Commands: `uv run pytest tests/unit` 459 passed; `uv run pytest tests/integration` on local Compose 9 passed; `make lint` passed. Not run: the `settle` sensor and a task retry on a live Airflow scheduler (P3-09). Other ingestion DAGs still take `ingestion_ts` from the clock.
+
 ### 2026-11-21 — Review of verified issues
 
 Every issue marked verified (Phases 0–3) was reviewed for data engineering soundness, without taking an ADR as proof. Findings, with code paths, severity, and the fix issue: [`docs/reviews/2026-11-21-verified-issues-review.md`](reviews/2026-11-21-verified-issues-review.md).

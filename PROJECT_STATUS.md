@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-21 (review of verified issues: P3-16 to P3-18 and P6-09 added) |
+| Last updated | 2026-11-22 (P3-16 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,7 +22,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-16** — Quality gate state and extract-window corrections. Not started.
+**P3-17** — Gold metric grain corrections. Not started.
+
+P3-16 is verified. Each Bronze and Silver check is recorded per dataset in `lakehouse_state.layer_checks`. An open check runs again on the next refresh even with no new raw objects, and Silver and Gold do not build on it. The gap report lists windows missed after the last recorded one. The OLTP tables keep `updated_at` with a trigger, the daily extract waits a 15-minute settle lag, one window is read from one snapshot, and a retry keeps its `dt=` ([quality gate](docs/architecture/airflow-local.md#quality-gate-p3-16), [verification](docs/architecture/airflow-local.md#verification-2026-11-22-p3-16)).
 
 A review of every verified issue on 2026-11-21 ([review](docs/reviews/2026-11-21-verified-issues-review.md)) found 19 pipeline and model findings and 8 test findings. The two highest: a failed Bronze or Silver check is bypassed by the next refresh that has no new raw objects, so Gold can be built from data that failed its checks (R1); and `mart_review_drivers` counts a review once per order item (R2). The Olist integration test had failed since 2026-10-26 without notice, because integration tests are not in CI; it and the other unsafe integration tests were fixed with the review. New issues P3-16 to P3-18 run before the close pair; P6-09 adds write-audit-publish. The Phase 3 missed-window acceptance is reopened: the gap report does not list windows after the last recorded one.
 
@@ -36,10 +38,9 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 
 ## Next work
 
-1. **P3-16** — Quality gate state and extract-window corrections. Acceptance: `ROADMAP.md` → P3-16.
-2. **P3-17** — Gold metric grain corrections.
-3. **P3-18** — Exact decimal type for money fields.
-4. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard).
+1. **P3-17** — Gold metric grain corrections. Acceptance: `ROADMAP.md` → P3-17.
+2. **P3-18** — Exact decimal type for money fields.
+3. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard).
 
 ---
 
@@ -60,7 +61,7 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 | P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
 | P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
 | P3-13 | Incremental lakehouse refresh | Verified | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
-| P3-16 | Quality gate state and extract-window corrections | Not started | — |
+| P3-16 | Quality gate state and extract-window corrections | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#quality-gate-p3-16) |
 | P3-17 | Gold metric grain corrections | Not started | — |
 | P3-18 | Exact decimal type for money fields | Not started | — |
 | P3-14 | Live run, result, and consistency check | Not started | — |
@@ -74,8 +75,8 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
 - [x] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily) (P3-05).
 - [ ] Backfills do not corrupt data or create undue duplication.
-- [ ] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06). Trailing gaps are not reported yet (P3-16).
-- [ ] A failed Bronze or Silver check blocks the next layer until it passes, including on a later refresh with no new raw objects (P3-16).
+- [x] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06; trailing gaps since P3-16).
+- [x] A failed Bronze or Silver check blocks the next layer until it passes, including on a later refresh with no new raw objects (P3-16).
 - [ ] Gold metrics keep their documented grain: no fan-out, rate denominators count only eligible rows, and money is exact decimal (P3-17, P3-18).
 - [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
 - [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
@@ -91,10 +92,10 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | Validation | Detail |
 | --- | --- |
-| Date | 2026-11-21 |
-| Environment | Local Compose. PostgreSQL, MinIO, Trino, Airflow 3.4 (`make airflow-up`), and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` |
-| Checks | `scripts/p3_05_weekly_check.sh`: daily backfill for 2026-11-13 with one on-time seller, one late seller committed after it, a manual weekly run (`-l`), and a cleared re-run of the same weekly run |
-| Result | PASS. Weekly extract window `[2026-11-08, 2026-11-15)`, extract 1.9 s, Asset-triggered transform 105 s. Silver sellers 5 → 6 with 6 keys; Silver window = PostgreSQL window = 2; Bronze window 3 rows (the on-time seller in the daily and the weekly execution). Re-run: transform 6.7 s, no count changed. Unit tests: 417 passed |
+| Date | 2026-11-22 |
+| Environment | Local Compose. PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` with the branch source mounted |
+| Checks | `scripts/p3_16_gate_check.sh`: extract on the old schema, `apply-schema`, a manual window, then refresh r1 with a planted Bronze count failure, r2 with no new raw objects, r3 after the fix, and r4 with nothing open. `uv run pytest tests/integration`, `make test`, `make lint` |
+| Result | PASS. Old schema: extract exit 1 (missing trigger). r1 `bronze_checks` failed on `orders` only. r2 re-ran the open check (failed again) and `silver` failed with `silver blocked`, writing no table. r3: check passed, 4 Silver tables, 4 Silver checks passed, dbt PASS=287. r4 skipped. Integration: 9 passed. Unit: 459 passed |
 
 ---
 

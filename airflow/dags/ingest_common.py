@@ -34,6 +34,16 @@ EXECUTION_ID = "{{ params.execution_id or run_id }}"
 # executions apart (P3-06).
 POSTGRES_EXECUTION_ID = "{{ params.execution_id or (dag.dag_id ~ '__' ~ run_id) }}"
 
+# A daily window [D-1, D) is read only after D + SETTLE_LAG (P3-16), so a
+# transaction that wrote just before midnight has committed. Must equal
+# ``open_data_platform.ingestion.coverage.SETTLE_LAG`` (a unit test checks).
+SETTLE_LAG = timedelta(minutes=15)
+
+# A run-stable ingestion timestamp: every try of a run, and a cleared run,
+# writes under the same ``dt=`` prefix, so a retry after midnight does not
+# add a second complete prefix for the same execution (P3-16).
+RUN_INGESTION_TS = "{{ dag_run.run_after.isoformat() }}"
+
 # One slot: tasks that write lakehouse tables and the reconciliation tests
 # never run at the same time. Compose ``airflow-init`` creates the pool.
 LAKEHOUSE_GOLD_POOL = "lakehouse_gold"
@@ -141,9 +151,15 @@ def python_task(
     outlets: list[Asset] | None = None,
     skip_exit_code: int | None = None,
     trigger_rule: str | None = None,
+    retries: int | None = None,
 ) -> PythonOperator:
-    """Return a task that runs ``python`` with the rendered argument vector."""
+    """Return a task that runs ``python`` with the rendered argument vector.
+
+    ``retries`` overrides ``DEFAULT_ARGS``; a deterministic check passes 0.
+    """
     extra: dict[str, object] = {}
+    if retries is not None:
+        extra["retries"] = retries
     if pool is not None:
         extra["pool"] = pool
     if outlets:
@@ -187,6 +203,8 @@ def postgres_extract_task(
             "{{ dag.dag_id }}",
             "--airflow-run-id",
             "{{ run_id }}",
+            "--ingestion-ts",
+            RUN_INGESTION_TS,
         ],
         outlets=[raw_asset("postgres_oltp")],
     )

@@ -43,3 +43,27 @@ CREATE TABLE IF NOT EXISTS oltp.order_items (
     updated_at timestamptz NOT NULL,
     PRIMARY KEY (order_id, order_item_id)
 );
+
+-- P3-16: the database keeps updated_at honest. An UPDATE that does not change
+-- updated_at gets the time the row was changed (clock_timestamp(), not the
+-- transaction start), so a writer that forgets the column is still extracted.
+-- A writer that sets updated_at explicitly keeps its value. INSERTs are not
+-- touched: the column is NOT NULL, so every insert names it.
+CREATE OR REPLACE FUNCTION oltp.set_updated_at() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.updated_at IS NOT DISTINCT FROM OLD.updated_at THEN
+        NEW.updated_at := clock_timestamp();
+    END IF;
+    RETURN NEW;
+END
+$$;
+
+CREATE OR REPLACE TRIGGER set_updated_at BEFORE UPDATE ON oltp.sellers
+    FOR EACH ROW EXECUTE FUNCTION oltp.set_updated_at();
+CREATE OR REPLACE TRIGGER set_updated_at BEFORE UPDATE ON oltp.customers
+    FOR EACH ROW EXECUTE FUNCTION oltp.set_updated_at();
+CREATE OR REPLACE TRIGGER set_updated_at BEFORE UPDATE ON oltp.orders
+    FOR EACH ROW EXECUTE FUNCTION oltp.set_updated_at();
+CREATE OR REPLACE TRIGGER set_updated_at BEFORE UPDATE ON oltp.order_items
+    FOR EACH ROW EXECUTE FUNCTION oltp.set_updated_at();

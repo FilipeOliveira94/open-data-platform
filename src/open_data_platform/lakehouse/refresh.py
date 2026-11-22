@@ -11,6 +11,11 @@ report the step as skipped.
 - Silver rebuilds the datasets pending for it, one Spark script each, then
   clears the flag and marks Gold pending.
 - Gold (quarantine staging and ``dbt build``) runs only while Gold is pending.
+- The quality gate (P3-16): a write marks its check pending in the registry.
+  Silver does not build a dataset whose Bronze check is open, and Gold does
+  not build while any Bronze or Silver check is open. An open check is
+  pending or failed; the check step runs it again on the next refresh even
+  when no new raw object arrives.
 
 ``full_rebuild`` rebuilds every dataset from all complete raw objects and
 every Silver table, and runs Gold. It is for a contract version change or
@@ -34,6 +39,8 @@ from open_data_platform.lakehouse.bronze import (
     promote_bronze,
 )
 from open_data_platform.lakehouse.promotion_registry import (
+    BRONZE,
+    CHECK_LAYERS,
     GOLD,
     GOLD_DATASET,
     SILVER,
@@ -189,6 +196,15 @@ def refresh_silver(
             for entry in available
             if (entry[0].source_id, entry[0].dataset) in pending
         )
+    unchecked = registry.open_checks(BRONZE)
+    held = sorted(
+        f"{contract.source_id}.{contract.dataset} ({unchecked[identity].status})"
+        for contract, _policy in entries
+        if (identity := (contract.source_id, contract.dataset)) in unchecked
+    )
+    if held:
+        msg = f"silver blocked: bronze check not passed for {', '.join(held)}"
+        raise RefreshError(msg)
     sql_dir = work / "silver-sql"
     done: list[tuple[str, str]] = []
     try:
@@ -219,6 +235,25 @@ def refresh_silver(
 def gold_mark(registry: PromotionRegistry) -> datetime | None:
     """The Gold pending mark, or ``None`` when Gold is up to date."""
     return registry.pending(GOLD).get(GOLD_DATASET)
+
+
+def open_checks_summary(registry: PromotionRegistry) -> tuple[str, ...]:
+    """``layer source.dataset (status)`` for every open check, sorted."""
+    return tuple(
+        sorted(
+            f"{layer} {source}.{dataset} ({check.status})"
+            for layer in CHECK_LAYERS
+            for (source, dataset), check in registry.open_checks(layer).items()
+        )
+    )
+
+
+def require_gold_inputs_checked(registry: PromotionRegistry) -> None:
+    """Raise when Gold would build on a Bronze or Silver check that is open."""
+    held = open_checks_summary(registry)
+    if held:
+        msg = f"gold blocked: check not passed for {', '.join(held)}"
+        raise RefreshError(msg)
 
 
 def complete_gold(

@@ -81,7 +81,7 @@ make live-refresh    # every transform step, incremental (same as transform_lake
 make live-rebuild    # every table from all complete raw objects
 ```
 
-PostgreSQL and MinIO must be healthy. The catalog database `iceberg` and the `lakehouse_state` schema are created when they are missing. The bronze step writes `bronze-source-counts.tsv` in the run's work directory: one line per table written in that run, with the registry row total of the dataset. `bronze-checks` compares each with Trino `COUNT(*)`. An empty file means no table was written, and the check step is skipped.
+PostgreSQL and MinIO must be healthy. The catalog database `iceberg` and the `lakehouse_state` schema are created when they are missing. The bronze step writes `bronze-source-counts.tsv` in the run's work directory: one line per table written in that run, with the registry row total of the dataset. Since P3-16 the file is an audit record only. `bronze-checks` reads the open Bronze checks from `lakehouse_state.layer_checks` and compares each stored row total with Trino `COUNT(*)`. It is skipped only when no Bronze check is open ([quality gate](airflow-local.md#quality-gate-p3-16)).
 
 The standalone CLI below has no registry. It renders a full rebuild of each selected dataset. To render a subset after objects are already in the raw bucket:
 

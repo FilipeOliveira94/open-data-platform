@@ -35,7 +35,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from open_data_platform.lakehouse.promotion_registry import PromotionRegistry
+    from open_data_platform.lakehouse.promotion_registry import (
+        OpenCheck,
+        PromotionRegistry,
+    )
 
 DEFAULT_SPARK_DIR = "/opt/odp/spark"
 DEFAULT_DBT_BIN = "/opt/dbt-venv/bin/dbt"
@@ -275,6 +278,106 @@ def run_step(
         raise MedallionBuildError(f"{step}: {exc}") from exc
 
 
+def _bronze_checks(
+    work: Path, env: Mapping[str, str], registry: PromotionRegistry
+) -> bool:
+    """Run every open Bronze check; record each result; fail if any failed.
+
+    The expected count is the registry row total stored with the write that
+    opened the check, so a check left open by an earlier run runs again
+    without that run's work dir.
+    """
+    from open_data_platform.contracts.load import load_contracts
+    from open_data_platform.lakehouse.promotion_registry import BRONZE
+    from open_data_platform.lakehouse.reconciliation import bronze_count_checks
+
+    contracts = load_contracts()
+    open_checks = registry.open_checks(BRONZE)
+    if not open_checks:
+        print("bronze checks: no bronze check is open")
+        return False
+
+    def checks_for(dataset: tuple[str, str]) -> Sequence[tuple[str, str]]:
+        expected = open_checks[dataset].expected_rows
+        if expected is None:
+            msg = f"bronze check of {dataset[0]}.{dataset[1]} has no expected count"
+            raise MedallionBuildError(msg)
+        return bronze_count_checks({f"{dataset[0]}.{dataset[1]}": expected}, contracts)
+
+    return _record_checks(BRONZE, open_checks, checks_for, work.name, env, registry)
+
+
+def _silver_checks(
+    work: Path, env: Mapping[str, str], registry: PromotionRegistry
+) -> bool:
+    """Run every open Silver check; record each result; fail if any failed."""
+    from open_data_platform.lakehouse.promotion_registry import SILVER
+    from open_data_platform.lakehouse.reconciliation import silver_live_checks
+    from open_data_platform.lakehouse.silver import cli as silver
+
+    open_checks = registry.open_checks(SILVER)
+    if not open_checks:
+        print("silver checks: no silver check is open")
+        return False
+    entries = {
+        (entry[0].source_id, entry[0].dataset): entry
+        for entry in silver.selected_entries(
+            source_id=None, datasets=(), all_sources=True
+        )
+    }
+
+    def checks_for(dataset: tuple[str, str]) -> Sequence[tuple[str, str]]:
+        if dataset not in entries:
+            msg = f"silver check of {dataset[0]}.{dataset[1]} has no silver contract"
+            raise MedallionBuildError(msg)
+        return silver_live_checks((entries[dataset],))
+
+    return _record_checks(SILVER, open_checks, checks_for, work.name, env, registry)
+
+
+def _record_checks(
+    layer: str,
+    open_checks: Mapping[tuple[str, str], OpenCheck],
+    checks_for: Callable[[tuple[str, str]], Sequence[tuple[str, str]]],
+    run_label: str,
+    env: Mapping[str, str],
+    registry: PromotionRegistry,
+) -> bool:
+    failed: list[str] = []
+    passed = 0
+    for dataset in sorted(open_checks):
+        name = f"{dataset[0]}.{dataset[1]}"
+        try:
+            count = run_checks(
+                checks_for(dataset), lambda statement: trino_scalar(statement, env)
+            )
+        except MedallionBuildError:
+            registry.record_check(
+                layer,
+                dataset,
+                open_checks[dataset].marked_at,
+                passed=False,
+                run_label=run_label,
+            )
+            print(f"{layer} check failed: {name}", file=sys.stderr, flush=True)
+            failed.append(name)
+            continue
+        registry.record_check(
+            layer,
+            dataset,
+            open_checks[dataset].marked_at,
+            passed=True,
+            run_label=run_label,
+        )
+        passed += count
+        print(f"{layer} check passed: {name} ({count} checks)", flush=True)
+    if failed:
+        msg = f"{layer} checks failed for {', '.join(failed)}"
+        raise MedallionBuildError(msg)
+    print(f"{layer} checks passed: {passed}")
+    return True
+
+
 def _run_step(
     step: str,
     work: Path,
@@ -307,66 +410,45 @@ def _run_step(
         )
         if result.wrote:
             return True
-        # Nothing new in raw. Later layers may still be pending after a failed
-        # run, so the step is skipped only when they are not.
+        # Nothing new in raw. Later layers or their checks may still be open
+        # after a failed run, so the step is skipped only when they are not.
         from open_data_platform.lakehouse.promotion_registry import SILVER
 
-        if registry.pending(SILVER) or refresh.gold_mark(registry) is not None:
-            print("bronze: no new raw objects; downstream layers are pending")
+        if (
+            registry.pending(SILVER)
+            or refresh.gold_mark(registry) is not None
+            or refresh.open_checks_summary(registry)
+        ):
+            print("bronze: no new raw objects; downstream work is pending")
             return True
         print("bronze: no new raw objects and nothing pending; no table written")
         return False
     if step == "bronze-checks":
-        from open_data_platform.contracts.load import load_contracts
-        from open_data_platform.lakehouse.reconciliation import (
-            bronze_count_checks,
-            parse_counts,
-        )
-
-        counts_file = work / refresh.COUNTS_FILE
-        if not counts_file.is_file():
-            msg = f"missing count file from the bronze step: {counts_file}"
-            raise MedallionBuildError(msg)
-        counts = parse_counts(counts_file.read_text(encoding="utf-8"))
-        if not counts:
-            print("bronze checks: no table written in this run")
-            return False
-        checks = bronze_count_checks(counts, load_contracts())
-        count = run_checks(checks, lambda statement: trino_scalar(statement, env))
-        print(f"bronze checks passed: {count}")
-        return True
+        return _bronze_checks(work, env, registry or _registry(env))
     if step == "silver":
+        from open_data_platform.lakehouse.promotion_registry import SILVER
+
         ensure_catalog_database(env)
+        registry = registry or _registry(env)
         done = refresh.refresh_silver(
-            registry=registry or _registry(env),
+            registry=registry,
             run_label=work.name,
             work=work,
             warehouse_bucket=env["ODP_WAREHOUSE_BUCKET"],
             run_spark=spark_runner("run_silver.sh", env, run_command),
             full_rebuild=full_rebuild,
         )
-        if not done:
-            print("silver: no dataset pending; no table written")
-        return bool(done)
+        if done:
+            return True
+        # A Silver check left open by an earlier run still has to run, and
+        # the check task only runs after this one succeeds.
+        if registry.open_checks(SILVER):
+            print("silver: no dataset pending; silver checks are open")
+            return True
+        print("silver: no dataset pending; no table written")
+        return False
     if step == "silver-checks":
-        from open_data_platform.lakehouse.reconciliation import silver_live_checks
-        from open_data_platform.lakehouse.silver import cli as silver
-
-        rebuilt = refresh.read_silver_datasets(work)
-        entries = silver.selected_entries(source_id=None, datasets=(), all_sources=True)
-        if rebuilt is not None:
-            entries = tuple(
-                entry
-                for entry in entries
-                if (entry[0].source_id, entry[0].dataset) in set(rebuilt)
-            )
-            if not entries:
-                print("silver checks: no table written in this run")
-                return False
-        checks = silver_live_checks(entries)
-        count = run_checks(checks, lambda statement: trino_scalar(statement, env))
-        print(f"silver checks passed: {count}")
-        return True
+        return _silver_checks(work, env, registry or _registry(env))
     if step == "stage-quarantine":
         from open_data_platform.lakehouse import quarantine_stage
 
@@ -374,6 +456,7 @@ def _run_step(
         if not full_rebuild and refresh.gold_mark(registry) is None:
             print("stage-quarantine: Gold is not pending; no table written")
             return False
+        refresh.require_gold_inputs_checked(registry)
         ensure_catalog_database(env)
         sql_dir = work / "quarantine-sql"
         _call(
@@ -389,6 +472,7 @@ def _run_step(
         if not full_rebuild and marked is None:
             print("dbt-build: Gold is not pending; no model built")
             return False
+        refresh.require_gold_inputs_checked(registry)
         _run_dbt(step, work, env, run_command)
         refresh.complete_gold(registry, work.name, marked)
         return True

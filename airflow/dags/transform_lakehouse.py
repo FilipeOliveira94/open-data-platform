@@ -20,6 +20,15 @@ is pending. A step with nothing to do writes no table, logs that, and ends
 as skipped. Each later write step uses the ``none_failed`` trigger rule, so a
 skipped step does not stop a layer that is still pending from an earlier
 failed run. A check step runs only after its write step succeeded.
+
+Quality gate (P3-16): each write marks its check pending in the promotion
+registry. A check step runs every open (pending or failed) check of its layer
+and records the result, so a check that failed runs again on the next
+refresh even when no new raw object arrives; ``bronze`` and ``silver`` end
+as "ran" while a check is open so the check task is not skipped. Silver does
+not build a dataset whose Bronze check is open, and Gold does not build while
+any check is open. Check steps have ``retries=0``: a failed check is a data
+result, not a transient error.
 ``--full-rebuild`` is a Make target (``make live-rebuild``), never this
 schedule.
 
@@ -92,6 +101,9 @@ with DAG(
                 # A write step runs after a skipped step; a check step only
                 # after its write step succeeded.
                 trigger_rule="none_failed" if writes and index else None,
+                # A failed check is a data result, not a transient error: it
+                # stays open in the registry and runs on the next refresh.
+                retries=None if writes else 0,
             )
             for index, (task_id, step, writes) in enumerate(STEPS)
         )

@@ -17,9 +17,12 @@ import pytest
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.model import ContractField, DataContract
 from open_data_platform.ingestion import extract_postgres_oltp as exported_extract
+from open_data_platform.ingestion.coverage import SETTLE_LAG
 from open_data_platform.ingestion.postgres_oltp import (
     DATASETS,
+    SNAPSHOT_SQL,
     SOURCE_ID,
+    TRIGGER_CHECK_SQL,
     PostgresOltpError,
     apply_oltp_schema,
     default_fixture_path,
@@ -89,6 +92,12 @@ class _ScriptedCursor:
         return None
 
     def execute(self, query: str, params: Sequence[object] | None = None) -> None:
+        # Snapshot setup and the trigger check are not data queries.
+        if query in {SNAPSHOT_SQL, TRIGGER_CHECK_SQL}:
+            self._owner.session.append((query, tuple(params or ())))
+            self.description = [("relname",)]
+            self._rows = [(name,) for name in self._owner.guarded]
+            return
         self._owner.queries.append((query, tuple(params or ())))
         if not self._owner.steps:
             msg = "unexpected query"
@@ -104,8 +113,14 @@ class _ScriptedCursor:
 
 
 class _ScriptedConnection:
-    def __init__(self, steps: list[_Table | Exception]) -> None:
+    def __init__(
+        self,
+        steps: list[_Table | Exception],
+        guarded: tuple[str, ...] = DATASETS,
+    ) -> None:
         self.steps = steps
+        self.guarded = guarded
+        self.session: list[tuple[str, tuple[object, ...]]] = []
         self.queries: list[tuple[str, tuple[object, ...]]] = []
         self.commits = 0
         self.rollbacks = 0
@@ -207,10 +222,18 @@ def test_apply_schema_executes_the_shipped_script() -> None:
     apply_oltp_schema(connection)
 
     statements = [query for query, _params in connection.queries]
-    assert len(statements) == 5
+    assert len(statements) == 10
     assert "CREATE SCHEMA IF NOT EXISTS oltp" in statements[0]
     created = [query for query in statements if query.startswith("CREATE TABLE")]
     assert len(created) == 4
+    function = [q for q in statements if "CREATE OR REPLACE FUNCTION" in q]
+    assert len(function) == 1
+    assert "clock_timestamp()" in function[0]
+    assert function[0].rstrip().endswith("$$")
+    triggers = [q for q in statements if "CREATE OR REPLACE TRIGGER" in q]
+    assert [q.split(" ON ")[1].split()[0] for q in triggers] == [
+        f"oltp.{dataset}" for dataset in DATASETS
+    ]
     assert connection.commits == 1
     assert connection.rollbacks == 0
 
@@ -432,12 +455,13 @@ def test_column_mismatch_keeps_the_dataset_already_written() -> None:
     with pytest.raises(PostgresOltpError, match="result columns do not match"):
         _extract(connection, client, datasets=("sellers", "customers", "orders"))
 
-    assert len(connection.queries) == 2
+    # All three are read in one snapshot; the write stops at the bad one.
+    assert len(connection.queries) == 3
     assert len(_data_puts(client)) == 1
-    assert connection.steps
+    assert not connection.steps
 
 
-def test_database_error_stops_the_remaining_datasets() -> None:
+def test_database_error_during_the_snapshot_writes_nothing() -> None:
     contract = _contracts()["sellers"]
     connection = _ScriptedConnection(
         [_table(contract, _row(contract)), psycopg.OperationalError("secret-row")]
@@ -448,7 +472,7 @@ def test_database_error_stops_the_remaining_datasets() -> None:
         _extract(connection, client, datasets=("sellers", "customers"))
 
     assert "secret-row" not in str(caught.value)
-    assert len(_data_puts(client)) == 1
+    assert len(_data_puts(client)) == 0
     assert len(connection.queries) == 2
     assert connection.rollbacks == 1
     assert connection.commits == 0
@@ -761,3 +785,66 @@ def test_cli_rejects_a_frequency_that_does_not_match_the_window(
     )
 
     assert code == 1
+
+
+def test_all_datasets_are_read_in_one_read_only_snapshot() -> None:
+    contracts = _contracts()
+    connection = _ScriptedConnection(
+        [_table(contracts[name]) for name in ("orders", "order_items")]
+    )
+    client = _client()
+
+    _extract(connection, client, datasets=("orders", "order_items"))
+
+    assert [query for query, _params in connection.session] == [
+        SNAPSHOT_SQL,
+        TRIGGER_CHECK_SQL,
+    ]
+    assert "REPEATABLE READ" in SNAPSHOT_SQL and "READ ONLY" in SNAPSHOT_SQL
+    assert connection.session[1][1] == ("oltp", "set_updated_at")
+    # Both reads happen before the first write, then the snapshot ends.
+    assert len(connection.queries) == 2
+    assert connection.rollbacks == 1
+    assert connection.commits == 0
+
+
+def test_a_table_without_the_updated_at_trigger_fails_before_reading() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract))], guarded=("customers",)
+    )
+    client = _client()
+
+    with pytest.raises(PostgresOltpError, match="without the set_updated_at trigger"):
+        _extract(connection, client)
+
+    assert connection.queries == []
+    assert len(_data_puts(client)) == 0
+
+
+def test_a_window_is_not_read_before_its_settle_lag() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection([_table(contract)])
+    client = _client()
+
+    with pytest.raises(PostgresOltpError, match="settle lag"):
+        _extract(connection, client, now=_DAY_END + SETTLE_LAG - timedelta(seconds=1))
+    assert connection.session == []
+
+    _extract(connection, client, now=_DAY_END + SETTLE_LAG)
+    assert len(connection.queries) == 1
+
+
+def test_the_schema_splitter_keeps_a_dollar_quoted_body_whole() -> None:
+    connection = _RecordingConnection()
+    script = "CREATE SCHEMA a; CREATE FUNCTION f() AS $$ BEGIN x; y; END $$; SELECT 1"
+
+    apply_oltp_schema(connection, script=script)
+
+    assert [query for query, _params in connection.queries] == [
+        "CREATE SCHEMA a",
+        "CREATE FUNCTION f() AS $$ BEGIN x; y; END $$",
+        "SELECT 1",
+    ]
+    with pytest.raises(PostgresOltpError, match="unterminated"):
+        apply_oltp_schema(connection, script="CREATE FUNCTION f() AS $$ BEGIN")
