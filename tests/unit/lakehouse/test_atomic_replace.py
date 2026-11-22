@@ -12,10 +12,11 @@ import pytest
 import yaml
 
 from open_data_platform.contracts.load import load_contracts
-from open_data_platform.lakehouse.bronze import render_bronze_sql
+from open_data_platform.lakehouse.bronze import render_bronze_sql, render_dataset_sql
 from open_data_platform.lakehouse.quarantine_stage import render_load_sql
 from open_data_platform.lakehouse.silver.cli import policy_for
 from open_data_platform.lakehouse.silver.common import render_silver_sql
+from open_data_platform.lakehouse.write_mode import BRONZE_WRITE_MODE
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -59,3 +60,36 @@ def test_dbt_gold_tables_replace_in_place() -> None:
     assert models["+on_table_exists"] == "replace"
     for path in (ROOT / "dbt" / "models").rglob("*.sql"):
         assert "on_table_exists" not in path.read_text(), path
+
+
+@pytest.mark.parametrize(
+    "replaced",
+    [
+        (),
+        (
+            "raw/demo_storefront/clickstream/dt=2026-11-01/execution_id=run-a/events.jsonl",
+        ),
+    ],
+)
+def test_scheduled_bronze_merge_never_drops_or_replaces_the_table(
+    replaced: tuple[str, ...],
+) -> None:
+    """The scheduled path (P3-13) commits one MERGE; it never drops the table.
+
+    The full-rebuild test above does not render this script (review T4).
+    """
+    for contract in load_contracts():
+        keys = replaced if contract.source_id == "demo_storefront" else ()
+        sql = render_dataset_sql(
+            contract,
+            3,
+            "odp-warehouse",
+            run_label="scheduled",
+            write_mode=BRONZE_WRITE_MODE,
+            replaced_keys=keys,
+        )
+        upper = sql.upper()
+        assert "DROP TABLE" not in upper
+        assert "INSERT OVERWRITE" not in upper
+        assert "CREATE OR REPLACE TABLE" not in upper
+        assert sql.count("MERGE INTO bronze.") == 1

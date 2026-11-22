@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
@@ -31,66 +33,62 @@ def _minio_env() -> dict[str, str]:
     }
 
 
-def test_demo_storefront_round_trip_overwrites_one_key_and_keeps_another() -> None:
+def test_demo_storefront_round_trip_overwrites_one_key_and_keeps_another(
+    test_raw_bucket: str, purge_executions: Callable[[Any, str, str], None]
+) -> None:
     env = _minio_env()
     client = client_from_env(env)
-    bucket = os.environ.get("ODP_RAW_BUCKET", "odp-raw")
+    bucket = test_raw_bucket
     execution_id = f"p107-{uuid.uuid4().hex}"
     other_execution_id = f"p107-{uuid.uuid4().hex}"
-    first = None
-    second = None
+    purge_executions(client, bucket, execution_id)
+    purge_executions(client, bucket, other_execution_id)
     try:
-        try:
-            first = ingest_demo_storefront(
-                client,
-                bucket=bucket,
-                execution_id=execution_id,
-                seed=11,
-                count=4,
-                event_time_start=_START,
-                ingestion_ts=_INGESTION_TS,
-            )
-        except (EndpointConnectionError, ClientError, BotoCoreError, OSError) as exc:
-            pytest.skip(f"MinIO not reachable: {exc}")
-
-        stored = client.get_object(Bucket=first.bucket, Key=first.key)
-        original = stored["Body"].read()
-        assert original.count(b"\n") == 4
-        assert first.key.startswith(
-            "raw/demo_storefront/clickstream/dt=2026-10-25/execution_id="
-        )
-        assert first.key.endswith("/events.jsonl")
-
-        replaced = ingest_demo_storefront(
+        first = ingest_demo_storefront(
             client,
             bucket=bucket,
             execution_id=execution_id,
-            seed=12,
-            count=4,
-            event_time_start=_START,
-            ingestion_ts=_INGESTION_TS,
-        )
-        assert replaced.key == first.key
-        reread = client.get_object(Bucket=first.bucket, Key=first.key)
-        replaced_body = reread["Body"].read()
-        assert replaced_body != original
-
-        second = ingest_demo_storefront(
-            client,
-            bucket=bucket,
-            execution_id=other_execution_id,
             seed=11,
             count=4,
             event_time_start=_START,
             ingestion_ts=_INGESTION_TS,
         )
-        assert second.key != first.key
-        kept = client.get_object(Bucket=first.bucket, Key=first.key)
-        assert kept["Body"].read() == replaced_body
-        other = client.get_object(Bucket=second.bucket, Key=second.key)
-        assert other["Body"].read() == original
-    finally:
-        for item in (first, second):
-            if item is None:
-                continue
-            client.delete_object(Bucket=item.bucket, Key=item.key)
+    except (EndpointConnectionError, ClientError, BotoCoreError, OSError) as exc:
+        pytest.skip(f"MinIO not reachable: {exc}")
+
+    stored = client.get_object(Bucket=first.bucket, Key=first.key)
+    original = stored["Body"].read()
+    assert original.count(b"\n") == 4
+    assert first.key.startswith(
+        "raw/demo_storefront/clickstream/dt=2026-10-25/execution_id="
+    )
+    assert first.key.endswith("/events.jsonl")
+
+    replaced = ingest_demo_storefront(
+        client,
+        bucket=bucket,
+        execution_id=execution_id,
+        seed=12,
+        count=4,
+        event_time_start=_START,
+        ingestion_ts=_INGESTION_TS,
+    )
+    assert replaced.key == first.key
+    reread = client.get_object(Bucket=first.bucket, Key=first.key)
+    replaced_body = reread["Body"].read()
+    assert replaced_body != original
+
+    second = ingest_demo_storefront(
+        client,
+        bucket=bucket,
+        execution_id=other_execution_id,
+        seed=11,
+        count=4,
+        event_time_start=_START,
+        ingestion_ts=_INGESTION_TS,
+    )
+    assert second.key != first.key
+    kept = client.get_object(Bucket=first.bucket, Key=first.key)
+    assert kept["Body"].read() == replaced_body
+    other = client.get_object(Bucket=second.bucket, Key=second.key)
+    assert other["Body"].read() == original

@@ -391,3 +391,41 @@ def test_main_returns_the_skip_exit_code_when_nothing_ran(
     argv = ["dbt-build", "--work-root", str(tmp_path), "--run-label", "r"]
     assert medallion_build.main([*argv, "--skip-exit-code", "99"]) == 99
     assert medallion_build.main(argv) == 0
+
+
+class _ChecksRan(Exception):
+    """Raised by the fake Trino query: the check step tried to check."""
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="review R1: a failed check is bypassed by the next refresh; P3-16",
+)
+def test_a_failed_bronze_check_is_checked_again_before_silver_builds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run 1 writes Bronze and its checks fail. Run 2 has no new raw object.
+
+    Silver is still pending on the Bronze that failed, so the check step of
+    run 2 must check again, not skip. Today it skips, and the DAG's
+    ``none_failed`` rule then builds Silver on it.
+    """
+    store = FakeS3()
+    registry = InMemoryPromotionRegistry()
+    _land(store, "run-a", "e1", "e2")
+    first, _spark = _bronze(store, registry, tmp_path, label="first")
+    assert first.wrote
+    # bronze_checks of "first" failed here; Silver did not run.
+    second, _spark = _bronze(store, registry, tmp_path, label="second")
+    assert not second.wrote
+    assert set(registry.pending(SILVER)) == {DATASET}
+
+    def query(_statement: str, _env: object) -> str:
+        raise _ChecksRan
+
+    monkeypatch.setattr(medallion_build, "trino_scalar", query)
+    with pytest.raises(_ChecksRan):
+        medallion_build.run_step(
+            "bronze-checks", tmp_path / "second", {}, _Recorder(), registry=registry
+        )

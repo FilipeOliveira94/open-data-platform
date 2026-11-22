@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -43,11 +45,14 @@ def _pages(bodies: dict[int, bytes]) -> Transport:
     return transport
 
 
-def test_dummyjson_products_round_trip_overwrites_the_same_pages() -> None:
+def test_dummyjson_products_round_trip_overwrites_the_same_pages(
+    test_raw_bucket: str, purge_executions: Callable[[Any, str, str], None]
+) -> None:
     env = _minio_env()
     client = client_from_env(env)
-    bucket = os.environ.get("ODP_RAW_BUCKET", "odp-raw")
+    bucket = test_raw_bucket
     execution_id = f"p105-{uuid.uuid4().hex}"
+    purge_executions(client, bucket, execution_id)
     ingestion_ts = datetime(2026, 10, 24, 18, 0, tzinfo=UTC)
     original = {
         0: (_FIXTURES / "page-skip-0.json").read_bytes(),
@@ -57,43 +62,37 @@ def test_dummyjson_products_round_trip_overwrites_the_same_pages() -> None:
     updated_page["products"][0]["title"] = "replacement"
     updated = dict(original)
     updated[0] = json.dumps(updated_page).encode()
-    results = None
     try:
-        try:
-            results = ingest_dummyjson_products(
-                client,
-                bucket=bucket,
-                execution_id=execution_id,
-                ingestion_ts=ingestion_ts,
-                limit=2,
-                base_url="https://dummyjson.test",
-                transport=_pages(original),
-                sleep=lambda _seconds: None,
-            )
-        except (EndpointConnectionError, ClientError, BotoCoreError, OSError) as exc:
-            pytest.skip(f"MinIO not reachable: {exc}")
-
-        assert len(results) == 2
-        assert results[0].key.endswith("/products-skip-000000.json")
-        assert results[1].key.endswith("/products-skip-000002.json")
-        assert "/dummyjson_products/products/" in results[0].key
-        stored = client.get_object(Bucket=results[0].bucket, Key=results[0].key)
-        assert stored["Body"].read() == original[0]
-
-        again = ingest_dummyjson_products(
+        results = ingest_dummyjson_products(
             client,
             bucket=bucket,
             execution_id=execution_id,
             ingestion_ts=ingestion_ts,
             limit=2,
             base_url="https://dummyjson.test",
-            transport=_pages(updated),
+            transport=_pages(original),
             sleep=lambda _seconds: None,
         )
-        assert again[0].key == results[0].key
-        reread = client.get_object(Bucket=results[0].bucket, Key=results[0].key)
-        assert reread["Body"].read() == updated[0]
-    finally:
-        if results is not None:
-            for item in results:
-                client.delete_object(Bucket=item.bucket, Key=item.key)
+    except (EndpointConnectionError, ClientError, BotoCoreError, OSError) as exc:
+        pytest.skip(f"MinIO not reachable: {exc}")
+
+    assert len(results) == 2
+    assert results[0].key.endswith("/products-skip-000000.json")
+    assert results[1].key.endswith("/products-skip-000002.json")
+    assert "/dummyjson_products/products/" in results[0].key
+    stored = client.get_object(Bucket=results[0].bucket, Key=results[0].key)
+    assert stored["Body"].read() == original[0]
+
+    again = ingest_dummyjson_products(
+        client,
+        bucket=bucket,
+        execution_id=execution_id,
+        ingestion_ts=ingestion_ts,
+        limit=2,
+        base_url="https://dummyjson.test",
+        transport=_pages(updated),
+        sleep=lambda _seconds: None,
+    )
+    assert again[0].key == results[0].key
+    reread = client.get_object(Bucket=results[0].bucket, Key=results[0].key)
+    assert reread["Body"].read() == updated[0]

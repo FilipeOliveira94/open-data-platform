@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-21 (P3-06 verified: window coverage, gap report, backfill) |
+| Last updated | 2026-11-21 (review of verified issues: P3-16 to P3-18 and P6-09 added) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,7 +22,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-07** — Quality checks and quarantine. Not started.
+**P3-16** — Quality gate state and extract-window corrections. Not started.
+
+A review of every verified issue on 2026-11-21 ([review](docs/reviews/2026-11-21-verified-issues-review.md)) found 19 pipeline and model findings and 8 test findings. The two highest: a failed Bronze or Silver check is bypassed by the next refresh that has no new raw objects, so Gold can be built from data that failed its checks (R1); and `mart_review_drivers` counts a review once per order item (R2). The Olist integration test had failed since 2026-10-26 without notice, because integration tests are not in CI; it and the other unsafe integration tests were fixed with the review. New issues P3-16 to P3-18 run before the close pair; P6-09 adds write-audit-publish. The Phase 3 missed-window acceptance is reopened: the gap report does not list windows after the last recorded one.
 
 P3-06 is verified. Each PostgreSQL extract records its window per dataset in `ingestion_state.extract_coverage` ([ADR-0025](docs/decisions/0025-extract-window-coverage-ledger.md)); `make coverage-report FREQUENCY=daily|weekly` lists gaps and overlaps, and the backfill parameters are documented. The live run found that the daily and weekly run ids collide at Monday 00:00Z and in backfills; the PostgreSQL execution id is now `<dag_id>__<run_id>` ([Local Airflow](docs/architecture/airflow-local.md#verification-2026-11-21-p3-06)).
 
@@ -34,7 +36,10 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 
 ## Next work
 
-1. **P3-07** — Quality checks and quarantine. Acceptance: `ROADMAP.md` → P3-07.
+1. **P3-16** — Quality gate state and extract-window corrections. Acceptance: `ROADMAP.md` → P3-16.
+2. **P3-17** — Gold metric grain corrections.
+3. **P3-18** — Exact decimal type for money fields.
+4. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard).
 
 ---
 
@@ -55,6 +60,9 @@ P3-04 is verified. `ingest_postgres_oltp_daily` runs at 00:00 UTC, passes the ru
 | P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
 | P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
 | P3-13 | Incremental lakehouse refresh | Verified | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
+| P3-16 | Quality gate state and extract-window corrections | Not started | — |
+| P3-17 | Gold metric grain corrections | Not started | — |
+| P3-18 | Exact decimal type for money fields | Not started | — |
 | P3-14 | Live run, result, and consistency check | Not started | — |
 | P3-15 | Phase 3 documentation and status | Not started | — |
 
@@ -64,12 +72,14 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 - [ ] DAGs have clear dependencies and verifiable failure behavior.
 - [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
-- [x] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily).
+- [x] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily) (P3-05).
 - [ ] Backfills do not corrupt data or create undue duplication.
-- [ ] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06).
+- [ ] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06). Trailing gaps are not reported yet (P3-16).
+- [ ] A failed Bronze or Silver check blocks the next layer until it passes, including on a later refresh with no new raw objects (P3-16).
+- [ ] Gold metrics keep their documented grain: no fan-out, rate denominators count only eligible rows, and money is exact decimal (P3-17, P3-18).
 - [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
 - [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
-- [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing and Silver rebuilds of `incremental_window`/`append_only` datasets still do (ADR-0024).
+- [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing, Silver rebuilds of `incremental_window`/`append_only` datasets (ADR-0024), and the Bronze `MERGE` over the whole unpartitioned table (review R5, P3-08) still do.
 - [ ] Invalid records are identified and handled per documented rules.
 - [ ] Success and failure scenarios have tests or reproducible evidence.
 - [ ] A live run result is recorded and compared to the source windows (P3-14).
@@ -158,7 +168,7 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-04, P3-11, P3-12, P3-13 verified) |
+| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-01–P3-06, P3-11–P3-13 verified; P3-16–P3-18 added 2026-11-21) |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
@@ -176,11 +186,13 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 - Spark `local[*]` runs inside the Airflow scheduler container and shares its CPU and memory. A full `transform_lakehouse` run took 10 min 12 s; the 30-minute timeout applies per task.
 - The `lakehouse_gold` pool is held per task, not per run. A waiting `dbt_reconcile` can take the slot between two transform writes and read a half-rebuilt lakehouse (no table changes while it reads). On 2026-11-20 that stretched one transform run to 20 min 22 s.
 - DAGs already in the `airflow` metadata database keep their paused state; `is_paused_upon_creation=True` applies only to new DAGs. A manual daily trigger gets the last complete UTC day, whatever `-l` says; `airflow dags trigger` without `-l` has no data interval and the extract fails.
-- Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window; the weekly re-extract (P3-05) picks them up. A row committed after the weekly run that covers its `updated_at` is still missed: P3-06 backfill and CDC (Phase 4). The first scheduled weekly run is 2026-11-23; only manual weekly runs have been exercised. Three synthetic `p3-05-late-*` sellers stay in the local PostgreSQL and lake.
-- Since P3-13 a refresh reads only new raw objects, but it still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table. A `MERGE` into a large Bronze table has not been measured. Raw executions without a `_COMPLETE` marker never enter Bronze.
-- Silver replaces each table with `DROP` → `CREATE` → `INSERT OVERWRITE`. During that window the table does not exist for Trino or dbt, and a failed insert leaves it empty (P3-11).
-- `full_refresh` sources (DummyJSON, IBGE) keep every record ever seen in Silver: a record removed at the source never leaves. `demo_storefront.clickstream` is labelled `snapshot` (P3-12).
-- The windowed batch extract does not see hard deletes. That rebuild is not a windowed lakehouse commit. The window that exists today is the PostgreSQL extract.
+- Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window; the weekly re-extract (P3-05) picks them up. A row committed after the weekly run that covers its `updated_at` is still missed: P3-06 backfill and CDC (Phase 4). The first scheduled weekly run is 2026-11-23; only manual weekly runs have been exercised. Three synthetic `p3-05-late-*` sellers stay in the lake; the 2026-11-21 integration-test run removed them from local PostgreSQL (review T8).
+- Since P3-13 a refresh reads only new raw objects, but it still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table. The Bronze `MERGE` joins against the whole unpartitioned table, so its scan grows with history (review R5, P3-08). Raw executions without a `_COMPLETE` marker never enter Bronze.
+- Until P3-16, a failed `bronze_checks` or `silver_checks` does not stop the next refresh: with no new raw objects the check step skips and the next layer builds (review R1). After a failed check, pause `transform_lakehouse` until the cause is fixed.
+- Until P3-17, `mart_review_drivers` counts a review once per order item and `on_time_handoff_rate` counts cancelled and unshipped orders as late (review R2, R3). Until P3-18, money columns are `DOUBLE`.
+- Silver and Gold are visible to readers before their checks run, and Gold models are replaced one at a time (review R6, P6-09).
+- Integration tests write to `ODP_TEST_RAW_BUCKET` (default `odp-test-raw`) and seed a scratch PostgreSQL database. Before that fix, the PostgreSQL integration test truncated the local `oltp` tables (review T8); a run on 2026-11-21 reset local PostgreSQL to the fixture.
+- The windowed batch extract does not see hard deletes. A deleted row stays in Silver and Gold on the batch path; the CDC path (Phase 4) handles deletes.
 - Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Exactly-once end-to-end will not be claimed without a written proof.

@@ -217,3 +217,19 @@ def test_format_report_names_windows_and_datasets_only() -> None:
 
 def _asdict(record: CoverageRecord) -> dict[str, object]:
     return {name: getattr(record, name) for name in record.__slots__}
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="review R7: windows after the last recorded one are not reported; P3-16",
+)
+def test_a_stopped_dag_reports_its_trailing_gaps() -> None:
+    """Only the first window was recorded, and the DAG then stopped.
+
+    Every window since then should have run by now, so each one is a gap.
+    Today the expected windows end at the last recorded window.
+    """
+    report = coverage_report(
+        "daily", _records(_day(0), _day(1)), datasets=DATASETS, cadence=DAILY
+    )
+    assert report.gaps
