@@ -22,15 +22,19 @@ select
   sum(io.item_gmv) as item_gmv,
   count(distinct io.order_id) as order_count,
   sum(io.freight_sum) / nullif(sum(io.price_sum), 0) as freight_to_price_ratio,
-  avg(
-    case
-      when o.order_delivered_carrier_date is not null
-       and io.shipping_limit_date is not null
-       and o.order_delivered_carrier_date <= io.shipping_limit_date
-      then 1.0 else 0.0
-    end
-  ) as on_time_handoff_rate
+  -- Only (seller, order) pairs with a carrier date and a shipping limit count.
+  count_if(
+    o.order_delivered_carrier_date is not null
+    and io.shipping_limit_date is not null
+  ) as handoff_eligible_count,
+  count_if(o.order_delivered_carrier_date <= io.shipping_limit_date) * 1.0
+    / nullif(
+      count_if(
+        o.order_delivered_carrier_date is not null
+        and io.shipping_limit_date is not null
+      ),
+      0
+    ) as on_time_handoff_rate
 from item_orders io
 join {{ ref('fct_oltp_orders') }} o on o.order_id = io.order_id
 group by 1
-

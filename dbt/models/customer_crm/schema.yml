@@ -110,6 +110,13 @@ models:
           - on_time
           - early
           - unknown
+  - name: category_english
+    description: >-
+      English category of the reviewed order. One distinct category across the
+      order's items gives that category; more than one gives `mixed`; no items
+      or no category gives null.
+  - name: review_count
+    description: Reviews, one per (review_id, order_id). Reconciles to fct_reviews.
 - name: fct_crm_quality_findings
   data_tests:
   - column_types:

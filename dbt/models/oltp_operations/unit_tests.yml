@@ -1,0 +1,40 @@
+version: 2
+
+unit_tests:
+- name: mart_oltp_delivery_performance_handoff_rate_counts_eligible_orders
+  description: >-
+    A cancelled order with no carrier date is not eligible for a handoff, so
+    it does not count as late. The delivered order with two items handed off
+    on time gives a rate of 1.0 over one eligible order.
+  model: mart_oltp_delivery_performance
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, order_purchase_timestamp: "2018-01-02 10:00:00", order_delivered_carrier_date: "2018-01-03 10:00:00", order_delivered_customer_date: "2018-01-06 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+    - {order_id: o2, order_status: canceled, order_purchase_timestamp: "2018-01-04 10:00:00"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, seller_id: s1, price: 10.0, freight_value: 2.0, item_gmv: 12.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o1, order_item_id: 2, seller_id: s1, price: 20.0, freight_value: 3.0, item_gmv: 23.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o2, order_item_id: 1, seller_id: s1, price: 5.0, freight_value: 1.0, item_gmv: 6.0, shipping_limit_date: "2018-01-06 00:00:00"}
+  expect:
+    rows:
+    - {purchase_month: "2018-01-01 00:00:00", delivered_with_both_dates: 1, handoff_eligible_count: 1, on_time_handoff_rate: 1.0}
+- name: mart_oltp_seller_performance_handoff_rate_counts_eligible_orders
+  description: >-
+    The seller has two orders. Only the shipped one is eligible for a handoff,
+    so the rate is 1.0 over one eligible (seller, order) pair.
+  model: mart_oltp_seller_performance
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, order_purchase_timestamp: "2018-01-02 10:00:00", order_delivered_carrier_date: "2018-01-03 10:00:00", order_delivered_customer_date: "2018-01-06 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+    - {order_id: o2, order_status: canceled, order_purchase_timestamp: "2018-01-04 10:00:00"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, seller_id: s1, price: 10.0, freight_value: 2.0, item_gmv: 12.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o1, order_item_id: 2, seller_id: s1, price: 20.0, freight_value: 3.0, item_gmv: 23.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o2, order_item_id: 1, seller_id: s1, price: 5.0, freight_value: 1.0, item_gmv: 6.0, shipping_limit_date: "2018-01-06 00:00:00"}
+  expect:
+    rows:
+    - {seller_id: s1, order_count: 2, handoff_eligible_count: 1, on_time_handoff_rate: 1.0}

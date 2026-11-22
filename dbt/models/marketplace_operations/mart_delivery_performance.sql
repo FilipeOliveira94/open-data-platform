@@ -42,6 +42,11 @@ base as (
       then 1 else 0
     end as on_time_handoff_flag,
     case
+      when o.order_delivered_carrier_date is not null
+       and il.shipping_limit_date is not null
+      then 1 else 0
+    end as handoff_eligible,
+    case
       when o.order_status = 'delivered'
        and o.order_delivered_customer_date is not null
        and o.order_estimated_delivery_date is not null
@@ -59,7 +64,9 @@ select
   sum(late_flag) as late_count,
   sum(on_time_flag) * 1.0 / nullif(sum(rate_eligible), 0) as on_time_rate,
   sum(late_flag) * 1.0 / nullif(sum(rate_eligible), 0) as late_rate,
-  avg(cast(on_time_handoff_flag as double)) as on_time_handoff_rate
+  -- Only orders with a carrier date and a shipping limit can hand off.
+  sum(handoff_eligible) as handoff_eligible_count,
+  cast(sum(on_time_handoff_flag) as double) / nullif(sum(handoff_eligible), 0) as on_time_handoff_rate
 from base
 group by 1, 2
 

@@ -46,12 +46,12 @@ Payments record method, installments, sequence, and amount. They do not record a
 | `fct_order_items` | Fact | One item on an order | Price, freight, product, seller, seller municipality, seller ZIP, shipping deadline |
 | `fct_payments` | Fact | One payment sequence on an order | Amount, method, installments |
 | `mart_platform_sales` | Mart | Purchase date | Marketplace totals: orders, delivered orders, item GMV (`price + freight`), amount collected |
-| `mart_seller_performance` | Mart | Seller | Item GMV, orders, on-time handoff to the carrier, freight relative to price, distinct buyer municipalities |
+| `mart_seller_performance` | Mart | Seller | Item GMV, orders, handoff-eligible (seller, order) pairs and the on-time handoff rate over them, freight relative to price, distinct buyer municipalities |
 | `mart_seller_buyer_geography` | Mart | Seller and municipality | Where that seller's buyers are. A null municipality is its own row |
 | `mart_order_milestones` | Mart | Purchase month and primary payment method | How many orders reached approval, carrier handoff, and customer delivery, and how many were canceled after approval or marked unavailable |
 | `mart_payment_mix` | Mart | Payment method and installment count | How shoppers pay |
 | `mart_order_cancellations` | Mart | Purchase month, status, primary payment method | Canceled and unavailable orders, item GMV, amount collected, and whether approval had already happened |
-| `mart_delivery_performance` | Mart | Purchase month and customer state | **On-time rate** against the estimate, late rate, and the share handed to the carrier on or before the shipping deadline |
+| `mart_delivery_performance` | Mart | Purchase month and customer state | **On-time rate** against the estimate, late rate, handoff-eligible orders, and the share of them handed to the carrier on or before the shipping deadline |
 | `mart_late_orders` | Mart | One delivered order past the estimate | Days late, state, seller, review score, freight relative to price, primary payment method, and whether the carrier handoff also missed the shipping deadline |
 | `mart_freight` | Mart | Customer state and distance band | Freight per item and freight relative to price. Bands are `0_50km`, `50_200km`, `200_500km`, `500km_plus`, and `unknown` |
 | `fct_operations_quality_findings` | Quality | One finding | Invalid or broken order, item, payment, product, or seller rows. Reasons are listed under [Quality findings](#quality-findings) |
@@ -68,7 +68,7 @@ The person is `customer_unique_id`. `customer_id` changes every order. The order
 | `fct_reviews` | Fact | One review on one order | Score from 1 to 5, whether a comment was written, when it was written, when it was answered. The comment text stays on this fact |
 | `mart_customer_retention` | Mart | One person | First and last delivered purchase, delivered order count, repeat flag |
 | `mart_customer_geography` | Mart | Municipality | Buyers, repeat buyers, and mean review score from the purchase address. A null municipality is its own row |
-| `mart_review_drivers` | Mart | Delay bucket and English category | Mean score, share of reviews with a comment, median days until an answer. Delay buckets are `late`, `on_time`, `early`, and `unknown` |
+| `mart_review_drivers` | Mart | Delay bucket and English category of the order | Reviews (one per `review_id, order_id`), mean score per review, share of reviews with a comment, median days until an answer. Delay buckets are `late`, `on_time`, `early`, and `unknown`. Category rule below |
 | `fct_crm_quality_findings` | Quality | One finding | Broken customer or review rows, and purchase addresses that do not match a municipality |
 
 ### Seller acquisition
@@ -127,19 +127,19 @@ These tokens do not join the catalog or the marketplace.
 
 Same operating questions as the marketplace, on the PostgreSQL tables. Those ids (`customer-17`, `order-17`) are a different population from the historical file. There is no payment table and no review table here, so there is no payment mix and no review mart. City and state use the same municipality bridge. ZIP is an integer and is padded to 5 characters before it joins `dim_zip_prefix`.
 
-The order fact copies city, state, and ZIP at purchase, so a later change to the customer row does not rewrite the address of the sale.
+The `purchase_city`, `purchase_state`, and `purchase_zip_prefix` columns on `fct_oltp_orders` come from the **current** customer row (Type 1), not from the address at purchase time. A later change to the customer row rewrites them on the next build. The names keep `purchase_*` for parity with the marketplace fact. Address history arrives with the CDC path (P4-08).
 
 | Model | Type | Grain | What you see |
 | --- | --- | --- | --- |
 | `dim_oltp_customers` | Dimension | One order-scoped customer | Current customer attributes, plus `updated_at` |
 | `dim_oltp_sellers` | Dimension | One seller | Current seller attributes, plus `updated_at` |
-| `fct_oltp_orders` | Fact | One order | Milestones, status, purchase address |
+| `fct_oltp_orders` | Fact | One order | Milestones, status, current customer address (Type 1) |
 | `fct_oltp_order_items` | Fact | One item | Price, freight, product, seller, shipping deadline |
 | `mart_oltp_platform_sales` | Mart | Purchase date | Orders, delivered orders, item GMV |
-| `mart_oltp_seller_performance` | Mart | Seller | Item GMV, orders, freight relative to price, on-time handoff |
+| `mart_oltp_seller_performance` | Mart | Seller | Item GMV, orders, freight relative to price, handoff-eligible pairs, on-time handoff rate |
 | `mart_oltp_buyer_geography` | Mart | Seller and municipality | Buyer location, with a null-municipality row |
 | `mart_oltp_order_milestones` | Mart | Purchase month | Approval, carrier, and delivery counts |
-| `mart_oltp_delivery_performance` | Mart | Purchase month | On-time rate and late rate against the estimate, and on-time handoff |
+| `mart_oltp_delivery_performance` | Mart | Purchase month | On-time rate and late rate against the estimate, handoff-eligible orders, on-time handoff rate |
 | `mart_oltp_late_orders` | Mart | One delivered order past the estimate | Days late, state, seller, handoff miss |
 | `mart_oltp_freight` | Mart | Customer state and distance band | Freight ratio. Unknown band when the padded ZIP misses the prefix dimension |
 | `mart_oltp_cancellations` | Mart | Purchase month and status | Canceled and unavailable orders, and whether approval had already happened |
@@ -166,9 +166,31 @@ Every model is a full refresh. Dimensions are type 1: one current row per busine
 
 A null foreign key stays. An orphan key stays. Rows are not dropped to make a rate look complete (D-013). Review comments are `pii` and stay on `fct_reviews`. CRM marts use the score, a comment-present flag, and the answer lag.
 
-On time for `mart_delivery_performance` and `mart_oltp_delivery_performance`: customer delivery date on or before the estimated date, among delivered orders that have both timestamps. Handoff on time: carrier timestamp on or before the latest `shipping_limit_date` on the order's items.
+On time for `mart_delivery_performance` and `mart_oltp_delivery_performance`: customer delivery date on or before the estimated date, among delivered orders that have both timestamps. Handoff on time: carrier timestamp on or before the latest `shipping_limit_date` on the order's items. The handoff rate in `mart_delivery_performance`, `mart_seller_performance`, `mart_oltp_delivery_performance`, and `mart_oltp_seller_performance` divides by the orders (or seller–order pairs) eligible for a handoff: a carrier timestamp and a shipping limit both present. Each mart exposes that denominator as `handoff_eligible_count`. An order never handed to a carrier, such as one cancelled before shipping, is not eligible and does not count as late. The rate is null when no row is eligible.
+
+Review category (`mart_review_drivers`): the category is resolved per order before the review join, so a review of an order with N items counts once. One distinct English category across the order's items gives that category. More than one gives `mixed`. An order with no items, or whose products have no category, gives null. `sum(review_count)` equals the `(review_id, order_id)` pairs on `fct_reviews`.
+
+Metric logic is covered by dbt unit tests (`dbt/models/<domain>/unit_tests.yml`, run with `make dbt-unit`). Each corrected mart builds from a fixture: an order with two items and one review, and a cancelled order with no carrier date.
 
 `dim_customers` takes attributes from the latest `order_purchase_timestamp`. A tie takes the greater `order_id`.
+
+### P3-17 metric corrections (2026-11-22)
+
+Local Gold, before and after the P3-17 change, on the same Silver. "Pooled" is on-time handoffs over the denominator across all rows. "Row mean" is the unweighted mean of the mart column.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| `mart_review_drivers` rows | 265 | 269 |
+| `mart_review_drivers` `sum(review_count)` | 113_131 (one per item) | 99_224 (equals `fct_reviews`) |
+| `mart_review_drivers` mean score weighted by `review_count` | 4.0170 | 4.0864 |
+| Reviews in the `mixed` category | — | 732 |
+| `mart_delivery_performance` handoff denominator | 99_441 orders | 97_657 eligible orders |
+| `mart_delivery_performance` pooled handoff rate | 0.8931 (88_808 / 99_441) | 0.9094 (88_808 / 97_657) |
+| `mart_delivery_performance` row mean of `on_time_handoff_rate` | 0.8667 | 0.8965 |
+| `mart_seller_performance` handoff denominator | 100_010 pairs | 99_000 eligible pairs |
+| `mart_seller_performance` pooled handoff rate | 0.9008 (90_087 / 100_010) | 0.9100 (90_087 / 99_000) |
+| `mart_seller_performance` row mean of `on_time_handoff_rate` | 0.8310 | 0.8798 |
+| `mart_oltp_delivery_performance` and `mart_oltp_seller_performance` handoff rate | 0.0 (2 orders, none shipped) | null (0 eligible) |
 
 ### Quality findings
 

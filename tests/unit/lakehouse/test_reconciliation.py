@@ -233,7 +233,7 @@ def test_reconciliation_is_outside_the_gold_build() -> None:
     runner = (
         ROOT / "src" / "open_data_platform" / "lakehouse" / "medallion_build.py"
     ).read_text(encoding="utf-8")
-    assert '"--exclude", "tag:reconciliation"' in runner
+    assert '"tag:reconciliation",\n            "test_type:unit",' in runner
     assert '"--select", "tag:reconciliation"' in runner
     assert "dbt-test-reconciliation:" in makefile
     assert "$(call medallion_step,dbt-build)" in makefile
