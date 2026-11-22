@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver live-refresh live-rebuild coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation live-gold runtime-build up airflow-up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver live-refresh live-rebuild coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation dbt-unit live-gold runtime-build up airflow-up down ps logs clean
 
 # One run label per make invocation (ADR-0024). The work directory and the
 # staging keys carry it, so a make run and an Airflow run never share staging.
@@ -159,6 +159,15 @@ dbt-test-reconciliation: ## Run reconciliation tests (separate from live-gold; w
 	set +a; \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(call medallion_step,dbt-reconcile)
+
+dbt-unit: ## Run dbt unit tests on fixtures (needs Trino and built parents; outside dbt-build)
+	@set -e; \
+	set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(call medallion_step,dbt-unit)
 
 live-gold: stage-quarantine dbt-build ## Stage quarantine sidecars then build Gold models (while Gold is pending)
 

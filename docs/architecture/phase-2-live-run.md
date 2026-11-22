@@ -100,7 +100,7 @@ Geolocation 1_000_163 → 738_332 and postgres_oltp 3/3/3/5 → 2/2/2/3 are the 
 | `customer_crm.fct_reviews` | 99_224 |
 | `customer_crm.mart_customer_geography` | 4_020 |
 | `customer_crm.mart_customer_retention` | 93_358 |
-| `customer_crm.mart_review_drivers` | 265 |
+| `customer_crm.mart_review_drivers` | 265 (269 after the P3-17 grain fix; see [gold-model-design.md](gold-model-design.md#p3-17-metric-corrections-2026-11-22)) |
 | `gold_shared.dim_date` | 3_774 |
 | `marketplace_operations.dim_products` | 32_951 |
 | `marketplace_operations.dim_sellers` | 3_095 |

@@ -31,7 +31,12 @@ joined as (
        and io.shipping_limit_date is not null
        and o.order_delivered_carrier_date <= io.shipping_limit_date
       then 1 else 0
-    end as on_time_handoff
+    end as on_time_handoff,
+    case
+      when o.order_delivered_carrier_date is not null
+       and io.shipping_limit_date is not null
+      then 1 else 0
+    end as handoff_eligible
   from item_orders io
   join {{ ref('fct_orders') }} o on o.order_id = io.order_id
 )
@@ -39,7 +44,9 @@ select
   seller_id,
   sum(item_gmv) as item_gmv,
   count(distinct order_id) as order_count,
-  avg(cast(on_time_handoff as double)) as on_time_handoff_rate,
+  -- Only (seller, order) pairs with a carrier date and a shipping limit count.
+  sum(handoff_eligible) as handoff_eligible_count,
+  cast(sum(on_time_handoff) as double) / nullif(sum(handoff_eligible), 0) as on_time_handoff_rate,
   sum(freight_sum) / nullif(sum(price_sum), 0) as freight_to_price_ratio,
   count(distinct buyer_municipality_id) as distinct_buyer_municipalities
 from joined

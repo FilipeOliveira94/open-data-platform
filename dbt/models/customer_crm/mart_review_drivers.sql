@@ -6,7 +6,20 @@
     }
 ) }}
 
-with base as (
+-- One category per order, resolved before the review join so a review
+-- of an order with N items still counts once (gold-model-design.md).
+with order_category as (
+  select
+    i.order_id,
+    case
+      when count(distinct p.category_english) > 1 then 'mixed'
+      else max(p.category_english)
+    end as category_english
+  from {{ ref('fct_order_items') }} i
+  left join {{ ref('dim_products') }} p on p.product_id = i.product_id
+  group by 1
+),
+base as (
   select
     r.review_score,
     r.has_comment,
@@ -17,11 +30,10 @@ with base as (
       when cast(o.order_delivered_customer_date as date) < cast(o.order_estimated_delivery_date as date) then 'early'
       else 'on_time'
     end as delay_bucket,
-    p.category_english
+    oc.category_english
   from {{ ref('fct_reviews') }} r
   left join {{ ref('fct_orders') }} o on o.order_id = r.order_id
-  left join {{ ref('fct_order_items') }} i on i.order_id = r.order_id
-  left join {{ ref('dim_products') }} p on p.product_id = i.product_id
+  left join order_category oc on oc.order_id = r.order_id
 )
 select
   delay_bucket,

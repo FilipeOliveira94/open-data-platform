@@ -1,0 +1,18 @@
+version: 2
+
+unit_tests:
+- name: mart_catalog_review_patterns_repeated_email_share
+  description: >-
+    Two of four reviews on one product share a reviewer email, so the
+    repeated-email share is 0.5.
+  model: mart_catalog_review_patterns
+  given:
+  - input: ref('fct_catalog_reviews')
+    rows:
+    - {product_id: 1, category: beauty, rating: 5, reviewer_email: a@example.test, comment_length: 10}
+    - {product_id: 1, category: beauty, rating: 5, reviewer_email: a@example.test, comment_length: 20}
+    - {product_id: 1, category: beauty, rating: 5, reviewer_email: b@example.test, comment_length: 30}
+    - {product_id: 1, category: beauty, rating: 5, reviewer_email: c@example.test, comment_length: 40}
+  expect:
+    rows:
+    - {category: beauty, rating: 5, review_count: 4, mean_comment_length: 25.0, repeated_reviewer_email_share: 0.5}

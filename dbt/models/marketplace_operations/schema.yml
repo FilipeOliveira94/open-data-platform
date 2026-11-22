@@ -201,6 +201,7 @@ models:
           seller_id: varchar
           item_gmv: double
           order_count: bigint
+          handoff_eligible_count: bigint
           on_time_handoff_rate: double
           freight_to_price_ratio: double
           distinct_buyer_municipalities: bigint
@@ -209,6 +210,12 @@ models:
     data_tests:
     - not_null
     - unique
+  - name: handoff_eligible_count
+    description: >-
+      (Seller, order) pairs with a carrier date and a shipping limit. The denominator of
+      on_time_handoff_rate. Orders never handed to a carrier (for example, cancelled before shipping) are excluded.
+  - name: on_time_handoff_rate
+    description: Share of handoff_eligible_count handed to the carrier by the shipping limit. Null when none is eligible.
 - name: mart_seller_buyer_geography
   data_tests:
   - column_types:
@@ -335,12 +342,20 @@ models:
           late_count: bigint
           on_time_rate: decimal
           late_rate: decimal
+          handoff_eligible_count: bigint
           on_time_handoff_rate: double
   - unique_combination:
       arguments:
         combination:
         - purchase_month
         - customer_state
+  columns:
+  - name: handoff_eligible_count
+    description: >-
+      Orders with a carrier date and a shipping limit. The denominator of
+      on_time_handoff_rate. Orders never handed to a carrier (for example, cancelled before shipping) are excluded.
+  - name: on_time_handoff_rate
+    description: Share of handoff_eligible_count handed to the carrier by the shipping limit. Null when none is eligible.
 - name: mart_late_orders
   data_tests:
   - column_types:

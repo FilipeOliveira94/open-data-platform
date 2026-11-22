@@ -36,6 +36,10 @@ models:
     - not_null
     - unique
 - name: fct_oltp_orders
+  description: >-
+    One OLTP order. The purchase_* location columns come from the current
+    customer row (Type 1), not the address at purchase time. History arrives
+    with P4-08.
   data_tests:
   - column_types:
       arguments:
@@ -61,6 +65,12 @@ models:
     data_tests:
     - not_null
     - unique
+  - name: purchase_city
+    description: Current customer city (Type 1), not the city at purchase time, until P4-08.
+  - name: purchase_state
+    description: Current customer state (Type 1), not the state at purchase time, until P4-08.
+  - name: purchase_zip_prefix
+    description: Current customer ZIP prefix (Type 1), not the prefix at purchase time, until P4-08.
   - name: order_status
     data_tests:
     - not_null
@@ -127,12 +137,19 @@ models:
           item_gmv: double
           order_count: bigint
           freight_to_price_ratio: double
+          handoff_eligible_count: bigint
           on_time_handoff_rate: decimal
   columns:
   - name: seller_id
     data_tests:
     - not_null
     - unique
+  - name: handoff_eligible_count
+    description: >-
+      (Seller, order) pairs with a carrier date and a shipping limit. The denominator of
+      on_time_handoff_rate. Orders never handed to a carrier (for example, cancelled before shipping) are excluded.
+  - name: on_time_handoff_rate
+    description: Share of handoff_eligible_count handed to the carrier by the shipping limit. Null when none is eligible.
 - name: mart_oltp_buyer_geography
   data_tests:
   - column_types:
@@ -173,12 +190,19 @@ models:
           delivered_with_both_dates: bigint
           on_time_rate: decimal
           late_rate: decimal
+          handoff_eligible_count: bigint
           on_time_handoff_rate: double
   columns:
   - name: purchase_month
     data_tests:
     - not_null
     - unique
+  - name: handoff_eligible_count
+    description: >-
+      Orders with a carrier date and a shipping limit. The denominator of
+      on_time_handoff_rate. Orders never handed to a carrier (for example, cancelled before shipping) are excluded.
+  - name: on_time_handoff_rate
+    description: Share of handoff_eligible_count handed to the carrier by the shipping limit. Null when none is eligible.
 - name: mart_oltp_late_orders
   data_tests:
   - column_types:

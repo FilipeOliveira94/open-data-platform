@@ -87,18 +87,21 @@ def test_checks_pass_and_fail_on_the_first_mismatch(
         medallion_build.run_checks([], answers.get)
 
 
-def test_dbt_build_excludes_reconciliation_and_reconcile_selects_it(
+def test_dbt_build_excludes_reconciliation_and_unit_tests(
     tmp_path: Path,
 ) -> None:
     env = {"ODP_DBT_BIN": "/opt/dbt-venv/bin/dbt", "ODP_REPO": "/opt/odp/repo"}
     build = medallion_build.dbt_command("build", tmp_path, env)
     assert build[:2] == ["/opt/dbt-venv/bin/dbt", "build"]
-    assert build[-2:] == ["--exclude", "tag:reconciliation"]
+    assert build[-3:] == ["--exclude", "tag:reconciliation", "test_type:unit"]
     assert "--project-dir" in build and "/opt/odp/repo/dbt" in build
     assert str(tmp_path / "dbt-target") in build
     reconcile = medallion_build.dbt_command("reconcile", tmp_path, env)
     assert reconcile[1] == "test"
     assert reconcile[-2:] == ["--select", "tag:reconciliation"]
+    unit = medallion_build.dbt_command("unit", tmp_path, env)
+    assert unit[1] == "test"
+    assert unit[-2:] == ["--select", "test_type:unit"]
     assert medallion_build.dbt_command("parse", tmp_path, env)[1] == "parse"
     with pytest.raises(MedallionBuildError):
         medallion_build.dbt_command("run", tmp_path, env)

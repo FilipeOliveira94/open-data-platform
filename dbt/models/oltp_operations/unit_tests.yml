@@ -1,0 +1,109 @@
+version: 2
+
+unit_tests:
+- name: mart_oltp_delivery_performance_handoff_rate_counts_eligible_orders
+  description: >-
+    A cancelled order with no carrier date is not eligible for a handoff, so
+    it does not count as late. The delivered order with two items handed off
+    on time gives a rate of 1.0 over one eligible order.
+  model: mart_oltp_delivery_performance
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, order_purchase_timestamp: "2018-01-02 10:00:00", order_delivered_carrier_date: "2018-01-03 10:00:00", order_delivered_customer_date: "2018-01-06 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+    - {order_id: o2, order_status: canceled, order_purchase_timestamp: "2018-01-04 10:00:00"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, seller_id: s1, price: 10.0, freight_value: 2.0, item_gmv: 12.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o1, order_item_id: 2, seller_id: s1, price: 20.0, freight_value: 3.0, item_gmv: 23.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o2, order_item_id: 1, seller_id: s1, price: 5.0, freight_value: 1.0, item_gmv: 6.0, shipping_limit_date: "2018-01-06 00:00:00"}
+  expect:
+    rows:
+    - {purchase_month: "2018-01-01 00:00:00", delivered_with_both_dates: 1, handoff_eligible_count: 1, on_time_handoff_rate: 1.0}
+- name: mart_oltp_seller_performance_handoff_rate_counts_eligible_orders
+  description: >-
+    The seller has two orders. Only the shipped one is eligible for a handoff,
+    so the rate is 1.0 over one eligible (seller, order) pair.
+  model: mart_oltp_seller_performance
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, order_purchase_timestamp: "2018-01-02 10:00:00", order_delivered_carrier_date: "2018-01-03 10:00:00", order_delivered_customer_date: "2018-01-06 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+    - {order_id: o2, order_status: canceled, order_purchase_timestamp: "2018-01-04 10:00:00"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, seller_id: s1, price: 10.0, freight_value: 2.0, item_gmv: 12.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o1, order_item_id: 2, seller_id: s1, price: 20.0, freight_value: 3.0, item_gmv: 23.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o2, order_item_id: 1, seller_id: s1, price: 5.0, freight_value: 1.0, item_gmv: 6.0, shipping_limit_date: "2018-01-06 00:00:00"}
+  expect:
+    rows:
+    - {seller_id: s1, order_count: 2, handoff_eligible_count: 1, on_time_handoff_rate: 1.0}
+- name: mart_oltp_late_orders_one_row_per_late_order
+  description: >-
+    A late delivered order with two items gives one row with the seller of the
+    first item and a handoff miss against the latest shipping limit. An
+    on-time order is not in the mart.
+  model: mart_oltp_late_orders
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, purchase_date: "2018-01-02", purchase_state: SP, order_delivered_carrier_date: "2018-01-05 10:00:00", order_delivered_customer_date: "2018-01-15 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+    - {order_id: o2, order_status: delivered, purchase_date: "2018-01-02", purchase_state: SP, order_delivered_carrier_date: "2018-01-03 10:00:00", order_delivered_customer_date: "2018-01-08 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, seller_id: s1, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o1, order_item_id: 2, seller_id: s2, shipping_limit_date: "2018-01-03 00:00:00"}
+    - {order_id: o2, order_item_id: 1, seller_id: s1, shipping_limit_date: "2018-01-04 00:00:00"}
+  expect:
+    rows:
+    - {order_id: o1, customer_state: SP, seller_id: s1, days_late: 5, carrier_handoff_missed_deadline: true}
+- name: mart_oltp_freight_bands_known_and_unknown_distance
+  description: >-
+    Customer and seller on the same ZIP prefix give `0_50km`. A customer
+    prefix missing from dim_zip_prefix gives `unknown`.
+  model: mart_oltp_freight
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, purchase_state: SP, purchase_zip_prefix: "01001"}
+    - {order_id: o2, purchase_state: RJ, purchase_zip_prefix: "99999"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, price: 100.0, freight_value: 10.0, seller_zip_prefix: "01001"}
+    - {order_id: o2, order_item_id: 1, price: 50.0, freight_value: 5.0, seller_zip_prefix: "01001"}
+  - input: ref('dim_zip_prefix')
+    rows:
+    - {zip_prefix: "01001", mean_latitude: -23.55, mean_longitude: -46.63}
+  expect:
+    rows:
+    - {customer_state: SP, distance_band: 0_50km, item_count: 1, freight_to_price_ratio: 0.1}
+    - {customer_state: RJ, distance_band: unknown, item_count: 1, freight_to_price_ratio: 0.1}
+- name: mart_oltp_cancellations_counts_approval_before_cancel
+  description: >-
+    Two canceled orders, one approved first, give one row with order_count 2
+    and approved_before_cancel_count 1. A delivered order is not in the mart.
+  model: mart_oltp_cancellations
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: canceled, order_purchase_timestamp: "2018-01-02 10:00:00", order_approved_at: "2018-01-02 11:00:00"}
+    - {order_id: o2, order_status: canceled, order_purchase_timestamp: "2018-01-03 10:00:00"}
+    - {order_id: o3, order_status: delivered, order_purchase_timestamp: "2018-01-04 10:00:00", order_approved_at: "2018-01-04 11:00:00"}
+  expect:
+    rows:
+    - {purchase_month: "2018-01-01 00:00:00", order_status: canceled, order_count: 2, approved_before_cancel_count: 1}
+- name: mart_oltp_platform_sales_no_item_fan_out
+  description: An order with two items counts once; item GMV is summed per order before the join.
+  model: mart_oltp_platform_sales
+  given:
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, purchase_date: "2018-01-02"}
+    - {order_id: o2, order_status: created, purchase_date: "2018-01-02"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, item_gmv: 12.0}
+    - {order_id: o1, order_item_id: 2, item_gmv: 23.0}
+  expect:
+    rows:
+    - {purchase_date: "2018-01-02", order_count: 2, delivered_order_count: 1, item_gmv: 35.0}

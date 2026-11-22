@@ -10,3 +10,10 @@ union all
   "select coalesce(sum(order_count), 0) from " ~ ref('mart_seller_performance'),
   "select count(*) from (select i.seller_id, i.order_id from " ~ ref('fct_order_items') ~ " i join " ~ ref('fct_orders') ~ " o on o.order_id = i.order_id group by 1, 2) pairs"
 ) }}
+union all
+-- Handoff eligibility per (seller, order): a carrier date and a shipping limit.
+{{ scalars_differ(
+  'mart_seller_performance_handoff_eligible',
+  "select coalesce(sum(handoff_eligible_count), 0) from " ~ ref('mart_seller_performance'),
+  "select count(*) from (select i.seller_id, i.order_id from " ~ ref('fct_order_items') ~ " i join " ~ ref('fct_orders') ~ " o on o.order_id = i.order_id where o.order_delivered_carrier_date is not null group by 1, 2 having max(i.shipping_limit_date) is not null) pairs"
+) }}

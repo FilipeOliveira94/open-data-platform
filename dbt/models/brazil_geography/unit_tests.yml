@@ -1,0 +1,16 @@
+version: 2
+
+unit_tests:
+- name: dim_zip_prefix_modal_tie_takes_first_by_name
+  description: >-
+    A prefix seen once in two states takes the first state and city by name
+    on the tie, sets the multi-state flag, and averages the coordinates.
+  model: dim_zip_prefix
+  given:
+  - input: source('silver', 'olist_brazilian_ecommerce__geolocation')
+    rows:
+    - {geolocation_zip_code_prefix: "01001", geolocation_state: SP, geolocation_city: sao paulo, geolocation_lat: -23.0, geolocation_lng: -46.0}
+    - {geolocation_zip_code_prefix: "01001", geolocation_state: RJ, geolocation_city: rio de janeiro, geolocation_lat: -22.0, geolocation_lng: -43.0}
+  expect:
+    rows:
+    - {zip_prefix: "01001", modal_state: RJ, modal_city: rio de janeiro, mean_latitude: -22.5, mean_longitude: -44.5, multi_state_flag: true}

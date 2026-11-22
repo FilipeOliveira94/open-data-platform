@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-22 (P3-16 verified) |
+| Last updated | 2026-11-22 (P3-17 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,7 +22,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-17** — Gold metric grain corrections. Not started.
+**P3-18** — Exact decimal type for money fields. Not started.
+
+P3-17 is verified. `mart_review_drivers` resolves the category per order (`mixed` when the items span categories) and counts 99_224 reviews, equal to `fct_reviews` (113_131 before). The handoff rate in the four delivery and seller marts divides by `handoff_eligible_count`; the marketplace pooled rate moves from 0.8931 to 0.9094. A [unit-test rule](docs/architecture/gold-layer.md#unit-test-rule) and `dbt/unit_test_policy.yml` classify all 56 Gold models: 26 have a dbt unit test (`make dbt-unit`), 23 are exempt, and the 7 quality-findings models are pending ([corrections](docs/architecture/gold-model-design.md#p3-17-metric-corrections-2026-11-22)).
 
 P3-16 is verified. Each Bronze and Silver check is recorded per dataset in `lakehouse_state.layer_checks`. An open check runs again on the next refresh even with no new raw objects, and Silver and Gold do not build on it. The gap report lists windows missed after the last recorded one. The OLTP tables keep `updated_at` with a trigger, the daily extract waits a 15-minute settle lag, one window is read from one snapshot, and a retry keeps its `dt=` ([quality gate](docs/architecture/airflow-local.md#quality-gate-p3-16), [verification](docs/architecture/airflow-local.md#verification-2026-11-22-p3-16)).
 
@@ -32,9 +34,8 @@ Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13): the progress table bel
 
 ## Next work
 
-1. **P3-17** — Gold metric grain corrections. Acceptance: `ROADMAP.md` → P3-17.
-2. **P3-18** — Exact decimal type for money fields.
-3. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard).
+1. **P3-18** — Exact decimal type for money fields. Acceptance: `ROADMAP.md` → P3-18.
+2. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard).
 
 ---
 
@@ -56,7 +57,7 @@ Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13): the progress table bel
 | P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
 | P3-13 | Incremental lakehouse refresh | Verified | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
 | P3-16 | Quality gate state and extract-window corrections | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#quality-gate-p3-16) |
-| P3-17 | Gold metric grain corrections | Not started | — |
+| P3-17 | Gold metric grain corrections | Verified | [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md#p3-17-metric-corrections-2026-11-22) |
 | P3-18 | Exact decimal type for money fields | Not started | — |
 | P3-14 | Live run, result, and consistency check | Not started | — |
 | P3-15 | Phase 3 documentation and status | Not started | — |
@@ -183,7 +184,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 - DAGs already in the `airflow` metadata database keep their paused state; `is_paused_upon_creation=True` applies only to new DAGs. A manual daily trigger gets the last complete UTC day, whatever `-l` says; `airflow dags trigger` without `-l` has no data interval and the extract fails.
 - Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window; the weekly re-extract (P3-05) picks them up. A row committed after the weekly run that covers its `updated_at` is still missed: P3-06 backfill and CDC (Phase 4). The first scheduled weekly run is 2026-11-23; only manual weekly runs have been exercised. Three synthetic `p3-05-late-*` sellers stay in the lake; the 2026-11-21 integration-test run removed them from local PostgreSQL (review T8).
 - Since P3-13 a refresh reads only new raw objects, but it still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table. The Bronze `MERGE` joins against the whole unpartitioned table, so its scan grows with history (review R5, P3-08). Raw executions without a `_COMPLETE` marker never enter Bronze.
-- Until P3-17, `mart_review_drivers` counts a review once per order item and `on_time_handoff_rate` counts cancelled and unshipped orders as late (review R2, R3). Until P3-18, money columns are `DOUBLE`.
+- Until P3-18, money columns are `DOUBLE`. dbt unit tests need Trino and the built parents, so CI does not run them; `make dbt-unit` runs them locally.
 - Silver and Gold are visible to readers before their checks run, and Gold models are replaced one at a time (review R6, P6-09).
 - Integration tests write to `ODP_TEST_RAW_BUCKET` (default `odp-test-raw`) and seed a scratch PostgreSQL database. Before that fix, the PostgreSQL integration test truncated the local `oltp` tables (review T8); a run on 2026-11-21 reset local PostgreSQL to the fixture.
 - The windowed batch extract does not see hard deletes. A deleted row stays in Silver and Gold on the batch path; the CDC path (Phase 4) handles deletes.

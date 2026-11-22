@@ -1,0 +1,46 @@
+version: 2
+
+unit_tests:
+- name: mart_lead_outcome_won_and_open_leads
+  description: >-
+    A won lead whose seller sold items gets days_to_win and the seller GMV. A
+    won lead whose seller never sold is unmatched. An open lead is not won.
+  model: mart_lead_outcome
+  given:
+  - input: ref('fct_leads')
+    rows:
+    - {mql_id: m1, origin: organic_search, first_contact_date: "2018-01-01"}
+    - {mql_id: m2, origin: paid_search, first_contact_date: "2018-01-01"}
+    - {mql_id: m3, origin: social, first_contact_date: "2018-01-01"}
+  - input: ref('fct_closed_deals')
+    rows:
+    - {mql_id: m1, seller_id: s1, won_date: "2018-01-15 00:00:00", business_segment: pet}
+    - {mql_id: m2, seller_id: s9, won_date: "2018-01-03 00:00:00", business_segment: toys}
+  - input: ref('dim_sellers')
+    rows:
+    - {seller_id: s1}
+  - input: ref('fct_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, seller_id: s1, item_gmv: 12.0}
+    - {order_id: o2, order_item_id: 1, seller_id: s1, item_gmv: 8.0}
+  expect:
+    rows:
+    - {mql_id: m1, is_won: true, days_to_win: 14, seller_matched_in_orders: true, matched_seller_item_gmv: 20.0}
+    - {mql_id: m2, is_won: true, days_to_win: 2, seller_matched_in_orders: false, matched_seller_item_gmv: null}
+    - {mql_id: m3, is_won: false, days_to_win: null, seller_matched_in_orders: false, matched_seller_item_gmv: null}
+- name: mart_marketing_acquisition_win_rate_and_segment_tie
+  description: >-
+    Two wins in four leads give a win rate of 0.5. A tie on the declared
+    segment count takes the first segment by name. Matched seller GMV sums
+    only matched sellers.
+  model: mart_marketing_acquisition
+  given:
+  - input: ref('mart_lead_outcome')
+    rows:
+    - {mql_id: m1, origin: organic_search, is_won: true, business_segment: toys, seller_matched_in_orders: true, matched_seller_item_gmv: 20.0}
+    - {mql_id: m2, origin: organic_search, is_won: true, business_segment: pet, seller_matched_in_orders: false}
+    - {mql_id: m3, origin: organic_search, is_won: false, seller_matched_in_orders: false}
+    - {mql_id: m4, origin: organic_search, is_won: false, seller_matched_in_orders: false}
+  expect:
+    rows:
+    - {origin: organic_search, lead_count: 4, win_count: 2, win_rate: 0.5, matched_seller_item_gmv: 20.0, top_declared_segment: pet}

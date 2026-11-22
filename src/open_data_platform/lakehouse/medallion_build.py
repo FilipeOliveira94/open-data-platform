@@ -57,6 +57,7 @@ STEPS = (
     "dbt-parse",
     "dbt-build",
     "dbt-reconcile",
+    "dbt-unit",
 )
 
 
@@ -217,7 +218,12 @@ def dbt_command(
     work: Path,
     env: Mapping[str, str],
 ) -> list[str]:
-    """Return the dbt argument vector for ``parse``, ``build``, or ``reconcile``."""
+    """Return the dbt argument vector for a ``parse``, ``build``, ``reconcile``,
+    or ``unit`` action.
+
+    ``build`` excludes reconciliation and dbt unit tests: a logic test on a
+    fixture does not gate promotion of live Gold. ``unit`` runs them alone.
+    """
     repo = env.get("ODP_REPO", DEFAULT_REPO)
     base = [env.get("ODP_DBT_BIN", DEFAULT_DBT_BIN)]
     tail = [
@@ -233,9 +239,18 @@ def dbt_command(
     if action == "parse":
         return [*base, "parse", *tail]
     if action == "build":
-        return [*base, "build", *tail, "--exclude", "tag:reconciliation"]
+        return [
+            *base,
+            "build",
+            *tail,
+            "--exclude",
+            "tag:reconciliation",
+            "test_type:unit",
+        ]
     if action == "reconcile":
         return [*base, "test", *tail, "--select", "tag:reconciliation"]
+    if action == "unit":
+        return [*base, "test", *tail, "--select", "test_type:unit"]
     msg = f"unknown dbt action: {action}"
     raise MedallionBuildError(msg)
 
@@ -476,7 +491,7 @@ def _run_step(
         _run_dbt(step, work, env, run_command)
         refresh.complete_gold(registry, work.name, marked)
         return True
-    if step in {"dbt-parse", "dbt-reconcile"}:
+    if step in {"dbt-parse", "dbt-reconcile", "dbt-unit"}:
         _run_dbt(step, work, env, run_command)
         return True
     msg = f"unknown step: {step}"
