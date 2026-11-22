@@ -4,6 +4,10 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-22 — Roadmap changelog and status ledger compacted
+
+The `ROADMAP.md` changelog moves out of the Document control table into a `Changelog` section with one line per change; the detail stays in this log. Three changelog facts had no entry here and are recorded now: 2026-11-20, the development flow was simplified (`AGENTS.md` §3 and §13) and Filipe, not a PO, decides the Phase 10 position; 2026-11-06, the Phase 4 close pair is P4-09/P4-10 and P4-08 (SCD Type 2) sits before it; 2026-11-05, the Phase 2 close pair is P2-09/P2-10 and the Spark Ivy cache was inserted as P2-08. `PROJECT_STATUS.md` drops the earlier Phase 3 narrative, the stale program roadmap table, the Log copies, and two risks that no longer hold (the D-006/D-007 note and the R1 check bypass closed by P3-16). The P1-03 and P1-04 entries below are back in date order. No issue status changed.
+
 ### 2026-11-22 — P3-16 quality gate state and extract-window corrections
 
 The promotion registry gains `lakehouse_state.layer_checks` (layer, dataset, status `pending`/`failed`/`passed`, expected Bronze rows, marking and checking run). A Bronze registration opens the Bronze check in the transaction that marks Silver pending; a Silver write opens the Silver check in the transaction that clears its flag. `bronze-checks` and `silver-checks` run every open check of their layer and record each result. `silver` refuses a dataset with an open Bronze check; `stage-quarantine` and `dbt-build` refuse while any check is open. `bronze` and `silver` end as "ran" while a check is open, so the check task is not skipped. Check tasks have `retries=0` (review R1, T3).
@@ -331,13 +335,13 @@ DummyJSON `/products` client: `limit`/`skip` pagination, timeout and 429/5xx ret
 
 Olist historical ingestion: Kaggle download client, safe unzip into gitignored staging, and raw writes for the 11 published CSVs. `closed_deals.seller_id` joins `sellers.seller_id` or `order_items.seller_id` (contract version 2). Each CSV is read and written on its own; a structural failure stops the remaining files. A leading UTF-8 BOM on `product_category_name_translation` is ignored for the header check and kept in the raw bytes. `uv run pytest tests/unit` → 76 passed; MinIO integration → 1 passed.
 
-### 2026-10-18 — P1-03 verified
-
-YAML contracts under `config/contracts/` for Olist e-commerce, marketing funnel, DummyJSON products, PostgreSQL v1 (`sellers`, `customers`, `orders`, `order_items`), and IBGE `municipios`. Structural loader only. `uv run pytest tests/unit` → 40 passed; ruff clean. D-013 stays `proposed`. Synthetic events and BrasilAPI CEP are out of this set.
-
 ### 2026-10-22 — P1-04 Olist historical ingestion
 
 Package fetch of `olistbr/brazilian-ecommerce` and `olistbr/marketing-funnel-olist` through `GET /api/v1/datasets/download/{owner}/{slug}`. One slug is extracted and its CSVs are written one at a time before the next slug starts. Published join: `closed_deals.seller_id` = `sellers.seller_id` or `order_items.seller_id` (those three contracts are version 2). Validation: `uv run ruff check src tests` PASS; `uv run ruff format --check src tests` PASS; `uv run pytest tests/unit` → 76 passed; `uv run pytest tests/integration/test_olist_ingest.py` → 1 passed on local MinIO. A live Kaggle run downloaded the e-commerce zip and stopped on the category-file BOM; the full live run after that fix was not re-executed. No Olist rows committed.
+
+### 2026-10-18 — P1-03 verified
+
+YAML contracts under `config/contracts/` for Olist e-commerce, marketing funnel, DummyJSON products, PostgreSQL v1 (`sellers`, `customers`, `orders`, `order_items`), and IBGE `municipios`. Structural loader only. `uv run pytest tests/unit` → 40 passed; ruff clean. D-013 stays `proposed`. Synthetic events and BrasilAPI CEP are out of this set.
 
 ### 2026-10-18 — P1-02 raw storage layout and ingestion metadata
 
