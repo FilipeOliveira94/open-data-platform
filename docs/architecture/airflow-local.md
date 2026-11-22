@@ -185,12 +185,12 @@ Since P3-13 the write steps are incremental. A step with nothing to do writes no
 
 | Step | What it calls |
 | --- | --- |
-| `bronze` | Creates the catalog database and `lakehouse_state` if missing, promotes new raw objects (`lakehouse.refresh.refresh_bronze`), runs `run_bronze.sh` once per changed dataset, then registers the objects. Skips when nothing is new and no later layer is pending |
-| `bronze-checks` | `bronze_count_checks` on the tables the `bronze` step wrote: Trino `COUNT(*)` against the registry row total. Skips when no table was written |
-| `silver` | Renders and runs `run_silver.sh` for each dataset pending for Silver, then clears its flag and marks Gold pending. Skips when nothing is pending |
-| `silver-checks` | Silver checks for the tables the `silver` step rebuilt. Skips when it rebuilt none |
-| `stage-quarantine` | While Gold is pending: `lakehouse.quarantine_stage`, then `run_bronze.sh` on that SQL |
-| `dbt-build` | While Gold is pending: `dbt build --exclude tag:reconciliation`, then clears the Gold flag |
+| `bronze` | Creates the catalog database and `lakehouse_state` if missing, promotes new raw objects (`lakehouse.refresh.refresh_bronze`), runs `run_bronze.sh` once per changed dataset, then registers the objects and opens their Bronze check. Skips when nothing is new, no later layer is pending, and no check is open |
+| `bronze-checks` | Every open Bronze check ([quality gate](#quality-gate-p3-16)): Trino `COUNT(*)` against the registry row total stored with the write. Records `passed` or `failed` per dataset. Skips when no Bronze check is open |
+| `silver` | Renders and runs `run_silver.sh` for each dataset pending for Silver, then clears its flag, opens its Silver check, and marks Gold pending. Fails without writing when a dataset to build has an open Bronze check. Skips when nothing is pending and no Silver check is open |
+| `silver-checks` | Every open Silver check. Records the result per dataset. Skips when no Silver check is open |
+| `stage-quarantine` | While Gold is pending and no check is open: `lakehouse.quarantine_stage`, then `run_bronze.sh` on that SQL |
+| `dbt-build` | While Gold is pending and no check is open: `dbt build --exclude tag:reconciliation`, then clears the Gold flag |
 | `dbt-parse` / `dbt-reconcile` | `dbt parse`, `dbt test --select tag:reconciliation` |
 
 `medallion_build` runs each process with an argument vector and no shell. Credentials stay in the container environment. Trino checks use the HTTP protocol at `ODP_TRINO_HOST:ODP_TRINO_PORT` (`trino:8080`). A mismatch prints the statement, the expected value, and the result, then fails the step.
@@ -206,7 +206,7 @@ Since P3-13 the write steps are incremental. A step with nothing to do writes no
 | `transform_lakehouse` | None (also triggered by `ingest_postgres_oltp_daily`, P3-04) | `bronze` → `bronze_checks` → `silver` → `silver_checks` → `stage_quarantine` → `dbt_build` |
 | `reconcile_gold` | `@weekly` | `dbt_reconcile` |
 
-The tasks use the P3-02 `DEFAULT_ARGS` from `ingest_common.py`: 2 retries, a 2-minute delay, and a 30-minute execution timeout. Both DAGs set `max_active_runs=1` and `catchup=False`. `transform_lakehouse` is linear. All Spark steps share one Ivy cache and one container, so two Spark steps do not run at the same time. Quarantine staging does not read Bronze or Silver. It runs after `silver_checks` only for that reason.
+The tasks use the P3-02 `DEFAULT_ARGS` from `ingest_common.py`: 2 retries, a 2-minute delay, and a 30-minute execution timeout. Since P3-16 the two check tasks have `retries=0`: a failed check is a data result, and it stays open for the next refresh. Both DAGs set `max_active_runs=1` and `catchup=False`. `transform_lakehouse` is linear. All Spark steps share one Ivy cache and one container, so two Spark steps do not run at the same time. Quarantine staging does not read Bronze or Silver. It runs after `silver_checks` only for that reason.
 
 Until P3-04, `reconcile_gold` was unpaused at creation and did not wait for `transform_lakehouse`, so a reconciliation run could read a table that was being replaced. P3-04 closes that with a pool (next section).
 
@@ -280,6 +280,8 @@ The seven task logs in MinIO did not contain the MinIO password, the Fernet key,
 | Timetable | `CronDataIntervalTimetable("0 0 * * *", timezone="UTC")` |
 | Window | The run's data interval, `[data_interval_start, data_interval_end)` = `[D-1 00:00Z, D 00:00Z)` for the run at `D 00:00Z` (21:00 in Brasília) |
 | Catchup | `True`, `start_date` 2026-11-19. After a pause or a scheduler outage, the scheduler creates one run per missed day, oldest first, one at a time. On a fresh database the first run is the 2026-11-19 window. Days before `start_date` are a backfill (P3-06). Until 2026-11-20 05:20Z the DAG had `catchup=False`; the live run below used that setting |
+| Settle lag | The `settle` sensor (`TimeDeltaSensor`, `mode="reschedule"`) holds `extract` until `D 00:00Z + 15 min` (P3-16). It does not defer: the stack has no triggerer (D-006). A caught-up window is already past the lag |
+| Ingestion timestamp | `--ingestion-ts {{ dag_run.run_after.isoformat() }}` (P3-16): `D 00:00Z` for a scheduled run, the trigger time for a manual one. Every try writes under the same `dt=` |
 | `max_active_runs` | 1 |
 | Paused at creation | Yes |
 | Params | `execution_id` only. No window params |
@@ -306,9 +308,16 @@ Idempotency:
 - A new run of the same window, for example a manual trigger on the same day as the scheduled run, has a new run id. It writes a new execution next to the previous one. Bronze keeps both and Silver deduplicates by key. This is the P3-02 rule: a new run keeps the previous raw object.
 - No window is skipped. The window comes only from the schedule and no watermark is stored, so with `catchup=False` a day the scheduler missed would never be extracted, without any error. `catchup=True` closes that gap. A record of covered windows and a gap report are P3-06.
 - Every caught-up run emits an Asset event. Events that arrive while a refresh runs start one follow-up refresh, which promotes every new window at once (P3-13).
-- The `dt=` segment is the real ingestion date. A retry that crosses UTC midnight writes the same window under the next `dt`. The content is the same and Silver deduplicates it.
+- The `dt=` segment comes from the run's `run_after`, not the try's clock (P3-16). Until P3-16 it was the real ingestion date, so a retry that crossed UTC midnight wrote a second complete prefix with the same execution id (review R14).
 
-Late commits are accepted and documented. A row whose `updated_at` falls before midnight but whose transaction commits after the 00:00Z run is not in that day's window. The [weekly re-extract](#weekly-postgresql-re-extract-p3-05) and backfills (P3-06) are the safety net. Streaming CDC (Phase 4) is the exact path.
+### Watermark, settle lag, and snapshot (P3-16)
+
+- `schema.sql` adds a `BEFORE UPDATE` trigger, `set_updated_at`, on each `oltp` table. When an `UPDATE` leaves `updated_at` unchanged, the trigger sets it to `clock_timestamp()`, the time of the row change rather than the transaction start. A writer that sets `updated_at` explicitly keeps its value. `INSERT` is untouched; the column is `NOT NULL`.
+- The extract checks `pg_trigger` and fails before reading when a table lacks the trigger. `python -m open_data_platform.ingestion.postgres_oltp apply-schema` (idempotent) adds it to an existing database without reseeding.
+- The extract refuses a window before `window_end + 15 min` (`coverage.SETTLE_LAG`). Bounds stay at UTC midnight.
+- The four datasets of a window are read in one `REPEATABLE READ, READ ONLY` transaction before any write. `orders` and `order_items` come from the same snapshot. A read failure writes nothing.
+
+Residual late commit: a transaction whose `UPDATE` ran before `D 00:00Z` and that commits after `D 00:15Z` has an `updated_at` inside `[D-1, D)` but was not visible to the daily read. The [weekly re-extract](#weekly-postgresql-re-extract-p3-05) reads that day again one day after the week ends, and backfills (P3-06) cover the rest. Streaming CDC (Phase 4) is the exact path.
 
 Since P3-13 `transform_lakehouse` promotes only the new raw objects and rebuilds only the Silver datasets they changed. Measured costs are in [Bronze layer](bronze-layer.md#incremental-refresh-p3-13).
 
@@ -363,12 +372,12 @@ The extract writes the rows in one transaction, after every dataset has its `_CO
 
 ### Gap report
 
-`make coverage-report FREQUENCY=daily` (or `weekly`) runs `python -m open_data_platform.ingestion.coverage report --frequency <f>`. The report rebuilds the expected windows of the cadence from its first window up to the last recorded window end:
+`make coverage-report FREQUENCY=daily` (or `weekly`) runs `python -m open_data_platform.ingestion.coverage report --frequency <f>`. The report rebuilds the expected windows of the cadence from its first window up to the last window due at report time (`as_of`, now in the CLI), or the last recorded window end when that is later. A window is due once its end plus the cadence run delay has passed. A DAG that stopped therefore shows every window since then as a gap (P3-16, review R7). Until P3-16 the expected windows ended at the last recorded window, so a stopped DAG reported no gap.
 
-| Cadence | First window | Expected windows |
-| --- | --- | --- |
-| `daily` | `[2026-11-19, 2026-11-20)`, the DAG `start_date` | `[D, D+1)` for every day |
-| `weekly` | `[2026-11-15, 2026-11-22)`, the first interval shifted back one day | `[W-8, W-1)` for every Monday `W` |
+| Cadence | First window | Expected windows | Due at |
+| --- | --- | --- | --- |
+| `daily` | `[2026-11-19, 2026-11-20)`, the DAG `start_date` | `[D, D+1)` for every day | `D+1 00:15Z` (settle lag) |
+| `weekly` | `[2026-11-15, 2026-11-22)`, the first interval shifted back one day | `[W-8, W-1)` for every Monday `W` | `W 00:00Z` (one day after the window end) |
 
 | Finding | Rule | Error |
 | --- | --- | --- |
@@ -412,7 +421,45 @@ Every ingestion DAG emits an Airflow Asset per raw source it lands, on the succe
 
 The URI is `odp-raw://{source_id}`. `transform_lakehouse` is scheduled on any of them (`AssetAny`) with `max_active_runs=1`. No DAG uses `TriggerDagRunOperator`. A manual `transform_lakehouse` trigger still works.
 
-Each write task of the transform after `bronze` uses the trigger rule `none_failed`, so a skipped step does not stop a layer that is still pending from an earlier failed run. A check task keeps `all_success` and is skipped when its write step was skipped. A step with nothing to do exits 99, which `run_python_args` turns into a skipped task.
+Each write task of the transform after `bronze` uses the trigger rule `none_failed`, so a skipped step does not stop a layer that is still pending from an earlier failed run. A check task keeps `all_success` and is skipped when its write step was skipped. A step with nothing to do exits 99, which `run_python_args` turns into a skipped task. Since P3-16 a write step does not skip while a check of its layer is open, so the check task still runs; see [Quality gate](#quality-gate-p3-16).
+
+## Quality gate (P3-16)
+
+Until P3-16 a check step checked only the tables its own run wrote. A refresh with no new raw object after a failed check skipped the check, and the `none_failed` rule then built Silver, and later Gold, on data that had failed (review R1). The check state now lives in the promotion registry, table `lakehouse_state.layer_checks`:
+
+| Column | Meaning |
+| --- | --- |
+| `layer`, `source_id`, `dataset` | Primary key. `layer` is `bronze` or `silver` |
+| `status` | `pending` (written, not checked), `failed`, or `passed`. Pending and failed checks are open |
+| `expected_rows` | Bronze only: the registry row total stored with the write. A later run re-checks without the earlier run's work dir |
+| `marked_by_run`, `marked_at` | The write that opened the check |
+| `checked_by_run`, `checked_at` | The check run that recorded `status` |
+
+| Event | Effect |
+| --- | --- |
+| Bronze registers objects of a dataset | Its Bronze check becomes `pending`, in the transaction that marks Silver pending |
+| Silver writes a dataset | Its Silver check becomes `pending`, in the transaction that clears its Silver flag |
+| A check step runs | It runs every open check of its layer, one dataset at a time, records `passed` or `failed` for each, and fails if any failed. A write that lands while the check runs leaves the check `pending` |
+| `silver` would build a dataset with an open Bronze check | The step fails before writing and names the dataset |
+| `stage-quarantine` or `dbt-build` while any check is open | The step fails before writing and names the checks |
+| `bronze` or `silver` has nothing to write but a check is open | The step ends as "ran", so the check task after it is not skipped |
+
+A dataset with no row has not been written since the gate existed and has no open check. A Trino error during a check is recorded as `failed`; the next refresh runs it again. The check tasks have `retries=0`.
+
+Pipeline design checklist:
+
+| Question | Answer |
+| --- | --- |
+| Change type | No `update_pattern` changes. The trigger makes `updated_at` reliable for the `postgres_oltp` datasets |
+| Window and watermark | Daily and weekly windows are unchanged. The daily read waits 15 minutes past the window end. A missed window shows as a gap, now also after the last recorded window. A commit later than the lag is left to the weekly re-extract |
+| Re-run and backfill | A retry keeps `dt=`, so it overwrites the same keys. Re-running a check on unchanged Bronze gives the same result. `--full-rebuild` opens every check and goes through the same gate |
+| Deletes | Not applicable: no delete path changes. A hard delete in OLTP is still invisible to the window extract (P3-12) |
+| What a run reads | A re-check is one Trino `COUNT(*)` (Bronze) or the Silver checks of each open dataset. No raw history is read again |
+| Reader view | A Bronze table that failed stays queryable; nothing in Silver or Gold is built on it. Atomic replace (P3-11) is unchanged |
+| Ownership and concurrency | Only the `transform_lakehouse` steps (`max_active_runs=1`) and the `make live-*` targets write `layer_checks`. A result is stored only if `marked_at` is unchanged, so a mark made during a check survives |
+| Trigger | Same Asset schedule. Each later run re-checks whatever is still open |
+| Failure | A failed check leaves `failed` in the registry and fails its task with no retry. The next refresh runs it again before Silver or Gold. A blocked write step fails with the dataset and check names |
+| Evidence | Unit tests, `pytest tests/integration`, and `scripts/p3_16_gate_check.sh` (below) |
 
 ## Verification (2026-11-20, P3-04)
 
@@ -518,3 +565,33 @@ Until this issue, the PostgreSQL DAGs used `params.execution_id or run_id`. Airf
 The fix is `POSTGRES_EXECUTION_ID = "{{ params.execution_id or (dag.dag_id ~ '__' ~ run_id) }}"` in `ingest_common.py`, used only by `postgres_extract_task`. The other ingestion DAGs each own one source and keep `run_id`. A DagBag test renders the daily and weekly extract at the same Monday instant and asserts distinct execution ids. The stray prefix from 2026-11-21 stays in raw storage: Bronze ignores it as incomplete, and its daily object was already promoted on 2026-11-21 18:19Z.
 
 Unit checks: `uv run pytest tests/unit` and `make lint` passed (counts in [`docs/status-log.md`](../status-log.md)).
+
+## Verification (2026-11-22, P3-16)
+
+`scripts/p3_16_gate_check.sh` ran on the local stack (PostgreSQL, MinIO, Trino, runtime image with the branch source mounted) on 2026-11-22 03:17Z. Each step is the `medallion_build` CLI that the DAG tasks call.
+
+| Run | Step and result | Seconds |
+| --- | --- | --- |
+| Setup | Extract on the old schema: exit 1, `oltp tables without the set_updated_at trigger: sellers, customers, orders, order_items` | 3 |
+| Setup | `apply-schema`: 4 triggers. Manual extract `[2026-10-19, 2026-10-20)`: 4 objects | 1, 3 |
+| r1 | `bronze`: 8 objects promoted, `orders` and `order_items` written (9 rows each). Then `orders.expected_rows` was raised from 9 to 10 in `layer_checks` (the planted failure) | 30 |
+| r1 | `bronze-checks`: exit 1. `customers`, `order_items`, `sellers` passed; `orders` failed | 4 |
+| r2 | `bronze`: no new raw object, exit 0, "downstream work is pending" | 2 |
+| r2 | `bronze-checks`: ran the open check again, exit 1, `orders` failed | 2 |
+| r2 | `silver`: exit 1, `silver blocked: bronze check not passed for postgres_oltp.orders (failed)`; no table written | 2 |
+| r2 | `dbt-build`: Gold not pending, no model built | 2 |
+| r3 | Planted value restored to 9. `bronze-checks`: `orders` passed | 2 |
+| r3 | `silver`: 4 tables. `silver-checks`: 4 passed. `stage-quarantine`, then `dbt-build` PASS=287 | 54, 3, 15, 41 |
+| r4 | `bronze`: nothing new, nothing pending, skipped. `bronze-checks`: no check open, skipped | 3, 2 |
+
+After r2, Silver was still pending for all four `postgres_oltp` datasets and Gold was not pending. After r3, `pending_layers` was empty and all eight checks were `passed`. The r1 `customers` and `sellers` objects had no new rows (`rows_appended=0`) but were registered, so their checks opened and passed.
+
+The extract changes were tested in `tests/integration/ingestion/test_postgres_oltp_ingest.py` against the scratch database:
+- An `UPDATE` that leaves `updated_at` out gets a time at or after the statement.
+- An explicit value is kept.
+- A commit from another session made between the `orders` and `order_items` reads does not show in the extracted `order_items`.
+- A dropped trigger fails the extract.
+
+The existing round-trip test now sets `updated_at` explicitly in its rewrite, because the trigger would otherwise move the row out of its window.
+
+Not verified on a live scheduler: the `settle` sensor and the rendered `--ingestion-ts` on an actual retry. The DagBag tests render the vector and check the sensor settings. Run behavior on a live scheduler is P3-09.

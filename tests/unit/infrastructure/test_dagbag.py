@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -41,6 +42,8 @@ POOLED_TASKS = {
 
 MEDALLION_BUILD = "open_data_platform.lakehouse.medallion_build"
 RUN_LABEL = ["--run-label", "{{ run_id }}"]
+CHECK_TASKS = {"bronze_checks", "silver_checks"}
+
 TRANSFORM_ORDER = (
     ("bronze", "bronze"),
     ("bronze_checks", "bronze-checks"),
@@ -96,7 +99,10 @@ def test_wrapper_tasks_share_the_p3_02_defaults(dagbag) -> None:
         # The daily and weekly extracts catch up missed windows (P3-04, P3-05).
         assert dag.catchup is (dag_id in {DAILY, WEEKLY})
         for task in dag.tasks:
-            assert task.retries == 2, (dag_id, task.task_id)
+            if task.task_id == "settle":
+                continue  # the daily settle-lag sensor (P3-16)
+            expected_retries = 0 if task.task_id in CHECK_TASKS else 2
+            assert task.retries == expected_retries, (dag_id, task.task_id)
             assert task.retry_delay == timedelta(minutes=2)
             assert task.execution_timeout == timedelta(minutes=30)
             assert task.python_callable.__name__ == "run_python_args"
@@ -206,7 +212,8 @@ def test_daily_dag_runs_at_utc_midnight_with_catchup(dagbag) -> None:
     assert dag.start_date == datetime(2026, 11, 19, tzinfo=UTC)
     assert dag.max_active_runs == 1
     assert set(dag.params.keys()) == {"execution_id"}
-    assert dag.task_ids == ["extract"]
+    assert sorted(dag.task_ids) == ["extract", "settle"]
+    assert dag.get_task("extract").upstream_task_ids == {"settle"}
     vector = _vector(dag.get_task("extract"))
     assert vector[:3] == ["-m", "open_data_platform.ingestion.postgres_oltp", "extract"]
 
@@ -274,9 +281,12 @@ def test_daily_dag_runs_every_missed_window_in_order(dagbag) -> None:
     assert first.data_interval.start == pendulum.datetime(2026, 11, 19, tz=utc)
 
 
+RUN_AFTER = datetime(2026, 10, 18, tzinfo=UTC)
+
+
 def _render_extract(dag, context: dict[str, object]) -> list[str]:
     task = dag.get_task("extract")
-    context = {"dag": dag, **context}
+    context = {"dag": dag, "dag_run": SimpleNamespace(run_after=RUN_AFTER), **context}
     return [str(task.render_template(arg, context)) for arg in task.op_args]
 
 
@@ -312,6 +322,8 @@ def test_daily_window_renders_into_a_valid_extract_window(dagbag) -> None:
         DAILY,
         "--airflow-run-id",
         run_id,
+        "--ingestion-ts",
+        RUN_AFTER.isoformat(),
     ]
     start = datetime.fromisoformat(vector[4])
     end = datetime.fromisoformat(vector[6])
@@ -425,6 +437,8 @@ def test_weekly_window_lags_the_interval_by_one_day(dagbag) -> None:
         WEEKLY,
         "--airflow-run-id",
         run_id,
+        "--ingestion-ts",
+        RUN_AFTER.isoformat(),
     ]
     start = datetime.fromisoformat(vector[4])
     end = datetime.fromisoformat(vector[6])
@@ -585,3 +599,33 @@ def test_daily_and_weekly_runs_at_the_same_instant_get_distinct_executions(
         },
     )
     assert explicit[8] == "rerun-7"
+
+
+def test_daily_extract_waits_for_the_settle_lag(dagbag) -> None:
+    from airflow.providers.standard.sensors.time_delta import TimeDeltaSensor
+    from ingest_common import SETTLE_LAG
+
+    from open_data_platform.ingestion import coverage
+
+    sensor = dagbag.dags[DAILY].get_task("settle")
+    assert isinstance(sensor, TimeDeltaSensor)
+    assert sensor.delta == SETTLE_LAG == coverage.SETTLE_LAG
+    assert sensor.mode == "reschedule"
+    assert sensor.deferrable is False  # no triggerer in local Compose (D-006)
+
+
+def test_every_try_of_a_run_renders_the_same_ingestion_timestamp(dagbag) -> None:
+    """The ``dt=`` prefix comes from run_after, not the try's clock (R14)."""
+    import pendulum
+
+    for dag_id in (DAILY, WEEKLY):
+        context = {
+            "data_interval_start": pendulum.datetime(2026, 10, 17, tz="UTC"),
+            "data_interval_end": pendulum.datetime(2026, 10, 18, tz="UTC"),
+            "params": {"execution_id": ""},
+            "run_id": "scheduled__x",
+        }
+        first = _render_extract(dagbag.dags[dag_id], context)
+        retry = _render_extract(dagbag.dags[dag_id], context)
+        flag = first.index("--ingestion-ts")
+        assert first[flag + 1] == retry[flag + 1] == RUN_AFTER.isoformat()

@@ -60,7 +60,9 @@ def _daily(*offsets: int) -> list[CoverageRecord]:
 
 
 def test_contiguous_windows_are_clean() -> None:
-    report = coverage_report("daily", _daily(0, 1, 2), datasets=DATASETS, cadence=DAILY)
+    report = coverage_report(
+        "daily", _daily(0, 1, 2), datasets=DATASETS, as_of=START, cadence=DAILY
+    )
 
     assert report.clean
     assert report.expected_windows == 3
@@ -68,7 +70,9 @@ def test_contiguous_windows_are_clean() -> None:
 
 
 def test_planted_gap_is_reported() -> None:
-    report = coverage_report("daily", _daily(0, 2), datasets=DATASETS, cadence=DAILY)
+    report = coverage_report(
+        "daily", _daily(0, 2), datasets=DATASETS, as_of=START, cadence=DAILY
+    )
 
     assert not report.clean
     assert [gap.window for gap in report.gaps] == [(_day(1), _day(2))]
@@ -79,7 +83,9 @@ def test_planted_gap_is_reported() -> None:
 def test_window_missing_one_dataset_is_a_gap() -> None:
     records = _daily(0) + _records(_day(1), _day(2), datasets=("sellers",))
 
-    report = coverage_report("daily", records, datasets=DATASETS, cadence=DAILY)
+    report = coverage_report(
+        "daily", records, datasets=DATASETS, as_of=START, cadence=DAILY
+    )
 
     assert [(g.window, g.missing_datasets) for g in report.gaps] == [
         ((_day(1), _day(2)), ("customers",))
@@ -92,7 +98,9 @@ def test_planted_overlap_is_reported() -> None:
         _day(3), _day(10), frequency="weekly", execution_id="shifted"
     )
 
-    report = coverage_report("weekly", records, datasets=DATASETS, cadence=weekly)
+    report = coverage_report(
+        "weekly", records, datasets=DATASETS, as_of=START, cadence=weekly
+    )
 
     assert report.overlaps == (((_day(0), _day(7)), (_day(3), _day(10))),)
     assert not report.clean
@@ -101,7 +109,9 @@ def test_planted_overlap_is_reported() -> None:
 def test_rerun_of_a_covered_window_is_not_an_overlap() -> None:
     records = _daily(0, 1) + _records(_day(1), _day(2), execution_id="backfill-1")
 
-    report = coverage_report("daily", records, datasets=DATASETS, cadence=DAILY)
+    report = coverage_report(
+        "daily", records, datasets=DATASETS, as_of=START, cadence=DAILY
+    )
 
     assert report.clean
     assert report.rerun_windows == ((_day(1), _day(2)),)
@@ -110,7 +120,9 @@ def test_rerun_of_a_covered_window_is_not_an_overlap() -> None:
 def test_backfill_before_start_is_listed_not_an_error() -> None:
     records = _daily(-30, 0)
 
-    report = coverage_report("daily", records, datasets=DATASETS, cadence=DAILY)
+    report = coverage_report(
+        "daily", records, datasets=DATASETS, as_of=START, cadence=DAILY
+    )
 
     assert report.clean
     assert report.before_start == ((_day(-30), _day(-29)),)
@@ -121,7 +133,11 @@ def test_other_frequencies_are_ignored() -> None:
     manual = _records(_day(0), _day(3), frequency="manual")
 
     report = coverage_report(
-        "daily", _daily(0) + weekly + manual, datasets=DATASETS, cadence=DAILY
+        "daily",
+        _daily(0) + weekly + manual,
+        datasets=DATASETS,
+        as_of=START,
+        cadence=DAILY,
     )
 
     assert report.clean
@@ -129,7 +145,7 @@ def test_other_frequencies_are_ignored() -> None:
 
 
 def test_empty_ledger_has_no_expected_window() -> None:
-    report = coverage_report("daily", [], datasets=DATASETS, cadence=DAILY)
+    report = coverage_report("daily", [], datasets=DATASETS, as_of=START, cadence=DAILY)
 
     assert report.clean
     assert report.last_window is None
@@ -138,12 +154,16 @@ def test_empty_ledger_has_no_expected_window() -> None:
 
 def test_manual_frequency_has_no_cadence() -> None:
     with pytest.raises(CoverageError, match="no cadence"):
-        coverage_report("manual", [], datasets=DATASETS)
+        coverage_report("manual", [], datasets=DATASETS, as_of=START)
 
 
 def test_default_cadences_follow_the_dag_windows() -> None:
-    assert CADENCES["daily"] == Cadence(datetime(2026, 11, 19, tzinfo=UTC), DAY)
-    assert CADENCES["weekly"] == Cadence(datetime(2026, 11, 15, tzinfo=UTC), 7 * DAY)
+    assert CADENCES["daily"] == Cadence(
+        datetime(2026, 11, 19, tzinfo=UTC), DAY, timedelta(minutes=15)
+    )
+    assert CADENCES["weekly"] == Cadence(
+        datetime(2026, 11, 15, tzinfo=UTC), 7 * DAY, DAY
+    )
     assert CADENCES["weekly"].first_start.weekday() == 6  # Sunday
 
 
@@ -206,7 +226,9 @@ def test_upsert_rejects_negative_counts() -> None:
 
 
 def test_format_report_names_windows_and_datasets_only() -> None:
-    report = coverage_report("daily", _daily(0, 2), datasets=DATASETS, cadence=DAILY)
+    report = coverage_report(
+        "daily", _daily(0, 2), datasets=DATASETS, as_of=START, cadence=DAILY
+    )
 
     lines = format_report(report)
 
@@ -219,17 +241,61 @@ def _asdict(record: CoverageRecord) -> dict[str, object]:
     return {name: getattr(record, name) for name in record.__slots__}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="review R7: windows after the last recorded one are not reported; P3-16",
-)
 def test_a_stopped_dag_reports_its_trailing_gaps() -> None:
     """Only the first window was recorded, and the DAG then stopped.
 
-    Every window since then should have run by now, so each one is a gap.
-    Today the expected windows end at the last recorded window.
+    Every window since then should have run by now, so each one is a gap
+    (review R7).
     """
     report = coverage_report(
-        "daily", _records(_day(0), _day(1)), datasets=DATASETS, cadence=DAILY
+        "daily",
+        _records(_day(0), _day(1)),
+        datasets=DATASETS,
+        as_of=_day(4),
+        cadence=DAILY,
     )
-    assert report.gaps
+    assert [gap.window for gap in report.gaps] == [
+        (_day(1), _day(2)),
+        (_day(2), _day(3)),
+        (_day(3), _day(4)),
+    ]
+
+
+def test_a_window_is_not_due_before_its_run_delay() -> None:
+    lagged = Cadence(START, DAY, timedelta(minutes=15))
+    records = _records(_day(0), _day(1))
+
+    early = coverage_report(
+        "daily",
+        records,
+        datasets=DATASETS,
+        as_of=_day(2) + timedelta(minutes=14),
+        cadence=lagged,
+    )
+    due = coverage_report(
+        "daily",
+        records,
+        datasets=DATASETS,
+        as_of=_day(2) + timedelta(minutes=15),
+        cadence=lagged,
+    )
+
+    assert early.clean
+    assert [gap.window for gap in due.gaps] == [(_day(1), _day(2))]
+
+
+def test_a_dag_that_never_ran_reports_every_due_window() -> None:
+    report = coverage_report(
+        "daily", [], datasets=DATASETS, as_of=_day(2), cadence=DAILY
+    )
+
+    assert report.last_window is None
+    assert report.expected_windows == 2
+    assert len(report.gaps) == 2
+
+
+def test_as_of_must_be_timezone_aware() -> None:
+    with pytest.raises(CoverageError, match="timezone-aware"):
+        coverage_report(
+            "daily", [], datasets=DATASETS, as_of=datetime(2026, 11, 20), cadence=DAILY
+        )

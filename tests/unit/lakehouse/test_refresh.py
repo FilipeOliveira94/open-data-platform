@@ -17,6 +17,9 @@ from open_data_platform.lakehouse.bronze import promote_bronze
 from open_data_platform.lakehouse.fixtures import land_complete_execution
 from open_data_platform.lakehouse.medallion_build import MedallionBuildError
 from open_data_platform.lakehouse.promotion_registry import (
+    BRONZE,
+    CHECK_FAILED,
+    CHECK_PENDING,
     GOLD,
     GOLD_DATASET,
     SILVER,
@@ -28,6 +31,13 @@ RAW = "odp-raw"
 WAREHOUSE = "odp-warehouse"
 DATASET = ("demo_storefront", "clickstream")
 PLANTED = "planted-event-value-xyz"
+
+
+def _pass_checks(registry: InMemoryPromotionRegistry, layer: str) -> None:
+    for dataset, check in registry.open_checks(layer).items():
+        registry.record_check(
+            layer, dataset, check.marked_at, passed=True, run_label="checks"
+        )
 
 
 def _contract(identity: tuple[str, str] = DATASET) -> DataContract:
@@ -303,6 +313,7 @@ def test_silver_rebuilds_only_pending_datasets_and_marks_gold(tmp_path: Path) ->
     assert refresh.read_silver_datasets(work) == ()
 
     registry.record_promotion(*DATASET, (), run_label="b", replace_dataset=False)
+    _pass_checks(registry, BRONZE)
     failing = _Spark(fail_on="demo_storefront__clickstream.sql")
     with pytest.raises(MedallionBuildError):
         refresh.refresh_silver(
@@ -361,6 +372,7 @@ def test_gold_steps_run_only_while_gold_is_pending(tmp_path: Path) -> None:
     assert recorder.calls == []
 
     registry.complete(SILVER, DATASET, None, run_label="s", mark_next=GOLD)
+    _pass_checks(registry, SILVER)
     with pytest.raises(MedallionBuildError, match="dbt-build exited with status 2"):
         medallion_build.run_step(
             "dbt-build", tmp_path, {}, _Recorder([2]), registry=registry
@@ -373,14 +385,40 @@ def test_gold_steps_run_only_while_gold_is_pending(tmp_path: Path) -> None:
     assert refresh.gold_mark(registry) is None
 
 
-def test_bronze_checks_skip_when_no_table_was_written(tmp_path: Path) -> None:
+def test_bronze_checks_skip_only_when_no_bronze_check_is_open(tmp_path: Path) -> None:
+    registry = InMemoryPromotionRegistry()
+    # An empty count file no longer decides: the registry does.
     (tmp_path / refresh.COUNTS_FILE).write_text("", encoding="utf-8")
-    assert not medallion_build.run_step("bronze-checks", tmp_path, {}, _Recorder())
+    assert not medallion_build.run_step(
+        "bronze-checks", tmp_path, {}, _Recorder(), registry=registry
+    )
+    registry.record_promotion(*DATASET, (), run_label="b", replace_dataset=False)
+    _pass_checks(registry, BRONZE)
+    assert not medallion_build.run_step(
+        "bronze-checks", tmp_path, {}, _Recorder(), registry=registry
+    )
 
 
-def test_silver_checks_skip_when_silver_wrote_nothing(tmp_path: Path) -> None:
+def test_silver_checks_skip_only_when_no_silver_check_is_open(tmp_path: Path) -> None:
+    registry = InMemoryPromotionRegistry()
     (tmp_path / refresh.SILVER_DATASETS_FILE).write_text("", encoding="utf-8")
-    assert not medallion_build.run_step("silver-checks", tmp_path, {}, _Recorder())
+    assert not medallion_build.run_step(
+        "silver-checks", tmp_path, {}, _Recorder(), registry=registry
+    )
+    registry.complete(SILVER, DATASET, None, run_label="s", mark_next=GOLD)
+    _pass_checks(registry, SILVER)
+    assert not medallion_build.run_step(
+        "silver-checks", tmp_path, {}, _Recorder(), registry=registry
+    )
+
+
+def test_a_check_result_does_not_clear_a_mark_made_during_the_check() -> None:
+    registry = InMemoryPromotionRegistry()
+    registry.record_promotion(*DATASET, (), run_label="a", replace_dataset=False)
+    read_before = registry.open_checks(BRONZE)[DATASET].marked_at
+    registry.record_promotion(*DATASET, (), run_label="b", replace_dataset=False)
+    registry.record_check(BRONZE, DATASET, read_before, passed=True, run_label="a")
+    assert registry.open_checks(BRONZE)[DATASET].status == CHECK_PENDING
 
 
 def test_main_returns_the_skip_exit_code_when_nothing_ran(
@@ -397,10 +435,6 @@ class _ChecksRan(Exception):
     """Raised by the fake Trino query: the check step tried to check."""
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="review R1: a failed check is bypassed by the next refresh; P3-16",
-)
 def test_a_failed_bronze_check_is_checked_again_before_silver_builds(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -408,8 +442,7 @@ def test_a_failed_bronze_check_is_checked_again_before_silver_builds(
     """Run 1 writes Bronze and its checks fail. Run 2 has no new raw object.
 
     Silver is still pending on the Bronze that failed, so the check step of
-    run 2 must check again, not skip. Today it skips, and the DAG's
-    ``none_failed`` rule then builds Silver on it.
+    run 2 must check again, not skip (review R1).
     """
     store = FakeS3()
     registry = InMemoryPromotionRegistry()
@@ -429,3 +462,109 @@ def test_a_failed_bronze_check_is_checked_again_before_silver_builds(
         medallion_build.run_step(
             "bronze-checks", tmp_path / "second", {}, _Recorder(), registry=registry
         )
+
+
+def _silver(registry: InMemoryPromotionRegistry, work: Path) -> tuple[str, ...]:
+    spark = _Spark()
+    work.mkdir(parents=True, exist_ok=True)
+    refresh.refresh_silver(
+        registry=registry,
+        run_label=work.name,
+        work=work,
+        warehouse_bucket=WAREHOUSE,
+        run_spark=spark,
+    )
+    return tuple(spark.files)
+
+
+def test_a_failed_check_blocks_silver_and_gold_on_the_next_refresh(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two refreshes with a failed Bronze check between them (review R1, T3).
+
+    The second refresh has no new raw object. Its check step runs the open
+    check again; while it fails, neither Silver nor Gold is built.
+    """
+    store = FakeS3()
+    registry = InMemoryPromotionRegistry()
+    recorder = _Recorder()
+    _land(store, "run-a", "e1", "e2")
+    answers = {"value": "999"}
+    monkeypatch.setattr(
+        medallion_build, "trino_scalar", lambda _statement, _env: answers["value"]
+    )
+
+    first, _spark = _bronze(store, registry, tmp_path, label="first")
+    assert first.wrote
+    with pytest.raises(MedallionBuildError, match="bronze checks failed"):
+        medallion_build.run_step(
+            "bronze-checks", tmp_path / "first", {}, recorder, registry=registry
+        )
+    assert registry.open_checks(BRONZE)[DATASET].status == CHECK_FAILED
+
+    second, _spark = _bronze(store, registry, tmp_path, label="second")
+    assert not second.wrote
+    with pytest.raises(MedallionBuildError, match="bronze checks failed"):
+        medallion_build.run_step(
+            "bronze-checks", tmp_path / "second", {}, recorder, registry=registry
+        )
+    # The DAG skips Silver after a failed check; a direct call is refused too.
+    with pytest.raises(refresh.RefreshError, match="silver blocked"):
+        _silver(registry, tmp_path / "second")
+    assert set(registry.pending(SILVER)) == {DATASET}
+    assert refresh.gold_mark(registry) is None
+    registry.complete(SILVER, ("other", "dataset"), None, run_label="x", mark_next=GOLD)
+    _pass_checks(registry, SILVER)
+    with pytest.raises(MedallionBuildError, match="gold blocked"):
+        medallion_build.run_step(
+            "dbt-build", tmp_path / "second", {}, recorder, registry=registry
+        )
+    assert recorder.calls == []
+
+    # The data is fixed: the third refresh passes the check and builds.
+    answers["value"] = "2"
+    assert medallion_build.run_step(
+        "bronze-checks", tmp_path / "third", {}, recorder, registry=registry
+    )
+    assert registry.open_checks(BRONZE) == {}
+    assert _silver(registry, tmp_path / "third") == (
+        "demo_storefront__clickstream.sql",
+    )
+    assert registry.open_checks(SILVER)[DATASET].status == CHECK_PENDING
+
+
+def test_a_failed_silver_check_blocks_gold_until_it_passes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = InMemoryPromotionRegistry()
+    recorder = _Recorder()
+    registry.record_promotion(*DATASET, (), run_label="a", replace_dataset=False)
+    _pass_checks(registry, BRONZE)
+    assert _silver(registry, tmp_path / "a")
+    assert refresh.gold_mark(registry) is not None
+
+    answers = {"value": "mismatch"}
+    monkeypatch.setattr(
+        medallion_build, "trino_scalar", lambda _statement, _env: answers["value"]
+    )
+    with pytest.raises(MedallionBuildError, match="silver checks failed"):
+        medallion_build.run_step(
+            "silver-checks", tmp_path / "a", {}, recorder, registry=registry
+        )
+    for step in ("stage-quarantine", "dbt-build"):
+        with pytest.raises(MedallionBuildError, match="gold blocked"):
+            medallion_build.run_step(
+                step, tmp_path / "b", {}, recorder, registry=registry
+            )
+    assert recorder.calls == []
+
+    answers["value"] = "ok"
+    assert medallion_build.run_step(
+        "silver-checks", tmp_path / "b", {}, recorder, registry=registry
+    )
+    assert medallion_build.run_step(
+        "dbt-build", tmp_path / "b", {}, recorder, registry=registry
+    )
+    assert recorder.calls[0][1] == "build"

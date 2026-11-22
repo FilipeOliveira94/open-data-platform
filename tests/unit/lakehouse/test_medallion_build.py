@@ -111,11 +111,6 @@ def test_dbt_step_failure_is_reported(tmp_path: Path) -> None:
     assert recorder.calls[0][0][1] == "test"
 
 
-def test_bronze_checks_need_the_count_file(tmp_path: Path) -> None:
-    with pytest.raises(MedallionBuildError, match="missing count file"):
-        medallion_build.run_step("bronze-checks", tmp_path, {}, _Recorder())
-
-
 class _Response(io.BytesIO):
     def __enter__(self):
         return self
@@ -166,4 +161,4 @@ def test_main_reports_a_failed_step(
         ["bronze-checks", "--work-root", str(tmp_path), "--run-label", "r1"]
     )
     assert status == 1
-    assert "missing count file" in capsys.readouterr().err
+    assert "promotion registry needs POSTGRES_USER" in capsys.readouterr().err

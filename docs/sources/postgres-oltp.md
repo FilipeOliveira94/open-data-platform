@@ -16,7 +16,7 @@ Minimal v1 is locked in [`config/contracts/postgres_oltp/`](../../config/contrac
 
 ## Schema and window
 
-The tables live in schema `oltp` inside the Compose database (`POSTGRES_DB`, default `odp`). DDL: `src/open_data_platform/ingestion/postgres_oltp/schema.sql`. `updated_at` is `timestamptz`.
+The tables live in schema `oltp` inside the Compose database (`POSTGRES_DB`, default `odp`). DDL: `src/open_data_platform/ingestion/postgres_oltp/schema.sql`. `updated_at` is `timestamptz`. Since P3-16 a `BEFORE UPDATE` trigger (`set_updated_at`) sets `updated_at` to `clock_timestamp()` when an `UPDATE` does not change it. The extract fails when a table lacks the trigger; `python -m open_data_platform.ingestion.postgres_oltp apply-schema` adds it without reseeding. The four tables of a window are read in one `REPEATABLE READ, READ ONLY` transaction, and a window is read only 15 minutes after its end ([Local Airflow](../architecture/airflow-local.md#watermark-settle-lag-and-snapshot-p3-16)).
 
 The extract predicate is half-open:
 

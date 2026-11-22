@@ -21,14 +21,27 @@ covers; windows before it are a backfill (P3-06). A run that is
 re-executed keeps its run id, so the extract overwrites the same raw keys
 on the same ingestion date. A new run of the same window writes a new
 execution, and Silver deduplicates by key.
+
+The ``settle`` sensor holds the extract until ``D 00:00Z + SETTLE_LAG``
+(P3-16). It reschedules instead of holding a worker slot, and does not
+defer: the local Compose stack has no triggerer (D-006). A caught-up window
+is already past its lag, so the sensor returns at once. The ingestion
+timestamp is the run's ``run_after`` (``D 00:00Z`` for a scheduled run), so
+every try writes under the same ``dt=`` prefix.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from airflow.providers.standard.sensors.time_delta import TimeDeltaSensor
 from airflow.sdk import DAG, CronDataIntervalTimetable
-from ingest_common import DEFAULT_ARGS, execution_id_param, postgres_extract_task
+from ingest_common import (
+    DEFAULT_ARGS,
+    SETTLE_LAG,
+    execution_id_param,
+    postgres_extract_task,
+)
 
 DAG_ID = "ingest_postgres_oltp_daily"
 # First daily window: [2026-11-19, 2026-11-20). Each missed day after it is
@@ -51,4 +64,10 @@ with DAG(
     params={"execution_id": execution_id_param()},
     doc_md=__doc__,
 ):
-    postgres_extract_task(WINDOW_START, WINDOW_END, "daily")
+    settle = TimeDeltaSensor(
+        task_id="settle",
+        delta=SETTLE_LAG,
+        mode="reschedule",
+        poke_interval=60,
+    )
+    settle >> postgres_extract_task(WINDOW_START, WINDOW_END, "daily")
