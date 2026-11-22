@@ -52,9 +52,29 @@ Schema tests run with the Gold build. Reconciliation does not.
 - Grain columns use `not_null` and `unique` or `unique_combination`. Closed sets from the contracts and the model design use `accepted_values`. Numeric bounds use `accepted_range`. Integer scores use `accepted_range` because `accepted_values` quotes every entry as varchar and Trino will not compare that list with an integer column.
 - Orphan foreign keys stay in the tables (D-013). There is no relationship test that fails on them.
 - Singular tests under `dbt/tests/reconciliation/<domain>/` fail by returning rows. One directory matches each Gold schema, including `gold_shared`. Population checks compare Gold keys with Silver (or with the parent fact). Measure checks compare counts and sums. Money sums use an absolute tolerance of `0.01`, the same epsilon as the payment-mismatch finding, because Trino `double` sums of the same values can differ in the last digits. The tag is `reconciliation`. `make dbt-build` and `make live-gold` exclude that tag. `make dbt-test-reconciliation` runs the full set. One domain is `dbt test --select tag:reconciliation,tag:<domain>`. The intended cadence is daily. The scheduler itself is Phase 3.
-- dbt unit tests (dbt-core 1.12) live in `dbt/models/<domain>/unit_tests.yml`. Each builds one mart from a small fixture and checks its grain and rate denominators (P3-17). `make dbt-unit` runs them (`dbt test --select test_type:unit`). `make dbt-build`, `make live-gold`, and the Airflow Gold build exclude `test_type:unit`, so a fixture test does not gate promotion of live Gold. They need Trino and the built parent models, so CI does not run them yet.
+- dbt unit tests (dbt-core 1.12) build one model from a small fixture. Which models need one is the [unit-test rule](#unit-test-rule) below.
 
 Bronze and Silver live checks are generated from the contracts and from `.local/bronze-source-counts.tsv`. See [Bronze](bronze-layer.md) and [Silver](silver-layer.md).
+
+## Unit-test rule
+
+Reconciliation compares totals, so a model can pass it with the wrong grain or the wrong denominator: the review fan-out (review R2) passed every check. A unit test fixes the rule on a fixture where the right and the wrong answer differ.
+
+A Gold model needs at least one dbt unit test when it has any of:
+
+- a join that can fan out (one-to-many) before an aggregate, or a pre-aggregation that prevents one;
+- a tie-break (`row_number`, `min_by`, latest row wins, mode of a value);
+- a rate, share, or mean whose denominator is a subset of the rows;
+- a bucket, band, or threshold (`case` on a value);
+- a rule for nulls or missing keys that keeps or forms a row (a null-municipality row, `unknown`, `mixed`).
+
+The fixture covers the boundary: the tie, the item that would fan out, the row outside the denominator, the null key. A model that only casts, renames, looks up a many-to-one key, or groups by keys with plain counts and sums is exempt.
+
+[`dbt/unit_test_policy.yml`](../../dbt/unit_test_policy.yml) lists every model under `dbt/models` once as `covered`, `exempt` (with the reason), or `pending` (with the issue). `tests/unit/lakehouse/test_dbt_unit_test_policy.py` fails when a model is missing from it or listed twice, when a `covered` model has no unit test, or when a model has a unit test but is not `covered`. A new model is therefore classified in the PR that adds it.
+
+Tests live in `dbt/models/<domain>/unit_tests.yml`. `make dbt-unit` runs them (`dbt test --select test_type:unit`). `make dbt-build`, `make live-gold`, and the Airflow Gold build exclude `test_type:unit`, so a fixture test does not gate promotion of live Gold. They need Trino and the built parent models (dbt reads their column types), so CI does not run them yet. An ephemeral input (`int_order_primary_payment`) is given as `format: sql` with every column cast.
+
+Status on 2026-11-22: 26 covered (one test each), 23 exempt, 7 pending (the `fct_*_quality_findings` models; their finding rules are proposed for P3-07).
 
 ## Commands
 

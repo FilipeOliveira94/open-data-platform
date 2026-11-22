@@ -170,7 +170,7 @@ On time for `mart_delivery_performance` and `mart_oltp_delivery_performance`: cu
 
 Review category (`mart_review_drivers`): the category is resolved per order before the review join, so a review of an order with N items counts once. One distinct English category across the order's items gives that category. More than one gives `mixed`. An order with no items, or whose products have no category, gives null. `sum(review_count)` equals the `(review_id, order_id)` pairs on `fct_reviews`.
 
-Metric logic is covered by dbt unit tests (`dbt/models/<domain>/unit_tests.yml`, run with `make dbt-unit`). Each corrected mart builds from a fixture: an order with two items and one review, and a cancelled order with no carrier date.
+Metric logic is covered by dbt unit tests under the [unit-test rule](gold-layer.md#unit-test-rule) (`dbt/models/<domain>/unit_tests.yml`, run with `make dbt-unit`). The P3-17 marts build from an order with two items and one review, and a cancelled order with no carrier date. The tie-breaks above (primary payment, latest customer address, latest category translation, modal ZIP state and city) each have a fixture with the tie.
 
 `dim_customers` takes attributes from the latest `order_purchase_timestamp`. A tie takes the greater `order_id`.
 

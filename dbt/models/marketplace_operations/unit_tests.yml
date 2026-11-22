@@ -38,3 +38,160 @@ unit_tests:
   expect:
     rows:
     - {seller_id: s1, order_count: 2, handoff_eligible_count: 1, on_time_handoff_rate: 1.0}
+- name: int_order_primary_payment_tie_takes_smaller_sequence
+  description: >-
+    The primary method is the largest payment. A tie on value takes the
+    smaller payment_sequential.
+  model: int_order_primary_payment
+  given:
+  - input: ref('fct_payments')
+    rows:
+    - {order_id: o1, payment_sequential: 1, payment_type: boleto, payment_value: 50.0}
+    - {order_id: o1, payment_sequential: 2, payment_type: credit_card, payment_value: 50.0}
+    - {order_id: o2, payment_sequential: 1, payment_type: voucher, payment_value: 10.0}
+    - {order_id: o2, payment_sequential: 2, payment_type: credit_card, payment_value: 90.0}
+  expect:
+    rows:
+    - {order_id: o1, primary_payment_method: boleto, primary_payment_sequential: 1}
+    - {order_id: o2, primary_payment_method: credit_card, primary_payment_sequential: 2}
+- name: mart_late_orders_one_row_per_late_order
+  description: >-
+    A late delivered order with two items, two reviews, and a primary payment
+    gives one row. The seller is the one on the first item, the review score
+    is the mean, and the handoff after the latest shipping limit is a miss.
+    An on-time order is not in the mart.
+  model: mart_late_orders
+  given:
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, purchase_date: "2018-01-02", purchase_state: SP, order_delivered_carrier_date: "2018-01-05 10:00:00", order_delivered_customer_date: "2018-01-15 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+    - {order_id: o2, order_status: delivered, purchase_date: "2018-01-02", purchase_state: SP, order_delivered_carrier_date: "2018-01-03 10:00:00", order_delivered_customer_date: "2018-01-08 10:00:00", order_estimated_delivery_date: "2018-01-10 00:00:00"}
+  - input: ref('fct_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, seller_id: s1, price: 10.0, freight_value: 2.0, shipping_limit_date: "2018-01-04 00:00:00"}
+    - {order_id: o1, order_item_id: 2, seller_id: s2, price: 30.0, freight_value: 2.0, shipping_limit_date: "2018-01-03 00:00:00"}
+    - {order_id: o2, order_item_id: 1, seller_id: s1, price: 10.0, freight_value: 2.0, shipping_limit_date: "2018-01-04 00:00:00"}
+  - input: ref('int_order_primary_payment')
+    format: sql
+    rows: |
+      select 'o1' as order_id, 'boleto' as primary_payment_method,
+        cast(1 as integer) as primary_payment_sequential,
+        cast(40.0 as double) as primary_payment_value
+  - input: source('silver', 'olist_brazilian_ecommerce__order_reviews')
+    rows:
+    - {review_id: r1, order_id: o1, review_score: 3}
+    - {review_id: r2, order_id: o1, review_score: 5}
+  expect:
+    rows:
+    - {order_id: o1, customer_state: SP, seller_id: s1, days_late: 5, review_score: 4.0, freight_to_price_ratio: 0.1, primary_payment_method: boleto, carrier_handoff_missed_deadline: true}
+- name: mart_freight_bands_known_and_unknown_distance
+  description: >-
+    Customer and seller on the same ZIP prefix are 0 km apart (`0_50km`). A
+    customer prefix missing from dim_zip_prefix gives `unknown`.
+  model: mart_freight
+  given:
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, purchase_state: SP, purchase_zip_prefix: "01001"}
+    - {order_id: o2, purchase_state: RJ, purchase_zip_prefix: "99999"}
+  - input: ref('fct_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, price: 100.0, freight_value: 10.0, seller_zip_prefix: "01001"}
+    - {order_id: o2, order_item_id: 1, price: 50.0, freight_value: 5.0, seller_zip_prefix: "01001"}
+  - input: ref('dim_zip_prefix')
+    rows:
+    - {zip_prefix: "01001", mean_latitude: -23.55, mean_longitude: -46.63}
+  expect:
+    rows:
+    - {customer_state: SP, distance_band: 0_50km, item_count: 1, avg_freight_per_item: 10.0, freight_to_price_ratio: 0.1}
+    - {customer_state: RJ, distance_band: unknown, item_count: 1, avg_freight_per_item: 5.0, freight_to_price_ratio: 0.1}
+- name: mart_order_milestones_counts_cancel_after_approval
+  description: >-
+    Canceled after approval needs both the status and an approval timestamp.
+    Unavailable counts on status alone. Orders with no payment get `unknown`.
+  model: mart_order_milestones
+  given:
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, order_status: canceled, order_purchase_timestamp: "2018-01-02 10:00:00", order_approved_at: "2018-01-02 11:00:00"}
+    - {order_id: o2, order_status: canceled, order_purchase_timestamp: "2018-01-03 10:00:00"}
+    - {order_id: o3, order_status: unavailable, order_purchase_timestamp: "2018-01-04 10:00:00", order_approved_at: "2018-01-04 11:00:00"}
+    - {order_id: o4, order_status: delivered, order_purchase_timestamp: "2018-01-05 10:00:00", order_approved_at: "2018-01-05 11:00:00", order_delivered_carrier_date: "2018-01-06 10:00:00", order_delivered_customer_date: "2018-01-09 10:00:00"}
+  - input: ref('int_order_primary_payment')
+    format: sql
+    rows: |
+      select cast(null as varchar) as order_id, cast(null as varchar) as primary_payment_method,
+        cast(null as integer) as primary_payment_sequential,
+        cast(null as double) as primary_payment_value
+      where false
+  expect:
+    rows:
+    - {purchase_month: "2018-01-01 00:00:00", primary_payment_method: unknown, order_count: 4, approved_count: 3, carrier_handoff_count: 1, customer_delivery_count: 1, canceled_after_approval_count: 1, unavailable_count: 1}
+- name: mart_order_cancellations_no_item_payment_fan_out
+  description: >-
+    A canceled order with two items and two payments counts once, with item
+    GMV and amount collected summed per order before the join. A delivered
+    order is not in the mart.
+  model: mart_order_cancellations
+  given:
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, order_status: canceled, order_purchase_timestamp: "2018-01-02 10:00:00", order_approved_at: "2018-01-02 11:00:00"}
+    - {order_id: o2, order_status: delivered, order_purchase_timestamp: "2018-01-03 10:00:00"}
+  - input: ref('fct_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, item_gmv: 12.0}
+    - {order_id: o1, order_item_id: 2, item_gmv: 23.0}
+    - {order_id: o2, order_item_id: 1, item_gmv: 9.0}
+  - input: ref('fct_payments')
+    rows:
+    - {order_id: o1, payment_sequential: 1, payment_value: 20.0}
+    - {order_id: o1, payment_sequential: 2, payment_value: 15.0}
+  - input: ref('int_order_primary_payment')
+    format: sql
+    rows: |
+      select 'o1' as order_id, 'boleto' as primary_payment_method,
+        cast(1 as integer) as primary_payment_sequential,
+        cast(20.0 as double) as primary_payment_value
+  expect:
+    rows:
+    - {purchase_month: "2018-01-01 00:00:00", order_status: canceled, primary_payment_method: boleto, order_count: 1, item_gmv: 35.0, amount_collected: 35.0, approved_before_cancel_count: 1}
+- name: mart_platform_sales_no_item_payment_fan_out
+  description: >-
+    An order with two items and two payments counts once. Item GMV and amount
+    collected are summed per order before the join.
+  model: mart_platform_sales
+  given:
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, purchase_date: "2018-01-02"}
+    - {order_id: o2, order_status: canceled, purchase_date: "2018-01-02"}
+  - input: ref('fct_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, item_gmv: 12.0}
+    - {order_id: o1, order_item_id: 2, item_gmv: 23.0}
+  - input: ref('fct_payments')
+    rows:
+    - {order_id: o1, payment_sequential: 1, payment_value: 20.0}
+    - {order_id: o1, payment_sequential: 2, payment_value: 15.0}
+  expect:
+    rows:
+    - {purchase_date: "2018-01-02", order_count: 2, delivered_order_count: 1, item_gmv: 35.0, amount_collected: 35.0}
+- name: dim_products_latest_translation_and_supplement
+  description: >-
+    The latest translation row for a Portuguese name wins. `pc_gamer`, absent
+    from the published translation, gets the platform supplement `gaming_pc`.
+  model: dim_products
+  given:
+  - input: source('silver', 'olist_brazilian_ecommerce__products')
+    rows:
+    - {product_id: p1, product_category_name: beleza_saude}
+    - {product_id: p2, product_category_name: pc_gamer}
+  - input: source('silver', 'olist_brazilian_ecommerce__product_category_name_translation')
+    rows:
+    - {product_category_name: beleza_saude, product_category_name_english: health_old, _ingestion_ts: "2026-01-01 00:00:00", execution_id: e1, raw_object_key: k1, record_index: 1}
+    - {product_category_name: beleza_saude, product_category_name_english: health_beauty, _ingestion_ts: "2026-02-01 00:00:00", execution_id: e2, raw_object_key: k2, record_index: 1}
+  expect:
+    rows:
+    - {product_id: p1, category_portuguese: beleza_saude, category_english: health_beauty}
+    - {product_id: p2, category_portuguese: pc_gamer, category_english: gaming_pc}
