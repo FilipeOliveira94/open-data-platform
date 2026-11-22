@@ -76,7 +76,7 @@ unit_tests:
     rows: |
       select 'o1' as order_id, 'boleto' as primary_payment_method,
         cast(1 as integer) as primary_payment_sequential,
-        cast(40.0 as double) as primary_payment_value
+        cast(40.00 as decimal(12,2)) as primary_payment_value
   - input: source('silver', 'olist_brazilian_ecommerce__order_reviews')
     rows:
     - {review_id: r1, order_id: o1, review_score: 3}
@@ -122,7 +122,7 @@ unit_tests:
     rows: |
       select cast(null as varchar) as order_id, cast(null as varchar) as primary_payment_method,
         cast(null as integer) as primary_payment_sequential,
-        cast(null as double) as primary_payment_value
+        cast(null as decimal(12,2)) as primary_payment_value
       where false
   expect:
     rows:
@@ -152,7 +152,7 @@ unit_tests:
     rows: |
       select 'o1' as order_id, 'boleto' as primary_payment_method,
         cast(1 as integer) as primary_payment_sequential,
-        cast(20.0 as double) as primary_payment_value
+        cast(20.00 as decimal(12,2)) as primary_payment_value
   expect:
     rows:
     - {purchase_month: "2018-01-01 00:00:00", order_status: canceled, primary_payment_method: boleto, order_count: 1, item_gmv: 35.0, amount_collected: 35.0, approved_before_cancel_count: 1}
@@ -177,6 +177,26 @@ unit_tests:
   expect:
     rows:
     - {purchase_date: "2018-01-02", order_count: 2, delivered_order_count: 1, item_gmv: 35.0, amount_collected: 35.0}
+- name: mart_platform_sales_sums_planted_cents_exactly
+  description: >-
+    Money is decimal (P3-18): 0.10 + 0.20 is exactly 0.30. As binary doubles
+    the same sum is 0.30000000000000004 and this test fails.
+  model: mart_platform_sales
+  given:
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, purchase_date: "2018-01-02"}
+  - input: ref('fct_order_items')
+    rows:
+    - {order_id: o1, order_item_id: 1, item_gmv: 0.10}
+    - {order_id: o1, order_item_id: 2, item_gmv: 0.20}
+  - input: ref('fct_payments')
+    rows:
+    - {order_id: o1, payment_sequential: 1, payment_value: 0.10}
+    - {order_id: o1, payment_sequential: 2, payment_value: 0.20}
+  expect:
+    rows:
+    - {purchase_date: "2018-01-02", order_count: 1, delivered_order_count: 1, item_gmv: 0.30, amount_collected: 0.30}
 - name: dim_products_latest_translation_and_supplement
   description: >-
     The latest translation row for a Portuguese name wins. `pc_gamer`, absent

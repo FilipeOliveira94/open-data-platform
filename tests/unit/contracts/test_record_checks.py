@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from open_data_platform.contracts.load import contract_from_mapping, load_contracts
@@ -9,6 +11,7 @@ from open_data_platform.contracts.model import DataContract
 from open_data_platform.contracts.records import (
     PayloadStructureError,
     classify_records,
+    encode_findings,
     load_jsonl_records,
     parsed_csv_record,
 )
@@ -171,3 +174,130 @@ def test_csv_empty_cell_is_null_and_bad_tokens_keep_their_text() -> None:
 def test_jsonl_rejects_a_line_that_is_not_an_object() -> None:
     with pytest.raises(PayloadStructureError, match="line 1 is not JSON"):
         load_jsonl_records(b'{"id": 1}\nnot-json\n')
+
+
+def _money_contract() -> DataContract:
+    return contract_from_mapping(
+        {
+            "contract_version": 1,
+            "source_id": "postgres_oltp",
+            "dataset": "order_items",
+            "description": "Decimal classifier fixture.",
+            "payload_format": "json",
+            "grain": "One row.",
+            "primary_key": ["id"],
+            "update_pattern": "incremental_window",
+            "on_invalid": "quarantine",
+            "on_structural_error": "fail_batch",
+            "governance": {"source_family": "olist_analysis", "owner": "platform"},
+            "provenance": {"system": "postgres"},
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "nullable": False,
+                    "classification": "internal",
+                    "description": "Identifier.",
+                },
+                {
+                    "name": "amount",
+                    "type": "decimal",
+                    "precision": 12,
+                    "scale": 2,
+                    "nullable": False,
+                    "classification": "internal",
+                    "description": "Amount in BRL.",
+                },
+                {
+                    "name": "rate",
+                    "type": "number",
+                    "nullable": True,
+                    "classification": "internal",
+                    "description": "A double.",
+                },
+            ],
+            "changelog": [{"version": 1, "note": "Fixture."}],
+        },
+        origin="test",
+    )
+
+
+def test_a_decimal_that_fits_is_valid() -> None:
+    rows = [
+        {"id": 1, "amount": Decimal("1234567890.12")},
+        {"id": 2, "amount": Decimal("0.05")},
+        {"id": 3, "amount": 20},
+        {"id": 4, "amount": Decimal("10.5")},
+        {"id": 5, "amount": Decimal("-0.00")},
+    ]
+
+    assert classify_records(_money_contract(), rows) == ()
+
+
+@pytest.mark.parametrize(
+    "amount",
+    [
+        Decimal("9.999"),
+        Decimal("58.900"),
+        Decimal("12345678901.00"),
+        Decimal("NaN"),
+        10.5,
+        "10.50",
+        True,
+    ],
+)
+def test_a_decimal_that_needs_rounding_or_was_a_float_is_a_type_mismatch(
+    amount: object,
+) -> None:
+    findings = classify_records(_money_contract(), [{"id": 1, "amount": amount}])
+
+    assert [(item.field, item.reason) for item in findings] == [
+        ("amount", "type_mismatch")
+    ]
+
+
+def test_csv_decimal_cells_become_exact_decimals() -> None:
+    contract = _money_contract()
+    parsed = parsed_csv_record(contract, {"id": "1", "amount": "58.90", "rate": "0.1"})
+
+    assert isinstance(parsed["amount"], Decimal)
+    assert str(parsed["amount"]) == "58.90"
+    assert classify_records(contract, [parsed]) == ()
+    for text in ("1e2", "058.90", ".5", "5."):
+        cell = parsed_csv_record(contract, {"id": "2", "amount": text, "rate": ""})
+        assert cell["amount"] == text
+        assert classify_records(contract, [cell])[0].reason == "type_mismatch"
+    too_precise = parsed_csv_record(
+        contract, {"id": "3", "amount": "58.901", "rate": ""}
+    )
+    assert too_precise["amount"] == Decimal("58.901")
+    assert classify_records(contract, [too_precise])[0].reason == "type_mismatch"
+
+
+def test_jsonl_numbers_are_read_as_exact_decimals() -> None:
+    records = load_jsonl_records(b'{"id": 1, "amount": 10.50, "rate": 0.25}\n')
+
+    assert str(records[0]["amount"]) == "10.50"
+    assert classify_records(_money_contract(), records) == ()
+
+
+def test_a_number_beyond_the_double_range_is_still_a_type_mismatch() -> None:
+    row = {"id": 1, "amount": Decimal("1.00"), "rate": Decimal("1E+400")}
+
+    findings = classify_records(_money_contract(), [row])
+
+    assert [(item.field, item.reason) for item in findings] == [
+        ("rate", "type_mismatch")
+    ]
+
+
+def test_findings_keep_the_exact_decimal_text() -> None:
+    findings = classify_records(
+        _money_contract(),
+        [{"id": None, "amount": Decimal("10.50"), "rate": Decimal("0.25")}],
+    )
+
+    encoded = encode_findings(findings)
+
+    assert b'"amount":10.50' in encoded
+    assert b'"rate":0.25' in encoded

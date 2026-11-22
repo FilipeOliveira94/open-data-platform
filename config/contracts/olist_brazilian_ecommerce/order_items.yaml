@@ -1,4 +1,4 @@
-contract_version: 3
+contract_version: 4
 source_id: olist_brazilian_ecommerce
 dataset: order_items
 description: "Items inside historical Olist orders. seller_id matches closed_deals.seller_id in the marketing funnel."
@@ -42,15 +42,19 @@ fields:
     classification: internal
     description: "Seller shipping deadline."
   - name: price
-    type: number
+    type: decimal
+    precision: 12
+    scale: 2
     nullable: false
     classification: internal
-    description: "Item price."
+    description: "Item price in BRL."
   - name: freight_value
-    type: number
+    type: decimal
+    precision: 12
+    scale: 2
     nullable: false
     classification: internal
-    description: "Freight charged for the item."
+    description: "Freight charged for the item, in BRL."
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
@@ -58,3 +62,5 @@ changelog:
     note: "Document the published seller_id join: closed_deals.seller_id matches sellers.seller_id or order_items.seller_id."
   - version: 3
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 4
+    note: "price and freight_value are decimal(12,2): exact BRL amounts with at most two decimal places. They were number, read as a binary double (P3-18)."

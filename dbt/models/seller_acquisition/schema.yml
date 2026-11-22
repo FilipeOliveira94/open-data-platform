@@ -34,7 +34,7 @@ models:
           average_stock: varchar
           business_type: varchar
           declared_product_catalog_size: double
-          declared_monthly_revenue: double
+          declared_monthly_revenue: decimal
   columns:
   - name: mql_id
     data_tests:
@@ -53,7 +53,7 @@ models:
           days_to_win: bigint
           seller_id: varchar
           seller_matched_in_orders: boolean
-          matched_seller_item_gmv: double
+          matched_seller_item_gmv: decimal
           business_segment: varchar
   columns:
   - name: mql_id
@@ -73,7 +73,7 @@ models:
           win_count: bigint
           win_rate: decimal
           median_days_to_win: bigint
-          matched_seller_item_gmv: double
+          matched_seller_item_gmv: decimal
           top_declared_segment: varchar
   columns:
   - name: origin

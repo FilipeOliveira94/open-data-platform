@@ -221,6 +221,66 @@ def test_json_array_keeps_nulls_wrong_types_and_nested_text() -> None:
     assert rows[1]["payload"] == '["demo"]'
 
 
+def _money_contract(payload_format: str = "json") -> DataContract:
+    amount = ContractField(
+        name="amount",
+        field_type="decimal",
+        nullable=True,
+        classification="public",
+        description="amount",
+        precision=12,
+        scale=2,
+    )
+    return _contract(
+        payload_format=payload_format,
+        fields=(
+            _field("id", "integer"),
+            amount,
+            _field("rate", "number", nullable=True),
+            _field("payload", "json", nullable=True),
+        ),
+        primary_key=("id",),
+    )
+
+
+def test_a_decimal_field_keeps_its_exact_digits_and_other_numbers_do_not_change() -> (
+    None
+):
+    body = (
+        b'[{"id":1,"amount":10.50,"rate":2.50,"payload":{"w":2.50,"e":1e5}},'
+        b'{"id":2,"amount":1e2,"rate":1e5},'
+        b'{"id":3,"amount":9.999},'
+        b'{"id":4,"amount":1234567890.12}]'
+    )
+
+    rows = parse_payload(_money_contract(), body)
+
+    assert [row["amount"] for row in rows] == ["10.50", "100", "9.999", "1234567890.12"]
+    # Numbers outside a decimal field keep the text they had before P3-18.
+    assert rows[0]["rate"] == json.dumps(2.5)
+    assert rows[1]["rate"] == json.dumps(1e5)
+    assert rows[0]["payload"] == '{"w":2.5,"e":100000.0}'
+
+
+def test_jsonl_decimal_field_keeps_its_exact_digits() -> None:
+    rows = parse_payload(_money_contract("jsonl"), b'{"id":1,"amount":0.10}\n')
+
+    assert rows[0]["amount"] == "0.10"
+
+
+def test_a_number_beyond_the_double_range_still_fails_outside_a_decimal_field() -> None:
+    contract = _money_contract()
+
+    with pytest.raises(BronzeParseError, match="non-finite"):
+        parse_payload(contract, b'[{"id":1,"rate":1e400}]')
+    with pytest.raises(BronzeParseError, match="nested JSON"):
+        parse_payload(contract, b'[{"id":1,"payload":{"w":1e400}}]')
+    # In a decimal field the value stays compact text; Silver casts it to NULL.
+    assert parse_payload(contract, b'[{"id":1,"amount":1e400}]')[0]["amount"] == (
+        "1E+400"
+    )
+
+
 def test_json_array_rejects_extra_keys_and_accepts_an_empty_array() -> None:
     contract = _contract()
     with pytest.raises(BronzeParseError, match="item 0"):

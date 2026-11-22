@@ -15,6 +15,7 @@ import yaml
 from open_data_platform.contracts.model import (
     CLASSIFICATIONS,
     FIELD_TYPES,
+    MAX_DECIMAL_PRECISION,
     ON_INVALID_POLICIES,
     PAYLOAD_FORMATS,
     PROVENANCE_SYSTEMS,
@@ -50,6 +51,8 @@ _TOP_LEVEL_KEYS: frozenset[str] = frozenset(
 _FIELD_KEYS: frozenset[str] = frozenset(
     {"name", "type", "nullable", "classification", "description"}
 )
+# Required on a ``decimal`` field and rejected on every other type.
+_DECIMAL_KEYS: frozenset[str] = frozenset({"precision", "scale"})
 _GOVERNANCE_KEYS: frozenset[str] = frozenset({"source_family", "owner"})
 _PROVENANCE_KEYS: frozenset[str] = frozenset({"system"})
 _CHANGELOG_KEYS: frozenset[str] = frozenset({"version", "note"})
@@ -248,7 +251,7 @@ def _parse_fields(
     for index, item in enumerate(value):
         item_origin = f"{origin}: {label}[{index}]"
         mapping = _mapping(item, item_origin, "field")
-        _reject_unknown(mapping, _FIELD_KEYS, item_origin, "field")
+        _reject_unknown(mapping, _FIELD_KEYS | _DECIMAL_KEYS, item_origin, "field")
         missing = _FIELD_KEYS - mapping.keys()
         if missing:
             names = ", ".join(sorted(missing))
@@ -259,10 +262,12 @@ def _parse_fields(
             msg = f"{item_origin}: duplicate field name {name!r}"
             raise ContractError(msg)
         seen.add(name)
+        field_type = _choice(mapping["type"], FIELD_TYPES, item_origin, "type")
+        precision, scale = _decimal_bounds(mapping, field_type, item_origin)
         fields.append(
             ContractField(
                 name=name,
-                field_type=_choice(mapping["type"], FIELD_TYPES, item_origin, "type"),
+                field_type=field_type,
                 nullable=_bool(mapping["nullable"], item_origin, "nullable"),
                 classification=_choice(
                     mapping["classification"],
@@ -273,9 +278,49 @@ def _parse_fields(
                 description=_non_empty_str(
                     mapping["description"], item_origin, "description"
                 ),
+                precision=precision,
+                scale=scale,
             )
         )
     return tuple(fields)
+
+
+def _decimal_bounds(
+    mapping: dict[str, Any],
+    field_type: str,
+    origin: str,
+) -> tuple[int | None, int | None]:
+    present = _DECIMAL_KEYS & mapping.keys()
+    if field_type != "decimal":
+        if present:
+            names = ", ".join(sorted(present))
+            msg = f"{origin}: {names} is only valid on a decimal field"
+            raise ContractError(msg)
+        return None, None
+    missing = _DECIMAL_KEYS - mapping.keys()
+    if missing:
+        names = ", ".join(sorted(missing))
+        msg = f"{origin}: a decimal field needs {names}"
+        raise ContractError(msg)
+    precision = mapping["precision"]
+    scale = mapping["scale"]
+    if (
+        isinstance(precision, bool)
+        or not isinstance(precision, int)
+        or not 1 <= precision <= MAX_DECIMAL_PRECISION
+    ):
+        msg = (
+            f"{origin}: precision must be an integer from 1 to {MAX_DECIMAL_PRECISION}"
+        )
+        raise ContractError(msg)
+    if (
+        isinstance(scale, bool)
+        or not isinstance(scale, int)
+        or not 0 <= scale <= precision
+    ):
+        msg = f"{origin}: scale must be an integer from 0 to precision"
+        raise ContractError(msg)
+    return precision, scale
 
 
 def _parse_primary_key(

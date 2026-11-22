@@ -204,6 +204,71 @@ def test_contract_from_mapping_rejects_structural_errors(
         contract_from_mapping(data, origin="test")
 
 
+def _with_field(**field: object) -> dict[str, object]:
+    data = _minimal_mapping()
+    data["fields"].append(  # type: ignore[union-attr]
+        {
+            "name": "price",
+            "nullable": False,
+            "classification": "public",
+            "description": "Amount.",
+            **field,
+        }
+    )
+    return data
+
+
+def test_a_decimal_field_carries_its_precision_and_scale() -> None:
+    contract = contract_from_mapping(
+        _with_field(type="decimal", precision=12, scale=2), origin="test"
+    )
+    price = contract.fields[1]
+    assert (price.field_type, price.precision, price.scale) == ("decimal", 12, 2)
+    assert (contract.fields[0].precision, contract.fields[0].scale) == (None, None)
+
+
+@pytest.mark.parametrize(
+    ("field", "expected"),
+    [
+        ({"type": "decimal", "precision": 12}, "a decimal field needs scale"),
+        ({"type": "decimal"}, "a decimal field needs precision, scale"),
+        ({"type": "number", "precision": 12, "scale": 2}, "only valid on a decimal"),
+        ({"type": "decimal", "precision": 0, "scale": 0}, "precision must be"),
+        ({"type": "decimal", "precision": 39, "scale": 2}, "precision must be"),
+        ({"type": "decimal", "precision": True, "scale": 0}, "precision must be"),
+        ({"type": "decimal", "precision": 12, "scale": 13}, "scale must be"),
+        ({"type": "decimal", "precision": 12, "scale": -1}, "scale must be"),
+        ({"type": "decimal", "precision": 12, "scale": "2"}, "scale must be"),
+    ],
+)
+def test_decimal_precision_and_scale_are_checked(
+    field: dict[str, object],
+    expected: str,
+) -> None:
+    with pytest.raises(ContractError, match=expected):
+        contract_from_mapping(_with_field(**field), origin="test")
+
+
+def test_money_fields_are_exact_decimals() -> None:
+    contracts = {(item.source_id, item.dataset): item for item in load_contracts()}
+    money = {
+        ("olist_brazilian_ecommerce", "order_items"): ("price", "freight_value"),
+        ("olist_brazilian_ecommerce", "order_payments"): ("payment_value",),
+        ("postgres_oltp", "order_items"): ("price", "freight_value"),
+        ("dummyjson_products", "products"): ("price",),
+        ("olist_marketing_funnel", "closed_deals"): ("declared_monthly_revenue",),
+    }
+    for identity, names in money.items():
+        contract = contracts[identity]
+        for name in names:
+            field = next(item for item in contract.fields if item.name == name)
+            assert (field.field_type, field.precision, field.scale) == (
+                "decimal",
+                12,
+                2,
+            ), (identity, name)
+
+
 def test_load_contract_file_requires_matching_directory(tmp_path: Path) -> None:
     payload = _minimal_mapping()
     target = tmp_path / "wrong_source" / "products.yaml"

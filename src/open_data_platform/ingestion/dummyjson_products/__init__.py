@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 from open_data_platform import __version__
+from open_data_platform.contracts import decimals
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.ingestion.http import (
     HttpRequest,
@@ -380,7 +381,7 @@ def _parse_page(
     requested_limit: int,
 ) -> _Page:
     try:
-        payload = json.loads(body.decode("utf-8"))
+        payload = decimals.json_loads(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         msg = "DummyJSON products page is not UTF-8 JSON"
         raise DummyJsonProductsError(msg) from exc

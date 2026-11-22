@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import psycopg
 
+from open_data_platform.contracts import decimals
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.ingestion.coverage import (
     FREQUENCIES,
@@ -692,12 +693,7 @@ def _encode_rows(
         raise PostgresOltpError(msg)
     payload = [_encode_row(dataset, contract, row) for row in rows]
     try:
-        encoded = json.dumps(
-            payload,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            allow_nan=False,
-        )
+        encoded = decimals.json_dumps(payload)
     except (TypeError, ValueError) as exc:
         msg = f"{dataset}: row could not be encoded as JSON"
         raise PostgresOltpError(msg) from exc
@@ -724,6 +720,8 @@ def _json_value(dataset: str, field: ContractField, value: object) -> object:
     if isinstance(value, datetime):
         return _format_timestamp(dataset, field.name, value)
     if isinstance(value, Decimal):
+        if field.field_type == "decimal":
+            return _exact_decimal(dataset, field.name, value)
         if field.field_type != "number":
             msg = f"{dataset}: field {field.name} has an unexpected type"
             raise PostgresOltpError(msg)
@@ -770,6 +768,14 @@ def _json_number(dataset: str, field_name: str, value: object) -> int | float:
     raise PostgresOltpError(msg)
 
 
+def _exact_decimal(dataset: str, field_name: str, value: Decimal) -> Decimal:
+    """Keep a ``numeric`` value as is: the payload writes its exact text."""
+    if not value.is_finite():
+        msg = f"{dataset}: field {field_name} must be a finite number"
+        raise PostgresOltpError(msg)
+    return value
+
+
 def _finite_float(value: float) -> bool:
     return value == value and value not in {float("inf"), float("-inf")}
 
@@ -782,7 +788,7 @@ def _load_fixture(
         msg = "synthetic fixture does not exist"
         raise PostgresOltpError(msg)
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal)
+        payload = decimals.json_loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         msg = "synthetic fixture is not valid JSON"
         raise PostgresOltpError(msg) from exc
@@ -845,7 +851,7 @@ def _fixture_value(dataset: str, field: ContractField, value: object) -> object:
             msg = f"{dataset}: field {field.name} has an unexpected type"
             raise PostgresOltpError(msg)
         return value
-    if field.field_type == "number":
+    if field.field_type in {"number", "decimal"}:
         if isinstance(value, bool) or not isinstance(value, int | Decimal):
             msg = f"{dataset}: field {field.name} has an unexpected type"
             raise PostgresOltpError(msg)

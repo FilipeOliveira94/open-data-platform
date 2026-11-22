@@ -34,7 +34,8 @@ select
     cast(o.order_delivered_customer_date as date)
   ) as days_late,
   r.mean_review_score as review_score,
-  ia.freight_sum / nullif(ia.price_sum, 0) as freight_to_price_ratio,
+  -- Money sums stay decimal; the ratio is a double (a decimal quotient is rounded at six places).
+  cast(ia.freight_sum as double) / nullif(cast(ia.price_sum as double), 0) as freight_to_price_ratio,
   pp.primary_payment_method,
   case
     when o.order_delivered_carrier_date is not null

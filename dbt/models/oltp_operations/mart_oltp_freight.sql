@@ -21,8 +21,10 @@ select
   customer_state,
   {{ distance_band('distance_km') }} as distance_band,
   count(*) as item_count,
-  avg(freight_value) as avg_freight_per_item,
-  sum(freight_value) / nullif(sum(price), 0) as freight_to_price_ratio
+  -- Money sums stay decimal; the mean and the ratio are doubles: a Trino decimal
+  -- mean keeps the input scale and a decimal quotient is rounded at six places.
+  avg(cast(freight_value as double)) as avg_freight_per_item,
+  cast(sum(freight_value) as double) / nullif(cast(sum(price) as double), 0) as freight_to_price_ratio
 from item_geo
 group by 1, 2
 

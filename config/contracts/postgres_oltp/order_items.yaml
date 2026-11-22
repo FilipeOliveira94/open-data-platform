@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: postgres_oltp
 dataset: order_items
 description: "PostgreSQL OLTP order items. JSON array of rows."
@@ -42,15 +42,19 @@ fields:
     classification: internal
     description: "Seller shipping deadline."
   - name: price
-    type: number
+    type: decimal
+    precision: 12
+    scale: 2
     nullable: false
     classification: internal
-    description: "Item price."
+    description: "Item price in BRL. PostgreSQL numeric(12,2)."
   - name: freight_value
-    type: number
+    type: decimal
+    precision: 12
+    scale: 2
     nullable: false
     classification: internal
-    description: "Freight charged for the item."
+    description: "Freight charged for the item, in BRL. PostgreSQL numeric(12,2)."
   - name: updated_at
     type: timestamp
     nullable: false
@@ -61,3 +65,5 @@ changelog:
     note: "Initial v1 contract. Columns align with the Olist dataset of the same grain, plus updated_at for the P1-06 watermark."
   - version: 2
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 3
+    note: "price and freight_value are decimal(12,2), the PostgreSQL numeric(12,2) type: exact BRL amounts. The extract writes their exact text; they were number, written as a binary float (P3-18)."
