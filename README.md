@@ -1,5 +1,10 @@
 # Open Data Platform
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/cover/cover-dark.png">
+  <img src="docs/assets/cover/cover.png" alt="Open Data Platform architecture: sources land in a MinIO raw zone, are refined through Bronze, Silver and Gold Iceberg tables with Spark, dbt and Trino, and answer business questions. Planned parts are dashed.">
+</picture>
+
 A number in a report should have a path you can follow, from the source to the person who uses it.
 
 - **Sources.** Historical files, HTTP APIs, a database window, and an event log share one raw layout.

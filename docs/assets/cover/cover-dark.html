@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Data Platform cover</title>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@500;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Urbanist', system-ui, sans-serif;
+      background: #120B20;
+      color: #F1ECFA;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .frame { max-width: 1200px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    svg { width: 100%; min-width: 1200px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <!-- Diagram Design · High-level (datalake variant, no cluster) adapted to the social-og preset.
+         Skin: Filipe Oliveira personal brand (brand/tokens.css), Urbanist + Geist Mono.
+         Deviations, by design: the phase banner steps through the brand violet scale instead of
+         alternating two bands; the Lakehouse phase holds three tier nodes; cross-cutting concerns
+         sit in a four-cell foundation band whose chips mark running (solid) vs planned (dashed). -->
+    <div class="diagram-container">
+      <svg viewBox="0 0 1200 632" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cover-dark-title cover-dark-desc">
+      <title id="cover-dark-title">Open Data Platform: from raw data to actionable insights</title>
+      <desc id="cover-dark-desc">Cover diagram of the Open Data Platform: five source types land in a MinIO raw zone, are refined through Bronze, Silver and Gold Iceberg tables with Spark, dbt and Trino, and answer business questions, with Airflow orchestration and quality checks running today and CDC, dashboards, observability and an AWS path through Terraform planned.</desc>
+      <defs><marker id="cover-dark-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#B3A8C9"/></marker></defs>
+      <rect width="1200" height="632" fill="#120B20"/>
+      <rect x="480" y="184" width="388" height="112" rx="8" fill="rgba(66,48,111,0.34)" stroke="rgba(176,140,255,0.26)" stroke-width="1"/>
+      <text x="856" y="284" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">Spark writes · dbt builds · Trino reads</text>
+      <polygon points="64,148 248,148 260,162 248,176 64,176" fill="#2B1E4A"/>
+      <text x="162.0" y="166" fill="#F1ECFA" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="middle" letter-spacing="0.14em">RAW SOURCES</text>
+      <polygon points="260,148 444,148 456,162 444,176 260,176 272,162" fill="#42306F"/>
+      <text x="358.0" y="166" fill="#F1ECFA" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="middle" letter-spacing="0.14em">INGEST</text>
+      <polygon points="456,148 876,148 888,162 876,176 456,176 468,162" fill="#8A62E8"/>
+      <text x="672.0" y="166" fill="#120B20" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="middle" letter-spacing="0.14em">REFINE · ICEBERG LAKEHOUSE</text>
+      <polygon points="888,148 1136,148 1136,176 888,176 900,162" fill="#B08CFF"/>
+      <text x="1012.0" y="166" fill="#120B20" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="middle" letter-spacing="0.14em">ACTIONABLE INSIGHTS</text>
+      <path d="M 232,224 H 288" fill="none" stroke="#B3A8C9" stroke-width="1.2" marker-end="url(#cover-dark-arrow)"/>
+      <path d="M 232,380 H 288" fill="none" stroke="#B3A8C9" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#cover-dark-arrow)"/>
+      <path d="M 432,224 H 492" fill="none" stroke="#B3A8C9" stroke-width="1.2" marker-end="url(#cover-dark-arrow)"/>
+      <path d="M 592,224 H 624" fill="none" stroke="#B3A8C9" stroke-width="1.2" marker-end="url(#cover-dark-arrow)"/>
+      <path d="M 724,224 H 756" fill="none" stroke="#B3A8C9" stroke-width="1.2" marker-end="url(#cover-dark-arrow)"/>
+      <path d="M 432,360 H 512 Q 520,360 520,352 V 296" fill="none" stroke="#B3A8C9" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#cover-dark-arrow)"/>
+      <path d="M 856,212 H 908" fill="none" stroke="#B3A8C9" stroke-width="1.2" marker-end="url(#cover-dark-arrow)"/>
+      <path d="M 856,236 H 872 Q 880,236 880,244 V 364 Q 880,372 888,372 H 908" fill="none" stroke="#B3A8C9" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#cover-dark-arrow)"/>
+      <rect x="234" y="200" width="52" height="16" rx="2" fill="#120B20"/>
+      <text x="260.0" y="212" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">BATCH</text>
+      <rect x="242" y="356" width="36" height="16" rx="2" fill="#120B20"/>
+      <text x="260.0" y="368" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">WAL</text>
+      <rect x="436" y="200" width="52" height="16" rx="2" fill="#120B20"/>
+      <text x="462.0" y="212" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SPARK</text>
+      <rect x="442" y="336" width="60" height="16" rx="2" fill="#120B20"/>
+      <text x="472.0" y="348" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">STREAM</text>
+      <rect x="864" y="188" width="36" height="16" rx="2" fill="#120B20"/>
+      <text x="882.0" y="200" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SQL</text>
+      <rect x="64" y="192" width="168" height="216" rx="6" fill="#120B20"/>
+      <rect x="64" y="192" width="168" height="216" rx="6" fill="#1A1229" stroke="#A397BB" stroke-width="1"/>
+      <text x="80" y="218" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700">CSV files</text>
+      <text x="80" y="233" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace">Olist · Kaggle</text>
+      <line x1="76" y1="240" x2="220" y2="240" stroke="rgba(241,236,250,0.12)" stroke-width="1"/>
+      <text x="80" y="258" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700">HTTP APIs</text>
+      <text x="80" y="273" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace">DummyJSON · IBGE</text>
+      <line x1="76" y1="280" x2="220" y2="280" stroke="rgba(241,236,250,0.12)" stroke-width="1"/>
+      <rect x="70" y="283" width="156" height="34" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="80" y="298" fill="#A397BB" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700">BCB SGS API</text>
+      <text x="80" y="313" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace">daily series</text>
+      <line x1="76" y1="320" x2="220" y2="320" stroke="rgba(241,236,250,0.12)" stroke-width="1"/>
+      <text x="80" y="338" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700">Clickstream</text>
+      <text x="80" y="353" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace">storefront events</text>
+      <line x1="76" y1="360" x2="220" y2="360" stroke="rgba(241,236,250,0.12)" stroke-width="1"/>
+      <text x="80" y="378" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700">PostgreSQL</text>
+      <text x="80" y="393" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace">orders · OLTP</text>
+      <rect x="288" y="192" width="144" height="64" rx="6" fill="#120B20"/>
+      <rect x="288" y="192" width="144" height="64" rx="6" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="360.0" y="212.0" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" text-anchor="middle">Raw zone</text>
+      <text x="360.0" y="230.0" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">MinIO · S3 API</text>
+      <text x="360.0" y="246.0" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kept per run</text>
+      <rect x="288" y="328" width="144" height="64" rx="6" fill="#120B20"/>
+      <rect x="288" y="328" width="144" height="64" rx="6" fill="#120B20" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="360.0" y="348.0" fill="#A397BB" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" text-anchor="middle">CDC stream</text>
+      <text x="360.0" y="366.0" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Debezium · Kafka</text>
+      <text x="360.0" y="382.0" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Spark streaming</text>
+      <rect x="492" y="192" width="100" height="64" rx="6" fill="#120B20"/>
+      <rect x="492" y="192" width="100" height="64" rx="6" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="542.0" y="220.0" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" text-anchor="middle">Bronze</text>
+      <text x="542.0" y="238.0" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">as landed</text>
+      <rect x="624" y="192" width="100" height="64" rx="6" fill="#120B20"/>
+      <rect x="624" y="192" width="100" height="64" rx="6" fill="#1A1229" stroke="#B08CFF" stroke-width="1.2"/>
+      <text x="674.0" y="220.0" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" text-anchor="middle">Silver</text>
+      <text x="674.0" y="238.0" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">cleaned</text>
+      <rect x="756" y="192" width="100" height="64" rx="6" fill="#120B20"/>
+      <rect x="756" y="192" width="100" height="64" rx="6" fill="#1A1229" stroke="#DECDFF" stroke-width="1.4"/>
+      <text x="806.0" y="220.0" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" text-anchor="middle">Gold</text>
+      <text x="806.0" y="238.0" fill="#B3A8C9" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">by domain</text>
+      <rect x="908" y="192" width="228" height="132" rx="6" fill="#120B20"/>
+      <rect x="908" y="192" width="228" height="132" rx="6" fill="rgba(255,111,166,0.10)" stroke="#FF6FA6" stroke-width="1.4"/>
+      <text x="924" y="220" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700">Actionable insights</text>
+      <rect x="924" y="238" width="8" height="8" rx="2" fill="#FF6FA6"/>
+      <text x="940" y="246" fill="#F1ECFA" font-size="12" font-family="'Urbanist', system-ui, sans-serif" font-weight="500">On-time delivery?</text>
+      <rect x="924" y="258" width="8" height="8" rx="2" fill="#FF6FA6"/>
+      <text x="940" y="266" fill="#F1ECFA" font-size="12" font-family="'Urbanist', system-ui, sans-serif" font-weight="500">Which leads become sellers?</text>
+      <rect x="924" y="278" width="8" height="8" rx="2" fill="#FF6FA6"/>
+      <text x="940" y="286" fill="#F1ECFA" font-size="12" font-family="'Urbanist', system-ui, sans-serif" font-weight="500">Who buys again?</text>
+      <rect x="924" y="298" width="8" height="8" rx="2" fill="#FF6FA6"/>
+      <text x="940" y="306" fill="#F1ECFA" font-size="12" font-family="'Urbanist', system-ui, sans-serif" font-weight="500">Where do buyers live?</text>
+      <rect x="908" y="340" width="228" height="64" rx="6" fill="#120B20"/>
+      <rect x="908" y="340" width="228" height="64" rx="6" fill="#120B20" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="1022.0" y="360.0" fill="#A397BB" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" text-anchor="middle">Dashboards &amp; report</text>
+      <text x="1022.0" y="378.0" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Superset · JupyterLab</text>
+      <text x="1022.0" y="394.0" fill="#A397BB" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Astro report site</text>
+      <rect x="64" y="424" width="256" height="104" rx="8" fill="rgba(66,48,111,0.34)" stroke="rgba(176,140,255,0.26)" stroke-width="1"/>
+      <text x="80" y="446" fill="#C9ADFF" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">ORCHESTRATE</text>
+      <rect x="80" y="456" width="60" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="110.0" y="470" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Airflow</text>
+      <rect x="146" y="456" width="108" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="200.0" y="470" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">daily + weekly</text>
+      <rect x="80" y="480" width="76" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="118.0" y="494" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">backfills</text>
+      <rect x="162" y="480" width="96" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="210.0" y="494" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">quality gate</text>
+      <rect x="336" y="424" width="256" height="104" rx="8" fill="rgba(66,48,111,0.34)" stroke="rgba(176,140,255,0.26)" stroke-width="1"/>
+      <text x="352" y="446" fill="#C9ADFF" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">TRUST</text>
+      <rect x="352" y="456" width="108" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="406.0" y="470" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">YAML contracts</text>
+      <rect x="466" y="456" width="84" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="508.0" y="470" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">quarantine</text>
+      <rect x="352" y="480" width="76" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="390.0" y="494" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">dbt tests</text>
+      <rect x="434" y="480" width="108" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="488.0" y="494" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">reconciliation</text>
+      <rect x="352" y="504" width="108" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="406.0" y="518" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">ODCS contracts</text>
+      <rect x="608" y="424" width="256" height="104" rx="8" fill="rgba(66,48,111,0.34)" stroke="rgba(176,140,255,0.26)" stroke-width="1"/>
+      <text x="624" y="446" fill="#C9ADFF" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">OBSERVE</text>
+      <rect x="624" y="456" width="84" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="666.0" y="470" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Prometheus</text>
+      <rect x="714" y="456" width="60" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="744.0" y="470" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Grafana</text>
+      <rect x="624" y="480" width="88" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="668.0" y="494" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">OpenLineage</text>
+      <rect x="718" y="480" width="96" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="766.0" y="494" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">FinOps model</text>
+      <rect x="880" y="424" width="256" height="104" rx="8" fill="rgba(66,48,111,0.34)" stroke="rgba(176,140,255,0.26)" stroke-width="1"/>
+      <text x="896" y="446" fill="#C9ADFF" font-size="12" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">SHIP</text>
+      <rect x="896" y="456" width="108" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="950.0" y="470" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Docker Compose</text>
+      <rect x="1010" y="456" width="108" height="20" rx="4" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="1064.0" y="470" fill="#F1ECFA" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">GitHub Actions</text>
+      <rect x="896" y="480" width="76" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="934.0" y="494" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Terraform</text>
+      <rect x="978" y="480" width="136" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="1046.0" y="494" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">S3 · Glue · Athena</text>
+      <rect x="896" y="504" width="156" height="20" rx="4" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="974.0" y="518" fill="#A397BB" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">resilience + security</text>
+      <text x="64" y="80" fill="#C9ADFF" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" letter-spacing="0.16em">OPEN DATA PLATFORM</text>
+      <text x="64" y="128" fill="#F1ECFA" font-size="40" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" letter-spacing="-0.02em">From raw data to actionable <tspan fill="#FF6FA6">insights</tspan></text>
+      <g transform="translate(1088,64) scale(0.6957)"><rect x="0" y="0" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="0" y="11.8" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="0" y="23.6" width="10" height="10" rx="2.2" fill="#B08CFF"/><rect x="0" y="35.4" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="0" y="47.2" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="0" y="59" width="10" height="10" rx="2.2" fill="#B08CFF"/><rect x="0" y="70.8" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="11.8" y="0" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="11.8" y="11.8" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="11.8" y="23.6" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="11.8" y="35.4" width="10" height="10" rx="2.2" fill="#B08CFF"/><rect x="11.8" y="47.2" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="11.8" y="59" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="11.8" y="70.8" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="23.6" y="0" width="10" height="10" rx="2.2" fill="#B08CFF"/><rect x="23.6" y="11.8" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="23.6" y="23.6" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="23.6" y="35.4" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="23.6" y="47.2" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="23.6" y="59" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="23.6" y="70.8" width="10" height="10" rx="2.2" fill="#2B1E4A"/><rect x="35.4" y="0" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="35.4" y="11.8" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="35.4" y="23.6" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="35.4" y="35.4" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="35.4" y="47.2" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="35.4" y="59" width="10" height="10" rx="2.2" fill="#2B1E4A"/><rect x="35.4" y="70.8" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="47.2" y="0" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="47.2" y="11.8" width="10" height="10" rx="2.2" fill="#2B1E4A"/><rect x="47.2" y="23.6" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="47.2" y="35.4" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="47.2" y="47.2" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="47.2" y="59" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="47.2" y="70.8" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="59" y="0" width="10" height="10" rx="2.2" fill="#FF6FA6"/><rect x="59" y="11.8" width="10" height="10" rx="2.2" fill="#1A1229"/><rect x="59" y="23.6" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="59" y="35.4" width="10" height="10" rx="2.2" fill="#B08CFF"/><rect x="59" y="47.2" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="59" y="59" width="10" height="10" rx="2.2" fill="#DECDFF"/><rect x="59" y="70.8" width="10" height="10" rx="2.2" fill="#B08CFF"/></g>
+      <text x="1076" y="88" fill="#F1ECFA" font-size="16" font-family="'Urbanist', system-ui, sans-serif" font-weight="700" text-anchor="end">Filipe Oliveira</text>
+      <text x="1076" y="108" fill="#B3A8C9" font-size="12" font-family="'Urbanist', system-ui, sans-serif" font-weight="500" text-anchor="end">Data &amp; Software Engineer</text>
+      <line x1="64" y1="540" x2="1136" y2="540" stroke="rgba(241,236,250,0.12)" stroke-width="1"/>
+      <rect x="64" y="550" width="24" height="12" rx="3" fill="#1A1229" stroke="#8A62E8" stroke-width="1"/>
+      <text x="96" y="560" fill="#B3A8C9" font-size="11" font-family="'Geist Mono', ui-monospace, monospace">Running today</text>
+      <rect x="224" y="550" width="24" height="12" rx="3" fill="none" stroke="#B3A8C9" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="256" y="560" fill="#B3A8C9" font-size="11" font-family="'Geist Mono', ui-monospace, monospace">Planned · phases 4–10</text>
+      <rect x="439" y="550" width="24" height="12" rx="3" fill="rgba(255,111,166,0.10)" stroke="#FF6FA6" stroke-width="1.4"/>
+      <text x="471" y="560" fill="#B3A8C9" font-size="11" font-family="'Geist Mono', ui-monospace, monospace">Focal · what the platform delivers</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
