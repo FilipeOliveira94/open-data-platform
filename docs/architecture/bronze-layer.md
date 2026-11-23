@@ -29,14 +29,14 @@ Columns, in order:
 | `_ingestion_ts` | Object user-metadata, unchanged. |
 | `raw_object_key` | Full raw key. |
 | `record_index` | Zero-based index inside that object. |
-| `dt` | `dt=` segment of the raw key. A column, not an Iceberg partition. |
+| `dt` | `dt=` segment of the raw key. The identity partition of the table (P3-08). |
 | `_execution_completed_ts` | `completed_at` of the execution's `_COMPLETE` marker (P3-12). Never null for rows promoted since P3-13. |
 | `_raw_etag` | ETag of the raw object the row came from (P3-13). Bronze only; Silver does not carry it. |
 | `_quarantine_reasons` | Reasons the ingestion sidecar `quarantine/…/{object_name}.jsonl` records for this row, sorted and comma-joined; NULL when the row has no finding (P3-07). Bronze reads the sidecar of each object it promotes, takes only `record_index` and `reason`, and fails the object if a line does not parse or names a record past the payload. Silver excludes or flags the row ([data contracts](data-contracts.md#silver-handling-of-quarantined-records-p3-07)) |
 | Contract fields | Contract order. |
 | Envelope fields | Page fields other than the `record_locator`, in contract order. |
 
-`dt` is the ingestion date already used to lay out raw objects. There is no Iceberg partition spec. Each incremental append writes its own data files, so the rows of one run sit in files of their own.
+`dt` is the ingestion date already used to lay out raw objects. Since P3-08 it is the table's Iceberg partition (`PARTITIONED BY (dt)`, [ADR-0026](../decisions/0026-bronze-partitions-and-run-metadata.md)). Each incremental append writes its own data files in the partitions of its objects, so the rows of one run sit in files of their own.
 
 Quarantine objects are not read. Invalid rows that remain inside a raw object are promoted with it. A payload that does not match the contract shape fails that dataset before the table is overwritten.
 
@@ -56,10 +56,14 @@ Airflow passes its run id as the run label; Make passes `make-<UTC timestamp>`. 
 
 | Mode | When | Statement |
 | --- | --- | --- |
-| `incremental_append` | Scheduled refresh of a registered dataset | `MERGE INTO bronze.{table}` on `raw_object_key`, `_raw_etag`, `record_index`; `WHEN NOT MATCHED THEN INSERT`. When a registered key has a new ETag, `WHEN NOT MATCHED BY SOURCE AND raw_object_key IN (…) THEN DELETE` removes its old rows in the same commit |
-| `full_overwrite` | `--full-rebuild`, or a dataset the registry has never seen | `CREATE OR REPLACE TABLE … AS SELECT` from every complete object |
+| `incremental_append` | Scheduled refresh of a registered dataset | `MERGE INTO bronze.{table}` on `target.dt IN (<staged dt values>)` (P3-08) and `raw_object_key`, `_raw_etag`, `record_index`; `WHEN NOT MATCHED THEN INSERT`. When a registered key has a new ETag, `WHEN NOT MATCHED BY SOURCE AND raw_object_key IN (…) THEN DELETE` removes its old rows in the same commit |
+| `full_overwrite` | `--full-rebuild`, or a dataset the registry has never seen | `CREATE OR REPLACE TABLE … PARTITIONED BY (dt) AS SELECT` from every complete object |
 
 After Spark commits, one registry transaction upserts the promoted objects and marks the dataset pending for Silver. Then the staging object is deleted. A crash between the commit and the registry write leaves the objects unregistered; the retry stages them again and the `MERGE` inserts nothing. `lakehouse_state.bronze_refreshes` records, per run and dataset, the objects listed, waiting for a marker, and promoted, the rows appended, and the table total. A failed dataset is recorded with mode `…:failed`.
+
+Before an incremental `MERGE` the step reads the table's current Iceberg metadata through the catalog. A table without the `dt` identity partition (created before P3-08) fails the step with a message naming `make live-rebuild`; its objects stay unregistered and are promoted by the rebuild.
+
+Execution metadata (P3-08): each dataset with promoted objects or a Spark script gets a `lakehouse_state.dataset_runs` row (objects read, rows staged, rows the commit added, registry total, seconds) and one `table_io` row per Iceberg table its script touched, with the scan files, skipped files, bytes, and rows, and the commit counts. See [Airflow, execution metadata](airflow-local.md#execution-metadata-p3-08).
 
 A dataset with nothing new gets no script, and its table is not written. A refresh where no dataset changed and no later layer is pending writes no table, and the Airflow task ends as skipped. An empty prefix is recorded, not failed, on the scheduled path. `--full-rebuild` fails for a dataset with no complete execution instead of emptying its table.
 

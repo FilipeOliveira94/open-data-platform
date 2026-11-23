@@ -80,7 +80,7 @@ Every Silver table has both columns; in an exclude dataset `_quarantined` is alw
 
 ### Quality counts (P3-07)
 
-The Silver script of each dataset records, after its replace, one row per metric in `iceberg.silver_audit.quality_counts` with the key `(run_label, source_id, dataset, column_name, metric)`. A rerun of the same run replaces its rows. Zero counts are recorded. Counts are over the Bronze rows Silver reads (the selection of the update pattern), before exclusion and deduplication.
+The Silver script of each dataset records, after its replace, one row per metric in `iceberg.silver_audit.quality_counts` with the key `(run_label, source_id, dataset, column_name, metric)`. A rerun of the same run replaces its rows; a metric dropped between two attempts of one run would stay, and the Silver check, which counts the metrics of the latest run, then fails (P3-08). Zero counts are recorded. Counts are over the Bronze rows Silver reads (the selection of the update pattern), before exclusion and deduplication.
 
 | Metric | `column_name` | Counts |
 | --- | --- | --- |
