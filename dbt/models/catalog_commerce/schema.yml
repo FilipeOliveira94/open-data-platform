@@ -9,7 +9,7 @@ models:
           title: varchar
           category: varchar
           brand: varchar
-          price: double
+          price: decimal
           dimensions_width: double
           dimensions_height: double
           dimensions_depth: double
@@ -52,9 +52,9 @@ models:
         expected:
           category: varchar
           product_count: bigint
-          min_price: double
+          min_price: decimal
           median_price: double
-          max_price: double
+          max_price: decimal
           products_missing_brand: bigint
   - unique_combination:
       arguments:

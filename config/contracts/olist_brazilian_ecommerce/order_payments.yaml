@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: olist_brazilian_ecommerce
 dataset: order_payments
 description: "Payment rows for historical Olist orders."
@@ -37,12 +37,16 @@ fields:
     classification: internal
     description: "Number of installments."
   - name: payment_value
-    type: number
+    type: decimal
+    precision: 12
+    scale: 2
     nullable: false
     classification: internal
-    description: "Amount of this payment."
+    description: "Amount of this payment, in BRL."
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Brazilian E-Commerce Public Dataset by Olist (Kaggle olistbr/brazilian-ecommerce). No sample rows are stored."
   - version: 2
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 3
+    note: "payment_value is decimal(12,2): exact BRL amounts with at most two decimal places. It was number, read as a binary double (P3-18)."

@@ -35,9 +35,11 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from open_data_platform.contracts import decimals
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.records import (
     PayloadStructureError,
@@ -230,7 +232,8 @@ def parse_payload(
 
     Empty cells, JSON nulls, and omitted nullable keys become ``None``.
     A value with the wrong logical type is kept as text. Nested JSON stays
-    compact JSON text. Duplicate keys are not removed.
+    compact JSON text. A JSON number in a ``decimal`` field keeps its exact
+    digits. Duplicate keys are not removed.
     """
     if contract.payload_format == "csv":
         _reject_page_shape(contract)
@@ -1177,7 +1180,7 @@ def _parse_json(
     body: bytes,
 ) -> tuple[dict[str, str | None], ...]:
     try:
-        payload = json.loads(body.decode("utf-8-sig"))
+        payload = decimals.json_loads(body.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         msg = "payload is not UTF-8 JSON"
         raise BronzeParseError(msg) from exc
@@ -1249,17 +1252,29 @@ def _record_strings(
         if field.name not in item or item[field.name] is None:
             rendered[field.name] = None
             continue
-        rendered[field.name] = _json_text(item[field.name], f"{label}.{field.name}")
+        rendered[field.name] = _json_text(
+            item[field.name], f"{label}.{field.name}", field
+        )
     return rendered
 
 
-def _json_text(value: object, label: str) -> str:
+def _json_text(value: object, label: str, field: ContractField) -> str:
+    """Bronze text of one JSON value.
+
+    A number in a ``decimal`` field keeps its exact digits (``10.50`` stays
+    ``10.50``). Other numbers keep the text they had before decimals existed:
+    the shortest text of the binary float.
+    """
     if isinstance(value, str):
         return value
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
+    if isinstance(value, Decimal):
+        if field.field_type == "decimal":
+            return _decimal_text(value, field)
+        value = float(value)
     if isinstance(value, float):
         if value != value or value in {float("inf"), float("-inf")}:
             msg = f"{label}: non-finite number"
@@ -1272,12 +1287,36 @@ def _json_text(value: object, label: str) -> str:
                 ensure_ascii=False,
                 separators=(",", ":"),
                 allow_nan=False,
+                default=_decimal_as_float,
             )
         except (TypeError, ValueError) as exc:
             msg = f"{label}: nested JSON could not be encoded"
             raise BronzeParseError(msg) from exc
     msg = f"{label}: unsupported JSON value"
     raise BronzeParseError(msg)
+
+
+def _decimal_text(value: Decimal, field: ContractField) -> str:
+    """Plain text when the value fits the field; otherwise its compact text.
+
+    Silver casts only plain text that fits, so a value outside the contract
+    becomes NULL there instead of a rounded number.
+    """
+    if (
+        field.precision is not None
+        and field.scale is not None
+        and decimals.fits(value, field.precision, field.scale)
+    ):
+        return decimals.plain_text(value)
+    return str(value)
+
+
+def _decimal_as_float(value: object) -> float:
+    """Nested JSON numbers keep the text they had before decimals existed."""
+    if isinstance(value, Decimal):
+        return float(value)
+    msg = f"unsupported nested JSON value: {type(value).__name__}"
+    raise TypeError(msg)
 
 
 def _parse_key(key: str) -> _RawKey:

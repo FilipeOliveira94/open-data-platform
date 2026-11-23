@@ -21,7 +21,8 @@ select
   io.seller_id,
   sum(io.item_gmv) as item_gmv,
   count(distinct io.order_id) as order_count,
-  sum(io.freight_sum) / nullif(sum(io.price_sum), 0) as freight_to_price_ratio,
+  -- Money sums stay decimal; the ratio is a double (a decimal quotient is rounded at six places).
+  cast(sum(io.freight_sum) as double) / nullif(cast(sum(io.price_sum) as double), 0) as freight_to_price_ratio,
   -- Only (seller, order) pairs with a carrier date and a shipping limit count.
   count_if(
     o.order_delivered_carrier_date is not null

@@ -10,16 +10,14 @@ union all
   "select count(*) from " ~ ref('fct_orders') ~ " where order_status = 'delivered'"
 ) }}
 union all
-{{ scalars_near(
+{{ scalars_differ(
   'mart_platform_sales_gmv',
   "select coalesce(sum(item_gmv), 0) from " ~ ref('mart_platform_sales'),
-  "select coalesce(sum(i.item_gmv), 0) from " ~ ref('fct_order_items') ~ " i where exists (select 1 from " ~ ref('fct_orders') ~ " o where o.order_id = i.order_id)",
-  0.01
+  "select coalesce(sum(i.item_gmv), 0) from " ~ ref('fct_order_items') ~ " i where exists (select 1 from " ~ ref('fct_orders') ~ " o where o.order_id = i.order_id)"
 ) }}
 union all
-{{ scalars_near(
+{{ scalars_differ(
   'mart_platform_sales_collected',
   "select coalesce(sum(amount_collected), 0) from " ~ ref('mart_platform_sales'),
-  "select coalesce(sum(p.payment_value), 0) from " ~ ref('fct_payments') ~ " p where exists (select 1 from " ~ ref('fct_orders') ~ " o where o.order_id = p.order_id)",
-  0.01
+  "select coalesce(sum(p.payment_value), 0) from " ~ ref('fct_payments') ~ " p where exists (select 1 from " ~ ref('fct_orders') ~ " o where o.order_id = p.order_id)"
 ) }}

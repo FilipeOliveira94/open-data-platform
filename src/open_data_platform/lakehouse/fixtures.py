@@ -12,8 +12,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from open_data_platform.contracts import decimals
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.ingestion.demo_storefront import (
     ingest_demo_storefront,
@@ -331,6 +333,8 @@ def _sample_value(field: ContractField, token: int) -> object:
         return token
     if field.field_type == "number":
         return 1.5
+    if field.field_type == "decimal":
+        return Decimal("1.50")
     if field.field_type == "boolean":
         return True
     if field.field_type == "json":
@@ -363,6 +367,4 @@ def _clickstream_null_products() -> int:
 
 
 def _dump(payload: object) -> bytes:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
-        "utf-8"
-    )
+    return decimals.json_dumps(payload).encode("utf-8")

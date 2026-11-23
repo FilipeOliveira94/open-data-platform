@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-22 (P3-17 verified) |
+| Last updated | 2026-11-22 (P3-18 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,20 +22,18 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-18** — Exact decimal type for money fields. Not started.
+**P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard). Not started.
 
-P3-17 is verified. `mart_review_drivers` resolves the category per order (`mixed` when the items span categories) and counts 99_224 reviews, equal to `fct_reviews` (113_131 before). The handoff rate in the four delivery and seller marts divides by `handoff_eligible_count`; the marketplace pooled rate moves from 0.8931 to 0.9094. A [unit-test rule](docs/architecture/gold-layer.md#unit-test-rule) and `dbt/unit_test_policy.yml` classify all 56 Gold models: 26 have a dbt unit test (`make dbt-unit`), 23 are exempt, and the 7 quality-findings models are pending ([corrections](docs/architecture/gold-model-design.md#p3-17-metric-corrections-2026-11-22)).
+P3-18 is verified. Money fields are `decimal(12,2)` from the contract to Gold: Olist item price and freight, payment value, OLTP item price and freight, DummyJSON price, and, added by Filipe, `closed_deals.declared_monthly_revenue`. Each names its currency; the [currency rules](docs/architecture/data-contracts.md#money-p3-18) say how another minor unit or a mixed-currency field would be handled. The PostgreSQL extract writes `numeric` as exact text, and Silver casts only text that fits, so nothing is rounded. After `make live-rebuild`, item GMV is 15843553.24 in the fact and every mart, reconciliation passes with exact equality (PASS=56), and `payment_amount_mismatch` falls from 381 to 303 orders: 78 one-cent differences had crossed the 0.01 threshold through binary rounding ([before and after](docs/architecture/gold-model-design.md#p3-18-exact-money-2026-11-22)).
 
-P3-16 is verified. Each Bronze and Silver check is recorded per dataset in `lakehouse_state.layer_checks`. An open check runs again on the next refresh even with no new raw objects, and Silver and Gold do not build on it. The gap report lists windows missed after the last recorded one. The OLTP tables keep `updated_at` with a trigger, the daily extract waits a 15-minute settle lag, one window is read from one snapshot, and a retry keeps its `dt=` ([quality gate](docs/architecture/airflow-local.md#quality-gate-p3-16), [verification](docs/architecture/airflow-local.md#verification-2026-11-22-p3-16)).
+The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-07 to P3-10, P3-15, and later phases.
 
-A review of every verified issue on 2026-11-21 ([review](docs/reviews/2026-11-21-verified-issues-review.md)) found 19 pipeline and model findings and 8 test findings. The two highest: a failed Bronze or Silver check is bypassed by the next refresh that has no new raw objects, so Gold can be built from data that failed its checks (R1); and `mart_review_drivers` counts a review once per order item (R2). The Olist integration test had failed since 2026-10-26 without notice, because integration tests are not in CI; it and the other unsafe integration tests were fixed with the review. New issues P3-16 to P3-18 run before the close pair; P6-09 adds write-audit-publish. P3-16 closed R1 and the trailing-gap part of the missed-window acceptance.
-
-Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13): the progress table below and [`docs/status-log.md`](docs/status-log.md).
+Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13, P3-16, P3-17): the progress table below and [`docs/status-log.md`](docs/status-log.md).
 
 ## Next work
 
-1. **P3-18** — Exact decimal type for money fields. Acceptance: `ROADMAP.md` → P3-18.
-2. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard).
+1. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard). Acceptance: `ROADMAP.md` → P3-07.
+2. **P3-08** — Execution metadata and failure logging (also the Bronze partition spec, review R5).
 
 ---
 
@@ -58,7 +56,7 @@ Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13): the progress table bel
 | P3-13 | Incremental lakehouse refresh | Verified | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
 | P3-16 | Quality gate state and extract-window corrections | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#quality-gate-p3-16) |
 | P3-17 | Gold metric grain corrections | Verified | [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md#p3-17-metric-corrections-2026-11-22) |
-| P3-18 | Exact decimal type for money fields | Not started | — |
+| P3-18 | Exact decimal type for money fields | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#money-p3-18) |
 | P3-14 | Live run, result, and consistency check | Not started | — |
 | P3-15 | Phase 3 documentation and status | Not started | — |
 
@@ -72,7 +70,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [ ] Backfills do not corrupt data or create undue duplication.
 - [x] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06; trailing gaps since P3-16).
 - [x] A failed Bronze or Silver check blocks the next layer until it passes, including on a later refresh with no new raw objects (P3-16).
-- [ ] Gold metrics keep their documented grain: no fan-out, rate denominators count only eligible rows, and money is exact decimal (P3-17, P3-18).
+- [x] Gold metrics keep their documented grain: no fan-out, rate denominators count only eligible rows, and money is exact decimal (P3-17, P3-18).
 - [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
 - [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
 - [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing, Silver rebuilds of `incremental_window`/`append_only` datasets (ADR-0024), and the Bronze `MERGE` over the whole unpartitioned table (review R5, P3-08) still do.
@@ -88,9 +86,9 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 | Validation | Detail |
 | --- | --- |
 | Date | 2026-11-22 |
-| Environment | Local Compose. PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` with the branch source mounted |
-| Checks | `scripts/p3_16_gate_check.sh`: extract on the old schema, `apply-schema`, a manual window, then refresh r1 with a planted Bronze count failure, r2 with no new raw objects, r3 after the fix, and r4 with nothing open. `uv run pytest tests/integration`, `make test`, `make lint` |
-| Result | PASS. Old schema: extract exit 1 (missing trigger). r1 `bronze_checks` failed on `orders` only. r2 re-ran the open check (failed again) and `silver` failed with `silver blocked`, writing no table. r3: check passed, 4 Silver tables, 4 Silver checks passed, dbt PASS=287. r4 skipped. Integration: 9 passed. Unit: 459 passed |
+| Environment | Local Compose with the Airflow services stopped. PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` with the branch source mounted |
+| Checks | `make live-rebuild`; a Trino join of Bronze and Silver for each money column; Gold money totals before and after; `make dbt-test-reconciliation`; `make dbt-unit`; a re-extract of the covered window [2026-10-19, 2026-10-20) and `make live-refresh`; a refresh with no new raw objects. `uv run pytest tests/integration`, `make test`, `make lint`, `make dbt-parse` |
+| Result | PASS. Rebuild 570 s (125 objects, 1_571_543 rows; dbt PASS=287). Every money column: no value differs between Bronze and Silver, equal non-null counts, `decimal(12,2)`. Reconciliation PASS=56 with exact equality. dbt unit PASS=27. Re-extract: landed text equals `numeric::text`, Silver counts and sums unchanged. No-new-data refresh wrote nothing. Integration 9 passed. Unit 530 passed |
 
 ---
 
@@ -165,7 +163,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-01–P3-06, P3-11–P3-13 verified; P3-16–P3-18 added 2026-11-21) |
+| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-01–P3-06, P3-11–P3-13, P3-16–P3-18 verified) |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
@@ -184,7 +182,8 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 - DAGs already in the `airflow` metadata database keep their paused state; `is_paused_upon_creation=True` applies only to new DAGs. A manual daily trigger gets the last complete UTC day, whatever `-l` says; `airflow dags trigger` without `-l` has no data interval and the extract fails.
 - Late commits (a row with `updated_at` before midnight committed after the 00:00Z run) miss the daily window; the weekly re-extract (P3-05) picks them up. A row committed after the weekly run that covers its `updated_at` is still missed: P3-06 backfill and CDC (Phase 4). The first scheduled weekly run is 2026-11-23; only manual weekly runs have been exercised. Three synthetic `p3-05-late-*` sellers stay in the lake; the 2026-11-21 integration-test run removed them from local PostgreSQL (review T8).
 - Since P3-13 a refresh reads only new raw objects, but it still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table. The Bronze `MERGE` joins against the whole unpartitioned table, so its scan grows with history (review R5, P3-08). Raw executions without a `_COMPLETE` marker never enter Bronze.
-- Until P3-18, money columns are `DOUBLE`. dbt unit tests need Trino and the built parents, so CI does not run them; `make dbt-unit` runs them locally.
+- dbt unit tests need Trino and the built parents, so CI does not run them; `make dbt-unit` runs them locally.
+- A contract type change takes effect on `make live-rebuild`. Until it runs, an incremental refresh retypes only the Silver datasets it rebuilds, and the Gold `column_types` tests fail `dbt_build`. Olist and DummyJSON quarantine findings stored before P3-18 come from the earlier contract versions until those sources are ingested again.
 - Silver and Gold are visible to readers before their checks run, and Gold models are replaced one at a time (review R6, P6-09).
 - Integration tests write to `ODP_TEST_RAW_BUCKET` (default `odp-test-raw`) and seed a scratch PostgreSQL database. Before that fix, the PostgreSQL integration test truncated the local `oltp` tables (review T8); a run on 2026-11-21 reset local PostgreSQL to the fixture.
 - The windowed batch extract does not see hard deletes. A deleted row stays in Silver and Gold on the batch path; the CDC path (Phase 4) handles deletes.

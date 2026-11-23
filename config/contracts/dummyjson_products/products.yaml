@@ -1,4 +1,4 @@
-contract_version: 3
+contract_version: 4
 source_id: dummyjson_products
 dataset: products
 description: "DummyJSON GET /products page. The raw object is the JSON page. The record grain is one element of products. DummyJSON id is not an Olist product_id."
@@ -36,10 +36,12 @@ fields:
     classification: public
     description: "DummyJSON category slug."
   - name: price
-    type: number
+    type: decimal
+    precision: 12
+    scale: 2
     nullable: false
     classification: public
-    description: "List price."
+    description: "List price. The API does not state a currency."
   - name: discountPercentage
     type: number
     nullable: false
@@ -154,3 +156,5 @@ changelog:
     note: "brand is nullable. Checked live on 2026-10-24: 92 of 194 products omit brand, and a short final page sets limit to the returned count."
   - version: 3
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 4
+    note: "price is decimal(12,2): an exact amount with at most two decimal places. The API states no currency. It was number, read as a binary double (P3-18)."

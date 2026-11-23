@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta, timezone
@@ -31,6 +32,12 @@ from open_data_platform.ingestion.postgres_oltp import (
     schema_sql,
     seed_synthetic,
     validate_window,
+)
+from open_data_platform.lakehouse.bronze import parse_payload
+from open_data_platform.lakehouse.silver.cli import policy_for
+from open_data_platform.lakehouse.silver.common import (
+    decimal_pattern,
+    render_silver_sql,
 )
 
 _TS = datetime(2026, 10, 25, 15, tzinfo=UTC)
@@ -152,7 +159,7 @@ def _sample(field: ContractField) -> object:
         return datetime(2026, 10, 17, 8, tzinfo=UTC)
     if field.field_type == "integer":
         return 7
-    if field.field_type == "number":
+    if field.field_type in {"number", "decimal"}:
         return Decimal("10.50")
     return "value"
 
@@ -373,11 +380,74 @@ def test_numbers_and_shifted_timestamps_are_json_values() -> None:
 
     _extract(connection, client, datasets=("order_items",))
 
-    stored = json.loads(_puts(client)[0].kwargs["Body"])
-    assert stored[0]["price"] == 10.5
-    assert stored[0]["freight_value"] == 3.25
+    body = _puts(client)[0].kwargs["Body"]
+    assert b'"price":10.50,"freight_value":3.25,' in body
+    stored = json.loads(body, parse_float=Decimal)
+    assert str(stored[0]["price"]) == "10.50"
     assert stored[0]["updated_at"] == "2026-10-17T08:00:00Z"
     assert 'ORDER BY "order_id", "order_item_id"' in connection.queries[0][0]
+
+
+def _order_item_prices(rows: list[tuple[object, ...]]) -> list[str | None]:
+    """Extract the rows, then read the raw body the way Bronze does."""
+    contract = _contracts()["order_items"]
+    client = _client()
+    _extract(
+        _ScriptedConnection([_table(contract, *rows)]),
+        client,
+        datasets=("order_items",),
+    )
+    body = _puts(client)[0].kwargs["Body"]
+    return [row["price"] for row in parse_payload(contract, body)]
+
+
+def test_a_planted_amount_survives_extract_bronze_and_silver_unchanged() -> None:
+    contract = _contracts()["order_items"]
+    planted = Decimal("1234567890.12")  # the largest scale-2 shape numeric(12,2) holds
+
+    [bronze_text] = _order_item_prices([_row(contract, price=planted)])
+
+    assert bronze_text == "1234567890.12"
+    silver_sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
+    assert (
+        "CASE WHEN `price` RLIKE '^-?(0|[1-9][0-9]{0,9})([.][0-9]{1,2})?$'"
+        " THEN TRY_CAST(`price` AS DECIMAL(12,2)) END"
+    ) in silver_sql
+    assert "CAST(`price` AS DECIMAL(12,2)) AS `price`" in silver_sql
+    assert re.search(decimal_pattern(12, 2), bronze_text) is not None
+    assert Decimal(bronze_text) == planted
+
+
+def test_an_old_float_token_and_a_new_exact_token_are_the_same_amount() -> None:
+    contract = _contracts()["order_items"]
+    old = b'[{"order_id":"o1","order_item_id":1,"product_id":"p","seller_id":"s",'
+    old += b'"shipping_limit_date":"2026-10-17T08:00:00Z","price":10.5,'
+    old += b'"freight_value":3.25,"updated_at":"2026-10-17T08:00:00Z"}]'
+
+    [old_text] = [row["price"] for row in parse_payload(contract, old)]
+    [new_text] = _order_item_prices([_row(contract, price=Decimal("10.50"))])
+
+    assert (old_text, new_text) == ("10.5", "10.50")
+    for text in (old_text, new_text):
+        assert re.search(decimal_pattern(12, 2), text) is not None
+    assert Decimal(old_text) == Decimal(new_text)
+
+
+def test_a_sum_of_planted_cents_is_exact() -> None:
+    contract = _contracts()["order_items"]
+    cents = [Decimal("0.10"), Decimal("0.20"), *([Decimal("0.01")] * 98)]
+    rows = [
+        _row(contract, order_item_id=index, price=amount)
+        for index, amount in enumerate(cents, start=1)
+    ]
+
+    texts = _order_item_prices(rows)
+
+    assert sum(Decimal(text) for text in texts if text is not None) == Decimal("1.28")
+    running = 0.0
+    for text in texts:
+        running += float(text or "0")
+    assert running != 1.28  # the same cents as binary doubles drift
 
 
 def test_empty_window_writes_an_empty_array() -> None:

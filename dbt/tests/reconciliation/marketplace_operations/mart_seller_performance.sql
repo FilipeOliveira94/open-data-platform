@@ -1,8 +1,7 @@
-{{ scalars_near(
+{{ scalars_differ(
   'mart_seller_performance_gmv',
   "select coalesce(sum(item_gmv), 0) from " ~ ref('mart_seller_performance'),
-  "select coalesce(sum(i.item_gmv), 0) from " ~ ref('fct_order_items') ~ " i join " ~ ref('fct_orders') ~ " o on o.order_id = i.order_id",
-  0.01
+  "select coalesce(sum(i.item_gmv), 0) from " ~ ref('fct_order_items') ~ " i join " ~ ref('fct_orders') ~ " o on o.order_id = i.order_id"
 ) }}
 union all
 {{ scalars_differ(

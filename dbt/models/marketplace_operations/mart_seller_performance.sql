@@ -47,7 +47,8 @@ select
   -- Only (seller, order) pairs with a carrier date and a shipping limit count.
   sum(handoff_eligible) as handoff_eligible_count,
   cast(sum(on_time_handoff) as double) / nullif(sum(handoff_eligible), 0) as on_time_handoff_rate,
-  sum(freight_sum) / nullif(sum(price_sum), 0) as freight_to_price_ratio,
+  -- Money sums stay decimal; the ratio is a double (a decimal quotient is rounded at six places).
+  cast(sum(freight_sum) as double) / nullif(cast(sum(price_sum) as double), 0) as freight_to_price_ratio,
   count(distinct buyer_municipality_id) as distinct_buyer_municipalities
 from joined
 group by 1

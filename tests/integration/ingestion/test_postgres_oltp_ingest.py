@@ -12,6 +12,7 @@ import os
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import psycopg
@@ -181,6 +182,24 @@ def test_windowed_extract_round_trip_overwrites_the_same_object(
             assert _stored_rows(client, weekly, dataset) == _fixture_rows(
                 dataset, _DAY_START, _WEEK_END
             )
+        # numeric(12,2) lands as the text PostgreSQL gives it: no float (P3-18).
+        items = next(item for item in weekly if "/order_items/" in item.key)
+        body = client.get_object(Bucket=items.bucket, Key=items.key)["Body"].read()
+        landed = [
+            (str(row["price"]), str(row["freight_value"]))
+            for row in json.loads(body, parse_float=Decimal)
+        ]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT price::text, freight_value::text FROM oltp.order_items "
+                "WHERE updated_at >= %s AND updated_at < %s "
+                "ORDER BY order_id, order_item_id",
+                (_DAY_START, _WEEK_END),
+            )
+            source_text = [tuple(row) for row in cursor.fetchall()]
+        connection.commit()
+        assert landed
+        assert landed == source_text
 
         with connection.cursor() as cursor:
             # An explicit updated_at keeps the row in the window; without it

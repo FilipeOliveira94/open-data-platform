@@ -138,7 +138,7 @@ def default_output_columns(
         columns.append(
             OutputColumn(
                 name=name,
-                iceberg_type=iceberg_type(field_def.field_type),
+                iceberg_type=column_type(field_def),
                 select_sql=_cast_expr(_quote_ident(name), field_def, style),
             )
         )
@@ -170,12 +170,50 @@ def resolve_output_columns(
 
 
 def iceberg_type(field_type: str) -> str:
-    """Map a contract logical type to an Iceberg / Spark SQL type name."""
+    """Map a contract logical type to an Iceberg / Spark SQL type name.
+
+    ``decimal`` needs its precision and scale: use ``column_type``.
+    """
     mapped = ICEBERG_TYPES.get(field_type)
     if mapped is None:
         msg = f"unsupported field type: {field_type!r}"
         raise SilverError(msg)
     return mapped
+
+
+def column_type(field: ContractField) -> str:
+    """Iceberg / Spark SQL type of one contract field."""
+    if field.field_type == "decimal":
+        precision, scale = _decimal_bounds(field)
+        return f"DECIMAL({precision},{scale})"
+    return iceberg_type(field.field_type)
+
+
+def decimal_pattern(precision: int, scale: int) -> str:
+    """Regex for plain decimal text that fits ``DECIMAL(precision, scale)``.
+
+    An optional minus sign, no leading zeros, at most ``precision - scale``
+    integer digits, and at most ``scale`` digits after the point. No exponent.
+    """
+    integer_digits = precision - scale
+    integer = (
+        "0" if integer_digits == 0 else f"(0|[1-9][0-9]{{0,{integer_digits - 1}}})"
+    )
+    fraction = f"([.][0-9]{{1,{scale}}})?" if scale > 0 else ""
+    return f"^-?{integer}{fraction}$"
+
+
+def decimal_sql(expr: str, precision: int, scale: int) -> str:
+    """Cast text to ``DECIMAL(precision, scale)`` only when it fits as written.
+
+    Spark rounds ``'9.999'`` to ``10.00`` on a plain cast. Here any text that
+    does not fit is NULL, like any other failed cast, and never another number.
+    """
+    pattern = decimal_pattern(precision, scale)
+    return (
+        f"CASE WHEN {expr} RLIKE '{pattern}' "
+        f"THEN TRY_CAST({expr} AS DECIMAL({precision},{scale})) END"
+    )
 
 
 def dataset_sql_name(contract: DataContract) -> str:
@@ -349,6 +387,9 @@ def _cast_expr(quoted: str, field: ContractField, style: TimestampStyle) -> str:
         return f"TRY_CAST({quoted} AS BIGINT)"
     if kind == "number":
         return f"TRY_CAST({quoted} AS DOUBLE)"
+    if kind == "decimal":
+        precision, scale = _decimal_bounds(field)
+        return decimal_sql(quoted, precision, scale)
     if kind == "boolean":
         return (
             "CASE "
@@ -493,6 +534,13 @@ def _payload_column_names(contract: DataContract) -> tuple[str, ...]:
             continue
         names.append(field_def.name)
     return tuple(names)
+
+
+def _decimal_bounds(field: ContractField) -> tuple[int, int]:
+    if field.precision is None or field.scale is None:
+        msg = f"decimal field {field.name!r} has no precision and scale"
+        raise SilverError(msg)
+    return field.precision, field.scale
 
 
 def _field_by_name(contract: DataContract, name: str) -> ContractField:

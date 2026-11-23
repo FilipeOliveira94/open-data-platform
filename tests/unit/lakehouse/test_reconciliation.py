@@ -24,7 +24,7 @@ from open_data_platform.lakehouse.silver.cli import (
     policy_for,
 )
 from open_data_platform.lakehouse.silver.common import (
-    ICEBERG_TYPES,
+    column_type,
     resolve_output_columns,
 )
 
@@ -186,7 +186,7 @@ def test_silver_types_follow_the_contract_and_json_expansion() -> None:
                 else:
                     assert field.name not in columns
                 continue
-            assert columns[field.name] == ICEBERG_TYPES[field.field_type]
+            assert columns[field.name] == column_type(field)
     products = next(
         item
         for item in load_contracts()

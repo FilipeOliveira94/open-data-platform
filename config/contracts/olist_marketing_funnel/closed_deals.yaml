@@ -1,4 +1,4 @@
-contract_version: 4
+contract_version: 5
 source_id: olist_marketing_funnel
 dataset: closed_deals
 description: "Closed seller deals. File olist_closed_deals_dataset.csv. seller_id equals olist_brazilian_ecommerce sellers.seller_id or order_items.seller_id. Self-declared commercial attributes are often null."
@@ -81,10 +81,12 @@ fields:
     classification: internal
     description: "Published catalog size. The file stores whole values with a decimal, such as 100.0."
   - name: declared_monthly_revenue
-    type: number
+    type: decimal
+    precision: 12
+    scale: 2
     nullable: true
     classification: internal
-    description: "Seller-declared monthly revenue."
+    description: "Seller-declared monthly revenue, in BRL."
 changelog:
   - version: 1
     note: "Initial contract. Columns follow the published Marketing Funnel by Olist (Kaggle olistbr/marketing-funnel-olist). No sample rows are stored."
@@ -94,3 +96,5 @@ changelog:
     note: "declared_product_catalog_size is a number. Published booleans use True and False."
   - version: 4
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 5
+    note: "declared_monthly_revenue is decimal(12,2): exact BRL amounts with at most two decimal places. It was number, read as a binary double (P3-18)."

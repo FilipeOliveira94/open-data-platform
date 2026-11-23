@@ -95,9 +95,9 @@ models:
           product_id: varchar
           seller_id: varchar
           shipping_limit_date: timestamp
-          price: double
-          freight_value: double
-          item_gmv: double
+          price: decimal
+          freight_value: decimal
+          item_gmv: decimal
           seller_zip_prefix: varchar
           seller_city: varchar
           seller_state_code: varchar
@@ -122,7 +122,7 @@ models:
           purchase_date: date
           order_count: bigint
           delivered_order_count: bigint
-          item_gmv: double
+          item_gmv: decimal
   columns:
   - name: purchase_date
     data_tests:
@@ -134,7 +134,7 @@ models:
       arguments:
         expected:
           seller_id: varchar
-          item_gmv: double
+          item_gmv: decimal
           order_count: bigint
           freight_to_price_ratio: double
           handoff_eligible_count: bigint
@@ -159,7 +159,7 @@ models:
           municipality_id: bigint
           municipality_name: varchar
           order_count: bigint
-          item_gmv: double
+          item_gmv: decimal
   - unique_combination:
       arguments:
         combination:

@@ -9,8 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 FIELD_TYPES: frozenset[str] = frozenset(
-    {"string", "integer", "number", "boolean", "timestamp", "date", "json"}
+    {"string", "integer", "number", "decimal", "boolean", "timestamp", "date", "json"}
 )
+# Iceberg, Spark, and Trino all cap DECIMAL precision at 38 digits.
+MAX_DECIMAL_PRECISION = 38
 CLASSIFICATIONS: frozenset[str] = frozenset({"public", "internal", "pii"})
 CLASSIFICATION_RANK: dict[str, int] = {"public": 0, "internal": 1, "pii": 2}
 PAYLOAD_FORMATS: frozenset[str] = frozenset({"csv", "json", "jsonl"})
@@ -31,13 +33,19 @@ class ContractError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ContractField:
-    """One expected field on a record or JSON envelope."""
+    """One expected field on a record or JSON envelope.
+
+    ``precision`` and ``scale`` are set only on a ``decimal`` field: at most
+    ``precision`` digits, ``scale`` of them after the decimal point.
+    """
 
     name: str
     field_type: str
     nullable: bool
     classification: str
     description: str
+    precision: int | None = None
+    scale: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -192,6 +192,25 @@ Local Gold, before and after the P3-17 change, on the same Silver. "Pooled" is o
 | `mart_seller_performance` row mean of `on_time_handoff_rate` | 0.8310 | 0.8798 |
 | `mart_oltp_delivery_performance` and `mart_oltp_seller_performance` handoff rate | 0.0 (2 orders, none shipped) | null (0 eligible) |
 
+### P3-18 exact money (2026-11-22)
+
+Money columns are `decimal` from Silver on ([data contracts](data-contracts.md#money-p3-18), [Gold money types](gold-layer.md#quality-and-reconciliation)). Local Gold before (`double`) and after `make live-rebuild` on the same raw objects:
+
+| Metric | Before | After |
+| --- | --- | --- |
+| `fct_order_items` `sum(price)` | 13591643.70001412 | 13591643.70 |
+| `fct_order_items` `sum(freight_value)` | 2251909.540000263 | 2251909.54 |
+| `fct_order_items` `sum(item_gmv)` | 15843553.23999886 | 15843553.24 |
+| `mart_platform_sales` and `mart_seller_performance` `sum(item_gmv)` | 15843553.240000017 and 15843553.24000002 | 15843553.24 in both |
+| `fct_payments` `sum(payment_value)` | 16008872.119999189 | 16008872.12 |
+| `fct_closed_deals` `sum(declared_monthly_revenue)` | 61784006.0 | 61784006.00 |
+| `mart_lead_outcome` `sum(matched_seller_item_gmv)` | 775815.6299999994 | 775815.63 |
+| `mart_catalog_prices` `sum(min_price)`, `sum(max_price)` | 30496.560000000012, 90282.76000000004 | 30496.56, 90282.76 |
+| `payment_amount_mismatch` findings | 381 orders | 303 orders |
+| `mart_freight` `sum(freight_to_price_ratio)` | 18.850581115142653 | 18.850581115142635 |
+
+The rule "item GMV and collected amount differ by more than 0.01" did not change. On exact amounts 273 orders differ by exactly 0.01 and 303 by more. A `double` difference of one cent can land above 0.01, so the old count (381) held 78 one-cent orders. 303 equals the 2026-11-06 profile below. Ratios, means, and the median are `double` and move only in the last digits, because the sums under them are now exact. Types after the rebuild, from `information_schema`: the 7 Silver money columns are `decimal(12,2)`. Of the Gold columns probed, 21 amounts and sums are `decimal` (`decimal(12,2)` for amounts, `decimal(13,2)` for `item_gmv`, `decimal(38,2)` for sums) and the 8 ratio, mean, and median columns are `double`.
+
 ### Quality findings
 
 Each `fct_*_quality_findings` has one row per finding. The same source row can emit more than one finding.

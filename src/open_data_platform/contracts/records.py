@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 
+from open_data_platform.contracts import decimals
 from open_data_platform.contracts.model import ContractField, DataContract
 
 NULL_VIOLATION = "null_violation"
@@ -43,7 +45,9 @@ def classify_records(
     duplicate. When a key repeats, every row in that group is reported.
     An empty ``primary_key`` skips the duplicate check. Nullable nulls are
     valid. ``timestamp`` and ``date`` are non-empty strings, with no
-    calendar check.
+    calendar check. A ``decimal`` is an ``int`` or a ``Decimal`` that fits the
+    field's precision and scale; a ``float`` is a type mismatch, because it
+    has already been through binary rounding.
     """
     pk_names = frozenset(contract.primary_key)
     findings: list[InvalidRecord] = []
@@ -99,9 +103,10 @@ def parsed_csv_record(
 ) -> dict[str, object]:
     """Convert one CSV row into values the classifier understands.
 
-    An empty cell is null. Integer, number, and boolean cells that do not
-    match their token stay as the original text so the classifier can report
-    a type mismatch. ``timestamp`` and ``date`` stay text.
+    An empty cell is null. Integer, number, decimal, and boolean cells that do
+    not match their token stay as the original text so the classifier can
+    report a type mismatch. A decimal cell becomes a ``Decimal``, never a
+    float. ``timestamp`` and ``date`` stay text.
     """
     return {
         field.name: _csv_cell(field, cells[field.name]) for field in contract.fields
@@ -109,7 +114,10 @@ def parsed_csv_record(
 
 
 def load_jsonl_records(body: bytes) -> tuple[dict[str, object], ...]:
-    """Parse UTF-8 JSONL into objects. A bad line is a structural error."""
+    """Parse UTF-8 JSONL into objects. A bad line is a structural error.
+
+    A number with a fraction or an exponent is read as a ``Decimal``.
+    """
     try:
         text = body.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -121,8 +129,8 @@ def load_jsonl_records(body: bytes) -> tuple[dict[str, object], ...]:
             msg = f"JSONL line {index} is empty"
             raise PayloadStructureError(msg)
         try:
-            item = json.loads(line)
-        except json.JSONDecodeError as exc:
+            item = decimals.json_loads(line)
+        except ValueError as exc:
             msg = f"JSONL line {index} is not JSON"
             raise PayloadStructureError(msg) from exc
         if not isinstance(item, dict):
@@ -133,19 +141,19 @@ def load_jsonl_records(body: bytes) -> tuple[dict[str, object], ...]:
 
 
 def encode_findings(findings: Sequence[InvalidRecord]) -> bytes:
-    """Encode findings as JSONL. Each object keeps a fixed key order."""
+    """Encode findings as JSONL. Each object keeps a fixed key order.
+
+    A ``Decimal`` in the record keeps its exact text.
+    """
     lines = [
-        json.dumps(
+        decimals.json_dumps(
             {
                 "record_index": item.record_index,
                 "reason": item.reason,
                 "field": item.field,
                 "primary_key": item.primary_key,
                 "record": item.record,
-            },
-            ensure_ascii=False,
-            separators=(",", ":"),
-            allow_nan=False,
+            }
         )
         for item in findings
     ]
@@ -179,13 +187,29 @@ def _matches(field: ContractField, value: object) -> bool:
             return False
         if isinstance(value, int):
             return True
+        if isinstance(value, Decimal):
+            return math.isfinite(float(value))
         return isinstance(value, float) and _finite(value)
+    if field.field_type == "decimal":
+        return _decimal_matches(field, value)
     if field.field_type == "boolean":
         return isinstance(value, bool)
     if field.field_type in _TEXT_TYPES:
         return isinstance(value, str) and value != ""
     if field.field_type == "json":
         return isinstance(value, dict | list)
+    return False
+
+
+def _decimal_matches(field: ContractField, value: object) -> bool:
+    if field.precision is None or field.scale is None:
+        return False
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return decimals.fits(Decimal(value), field.precision, field.scale)
+    if isinstance(value, Decimal):
+        return decimals.fits(value, field.precision, field.scale)
     return False
 
 
@@ -204,6 +228,8 @@ def _csv_cell(field: ContractField, text: str) -> object:
         if "." in text:
             return float(text)
         return int(text)
+    if field.field_type == "decimal" and _NUMBER_RE.fullmatch(text):
+        return Decimal(text)
     if field.field_type == "boolean" and text in {"true", "false", "True", "False"}:
         return text in {"true", "True"}
     return text

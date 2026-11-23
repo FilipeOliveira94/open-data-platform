@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from open_data_platform.contracts.load import load_contracts
+from open_data_platform.contracts.model import ContractField
 from open_data_platform.lakehouse.silver.cli import (
     SOURCE_MODULES,
     live_checks,
@@ -16,6 +19,9 @@ from open_data_platform.lakehouse.silver.common import (
     DedupPolicy,
     SilverError,
     TimestampStyle,
+    column_type,
+    decimal_pattern,
+    decimal_sql,
     iceberg_type,
     json_path_timestamp,
     render_silver_sql,
@@ -246,7 +252,11 @@ def test_boolean_cast_for_closed_deals() -> None:
         policy_for(contract),
     )
     assert "WHEN lower(`has_company`) IN ('true') THEN true" in sql
-    assert "TRY_CAST(`declared_monthly_revenue` AS DOUBLE)" in sql
+    assert (
+        "CASE WHEN `declared_monthly_revenue` RLIKE"
+        " '^-?(0|[1-9][0-9]{0,9})([.][0-9]{1,2})?$'"
+        " THEN TRY_CAST(`declared_monthly_revenue` AS DECIMAL(12,2)) END"
+    ) in sql
 
 
 def test_iceberg_type_map() -> None:
@@ -310,3 +320,86 @@ def test_empty_pk_without_payload_partition_fails() -> None:
                 timestamp_style=TimestampStyle.OLIST_CSV,
             ),
         )
+
+
+def _decimal_field(precision: int = 12, scale: int = 2) -> ContractField:
+    return ContractField(
+        name="amount",
+        field_type="decimal",
+        nullable=False,
+        classification="public",
+        description="amount",
+        precision=precision,
+        scale=scale,
+    )
+
+
+def test_a_decimal_field_maps_to_its_precision_and_scale() -> None:
+    assert column_type(_decimal_field()) == "DECIMAL(12,2)"
+    assert column_type(_decimal_field(38, 0)) == "DECIMAL(38,0)"
+    with pytest.raises(SilverError):
+        iceberg_type("decimal")
+
+
+@pytest.mark.parametrize(
+    ("text", "fits"),
+    [
+        ("1234567890.12", True),
+        ("58.90", True),
+        ("10.5", True),
+        ("0.05", True),
+        ("-0.00", True),
+        ("100", True),
+        ("9.999", False),
+        ("12345678901.00", False),
+        ("1E+2", False),
+        ("058.90", False),
+        (".5", False),
+        ("5.", False),
+        ("", False),
+        (" 1.00", False),
+    ],
+)
+def test_the_decimal_guard_accepts_only_text_that_fits_as_written(
+    text: str,
+    fits: bool,
+) -> None:
+    # Spark RLIKE is a regex search; Python re.search reads this pattern the same way.
+    assert (re.search(decimal_pattern(12, 2), text) is not None) is fits
+
+
+def test_decimal_patterns_for_other_scales() -> None:
+    assert re.search(decimal_pattern(12, 0), "120") is not None
+    assert re.search(decimal_pattern(12, 0), "120.5") is None
+    assert re.search(decimal_pattern(13, 3), "1.250") is not None
+    assert re.search(decimal_pattern(2, 2), "0.05") is not None
+    assert re.search(decimal_pattern(2, 2), "1.05") is None
+
+
+def test_the_decimal_cast_is_null_instead_of_rounded() -> None:
+    assert decimal_sql("`price`", 12, 2) == (
+        "CASE WHEN `price` RLIKE '^-?(0|[1-9][0-9]{0,9})([.][0-9]{1,2})?$' "
+        "THEN TRY_CAST(`price` AS DECIMAL(12,2)) END"
+    )
+
+
+def test_money_columns_are_decimal_in_silver() -> None:
+    money = {
+        ("olist_brazilian_ecommerce", "order_items"): ("price", "freight_value"),
+        ("olist_brazilian_ecommerce", "order_payments"): ("payment_value",),
+        ("postgres_oltp", "order_items"): ("price", "freight_value"),
+        ("dummyjson_products", "products"): ("price",),
+        ("olist_marketing_funnel", "closed_deals"): ("declared_monthly_revenue",),
+    }
+    contracts = {(item.source_id, item.dataset): item for item in load_contracts()}
+    for identity, names in money.items():
+        contract = contracts[identity]
+        columns = {
+            column.name: column
+            for column in resolve_output_columns(contract, policy_for(contract))
+        }
+        sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
+        for name in names:
+            assert columns[name].iceberg_type == "DECIMAL(12,2)", (identity, name)
+            assert f"CAST(`{name}` AS DECIMAL(12,2)) AS `{name}`" in sql
+            assert f"TRY_CAST(`{name}` AS DOUBLE)" not in sql

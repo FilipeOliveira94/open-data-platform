@@ -130,7 +130,7 @@ def _contract() -> DataContract:
 def _sample(field: ContractField) -> object:
     if field.field_type == "integer":
         return 1
-    if field.field_type == "number":
+    if field.field_type in {"number", "decimal"}:
         return 1.5
     if field.field_type == "string":
         return "fixture"
@@ -284,6 +284,41 @@ def test_null_and_duplicate_ids_stay_in_the_page() -> None:
     assert findings[0]["field"] == "id"
 
 
+def test_a_price_that_needs_rounding_is_quarantined_and_kept_exact() -> None:
+    contract = _contract()
+    client = _client()
+    body = (
+        _page(
+            contract,
+            skip=0,
+            limit=2,
+            total=2,
+            products=[_product(contract, id=1), _product(contract, id=2)],
+        )
+        .replace(b'"price": 1.5', b'"price": 9.99', 1)
+        .replace(b'"price": 1.5', b'"price": 9.999', 1)
+    )
+
+    _ingest(client, _Pages({0: body}), limit=30)
+
+    raw = next(
+        call.kwargs
+        for call in _data_puts(client)
+        if call.kwargs["Key"].endswith("/products-skip-000000.json")
+    )
+    assert raw["Body"] == body
+    sidecar = next(
+        call.kwargs
+        for call in _data_puts(client)
+        if call.kwargs["Key"].startswith("quarantine/")
+    )
+    findings = [json.loads(line) for line in sidecar["Body"].splitlines()]
+    assert [
+        (item["record_index"], item["field"], item["reason"]) for item in findings
+    ] == [(1, "price", "type_mismatch")]
+    assert b'"price":9.999' in sidecar["Body"]
+
+
 def test_limit_below_one_makes_no_request() -> None:
     transport = _Pages({})
     with pytest.raises(DummyJsonProductsError, match="limit must be an integer >= 1"):
@@ -363,7 +398,7 @@ def test_marker_is_cleared_first_and_written_after_the_last_page() -> None:
 
 def test_short_final_page_accepts_the_returned_count_as_limit() -> None:
     contract = _contract()
-    assert contract.contract_version == 3
+    assert contract.contract_version == 4
     client = _client()
     body = _page(
         contract,

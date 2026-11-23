@@ -10,7 +10,8 @@ select
   category,
   count(*) as product_count,
   min(price) as min_price,
-  approx_percentile(price, 0.5) as median_price,
+  -- approx_percentile takes a double; min and max keep the exact decimal.
+  approx_percentile(cast(price as double), 0.5) as median_price,
   max(price) as max_price,
   count_if(brand is null or trim(brand) = '') as products_missing_brand
 from {{ ref('dim_catalog_products') }}

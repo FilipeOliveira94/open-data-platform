@@ -14,7 +14,7 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | --- | --- | --- |
 | Identity | `contract_version`, `source_id`, `dataset`, `description`, `grain`, `primary_key` | What one record is, and which fields identify it |
 | Payload | `payload_format` (`csv`, `json`, or `jsonl`), optional `record_locator` + `envelope_fields` | How the raw object is shaped |
-| Schema | `fields[]` with `name`, `type`, `nullable`, `classification`, `description` | Expected columns or object keys |
+| Schema | `fields[]` with `name`, `type`, `nullable`, `classification`, `description`; `precision` and `scale` on a `decimal` field | Expected columns or object keys |
 | Invalid rows | `on_invalid` (`quarantine` or `fail_batch`) | Declared row-level policy |
 | Structural errors | `on_structural_error` | Always `fail_batch` (missing column, unreadable payload) |
 | Change pattern | `update_pattern` | `snapshot`, `full_refresh`, `incremental_window`, or `append_only`. Downstream behavior: [Update patterns](#update-patterns-p3-12) |
@@ -22,7 +22,7 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | Provenance | `provenance.system` | Producer of the bytes |
 | Evolution | `changelog[]` | Note for each `contract_version` |
 
-Logical types are `string`, `integer`, `number`, `boolean`, `timestamp`, `date`, and `json`. Bronze stores each field as Iceberg `STRING` ([bronze layer](bronze-layer.md)). Casting to the logical type is [Silver](silver-layer.md) (P2-04).
+Logical types are `string`, `integer`, `number`, `decimal`, `boolean`, `timestamp`, `date`, and `json`. `number` is a binary double. `decimal` is exact and needs `precision` (1 to 38 digits) and `scale` (0 to `precision` digits after the point); the loader rejects them on any other type. Bronze stores each field as Iceberg `STRING` ([bronze layer](bronze-layer.md)). Casting to the logical type is [Silver](silver-layer.md) (P2-04).
 
 Field classification is `public`, `internal`, or `pii`. The dataset classification is the strictest of its fields (envelope included). It is computed by the loader and is not stored, so the rollup cannot drift from the fields.
 
@@ -42,7 +42,7 @@ After the shape is readable, each record is classified. The raw bytes are still 
 | --- | --- |
 | none | Null in a nullable field, including a nullable key that is omitted |
 | `null_violation` | Null in a non-nullable field, or a null primary-key value. An empty CSV cell is null |
-| `type_mismatch` | Value has the wrong type. CSV integers are base-10 without a leading zero. CSV numbers are plain decimals. CSV booleans are `true`, `false`, `True`, or `False`. `timestamp` and `date` are non-empty text, with no calendar check. `json` is an object or an array |
+| `type_mismatch` | Value has the wrong type. CSV integers are base-10 without a leading zero. CSV numbers are plain decimals. A `decimal` is a JSON number or a plain CSV decimal with at most `scale` digits after the point, as written, and at most `precision - scale` before it; a value that would need rounding, or one already read as a binary float, is a mismatch. CSV booleans are `true`, `false`, `True`, or `False`. `timestamp` and `date` are non-empty text, with no calendar check. `json` is an object or an array |
 | `duplicate_primary_key` | The primary key repeats inside that object. Every row in the group is reported. A null primary key is not grouped. An empty `primary_key` skips this check |
 
 Olist geolocation is the empty-key case: the ZIP prefix repeats and is not a duplicate finding.
@@ -86,9 +86,45 @@ Raw objects written before P3-12 have no marker. Their executions are incomplete
 
 Evidence: unit tests in `tests/unit/lakehouse/test_silver.py`, `test_bronze.py`, `test_reconciliation.py`, and the ingestion tests; the live check `scripts/p3_12_refresh_check.sh` (result in the [status log](../status-log.md)).
 
+## Money (P3-18)
+
+A money field is `decimal`, never `number`. JSON readers (`contracts.decimals.json_loads`) parse a number with a fraction as a `Decimal`, and writers (`json_dumps`) write a `Decimal` as its exact text, so `10.50` stays `10.50` from the source to Silver. The PostgreSQL extract writes `numeric(12,2)` as that text, with no float conversion.
+
+| Source | Dataset | Field | Type | Currency |
+| --- | --- | --- | --- | --- |
+| `olist_brazilian_ecommerce` | `order_items` (v4) | `price`, `freight_value` | `decimal(12,2)` | BRL |
+| `olist_brazilian_ecommerce` | `order_payments` (v3) | `payment_value` | `decimal(12,2)` | BRL |
+| `olist_marketing_funnel` | `closed_deals` (v5) | `declared_monthly_revenue` | `decimal(12,2)` | BRL (declared by the seller) |
+| `postgres_oltp` | `order_items` (v3) | `price`, `freight_value` | `decimal(12,2)` (PostgreSQL `numeric(12,2)`) | BRL (the synthetic OLTP mirrors Olist) |
+| `dummyjson_products` | `products` (v4) | `price` | `decimal(12,2)` | Not stated by the API |
+
+The local Olist files fit `decimal(12,2)`: at most two decimal places, largest values 6_735.00 (`price`), 409.68 (`freight_value`), 13_664.08 (`payment_value`), and 50_000_000.0 (`declared_monthly_revenue`), measured on 2026-11-22.
+
+Currency rules:
+
+- Every field holds one currency, named in its `description`. No contract has a currency column, and no source mixes currencies in a field.
+- The scale is the currency's minor unit, per field: `decimal(p,0)` for JPY or CLP, `decimal(p,3)` for KWD or BHD. `(12,2)` belongs to the BRL fields above, not to the type.
+- A value with more digits than the field allows is never rounded. It is a `type_mismatch` finding at ingestion, Bronze keeps its text, and Silver casts it to NULL ([silver layer](silver-layer.md)). A source that starts sending a three-decimal currency shows up as findings, not as a wrong total.
+- A field that mixes currencies is out of scope until a source needs it. That issue adds a required ISO 4217 `currency_code` next to the amount, a scale that covers the largest accepted minor unit with a per-row check against the row's currency, Gold sums grouped by currency and never across currencies, and conversion to BRL only through a dated rate with an explicit rounding rule, keeping the original amount, currency, rate, and converted amount. Phase 10 brings the BCB US dollar selling rate (SGS series 1), one such rate.
+
+### Pipeline design checklist (P3-18)
+
+| Question | P3-18 answer |
+| --- | --- |
+| Change type | No `update_pattern` changes. The column type changes: re-reading the same execution gives the same rows, now `DECIMAL` |
+| Window and watermark | Unchanged: same windows, same `updated_at` watermark. Missed windows follow P3-06 and P3-16 |
+| Re-run and backfill | `make live-rebuild` re-reads every complete raw object under the new contracts (`CREATE OR REPLACE`). An old PostgreSQL raw object carries `10.5`, a new one `10.50`: both are the same `DECIMAL`, so re-extracting a covered window changes no count and no sum |
+| Deletes | Unchanged. The batch path does not see a hard delete (CDC, Phase 4); `snapshot` and `full_refresh` follow the latest complete execution |
+| What a run reads | A scheduled refresh reads what it read before. The one-off rebuild reads all raw history |
+| Reader view | Silver swaps type and rows in one commit, so a reader sees the `DOUBLE` table or the `DECIMAL` one, never a missing table. Gold replaces one model at a time (review R6, P6-09): during the rebuild some Gold models can still be `double` |
+| Ownership and concurrency | Same writers (Spark Bronze and Silver, dbt Gold). The rebuild ran with the Airflow services stopped, so no `transform_lakehouse` run shared the tables or the Ivy cache |
+| Trigger | No new trigger. A refresh started by an Asset before the rebuild retypes only the Silver datasets it rebuilds, and the `column_types` tests fail `dbt_build` until `make live-rebuild` runs |
+| Failure | A failed rebuild leaves each table at its previous snapshot; the retry is another `make live-rebuild`. A value outside the contract is written exactly to raw, becomes a quarantine finding, and is NULL in Silver |
+| Evidence | Unit tests (`tests/unit/contracts`, the extract, Bronze, Silver, and DummyJSON tests), `make dbt-unit`, `pytest tests/integration`, and the 2026-11-22 rebuild with exact reconciliation ([status log](../status-log.md)) |
+
 ## Evolution
 
-Raise `contract_version` and append a `changelog` note in the same change as any field, nullability, key, or classification edit. Do not rewrite history in place. There is no migration engine in this issue.
+Raise `contract_version` and append a `changelog` note in the same change as any field, nullability, key, or classification edit. Do not rewrite history in place. There is no migration engine in this issue. A type change takes effect on the next `make live-rebuild`, which rebuilds every table from all complete raw objects ([ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md)); an incremental refresh retypes only the Silver datasets it rebuilds, and the Gold `column_types` tests fail until the rebuild.
 
 ## Sources in version 1
 

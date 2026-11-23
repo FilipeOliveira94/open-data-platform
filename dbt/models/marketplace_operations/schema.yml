@@ -85,9 +85,9 @@ models:
           product_id: varchar
           seller_id: varchar
           shipping_limit_date: timestamp
-          price: double
-          freight_value: double
-          item_gmv: double
+          price: decimal
+          freight_value: decimal
+          item_gmv: decimal
           seller_city: varchar
           seller_state_code: varchar
           seller_zip_prefix: varchar
@@ -124,7 +124,7 @@ models:
           payment_sequential: bigint
           payment_type: varchar
           payment_installments: bigint
-          payment_value: double
+          payment_value: decimal
   - unique_combination:
       arguments:
         combination:
@@ -186,8 +186,8 @@ models:
           purchase_date: date
           order_count: bigint
           delivered_order_count: bigint
-          item_gmv: double
-          amount_collected: double
+          item_gmv: decimal
+          amount_collected: decimal
   columns:
   - name: purchase_date
     data_tests:
@@ -199,7 +199,7 @@ models:
       arguments:
         expected:
           seller_id: varchar
-          item_gmv: double
+          item_gmv: decimal
           order_count: bigint
           handoff_eligible_count: bigint
           on_time_handoff_rate: double
@@ -225,7 +225,7 @@ models:
           municipality_id: bigint
           municipality_name: varchar
           order_count: bigint
-          item_gmv: double
+          item_gmv: decimal
   - unique_combination:
       arguments:
         combination:
@@ -272,7 +272,7 @@ models:
           installment_count: bigint
           payment_row_count: bigint
           order_count: bigint
-          amount_collected: double
+          amount_collected: decimal
   - unique_combination:
       arguments:
         combination:
@@ -299,8 +299,8 @@ models:
           order_status: varchar
           primary_payment_method: varchar
           order_count: bigint
-          item_gmv: double
-          amount_collected: double
+          item_gmv: decimal
+          amount_collected: decimal
           approved_before_cancel_count: bigint
   - unique_combination:
       arguments:

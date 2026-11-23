@@ -18,7 +18,7 @@ Spark `3.5.8-java17` writes. Trino `484` reads `iceberg.bronze.{table}`. `spark.
 
 The grain is the contract grain: one CSV row, one JSONL line, one JSON array element, or one element of the DummyJSON `products` array. `total`, `skip`, and `limit` are repeated on each product row. The `products` array is not a column.
 
-Every value is Iceberg `STRING`. A logical `integer`, `number`, `boolean`, `timestamp`, or `date` is stored as text. Nested `json` is compact JSON text. An empty CSV cell, a JSON null, and an omitted nullable key become null. A value of the wrong logical type stays in the row. Duplicate primary keys stay in the row. The contract `primary_key` is not an Iceberg identifier and is not unique here.
+Every value is Iceberg `STRING`. A logical `integer`, `number`, `decimal`, `boolean`, `timestamp`, or `date` is stored as text. A JSON number in a `decimal` field keeps its exact digits (`10.50` stays `10.50`, P3-18); JSON is read with `parse_float=Decimal`, so no amount passes through a binary float. Other JSON numbers keep the text they had before: the shortest text of the double. Nested `json` is compact JSON text. An empty CSV cell, a JSON null, and an omitted nullable key become null. A value of the wrong logical type stays in the row. Duplicate primary keys stay in the row. The contract `primary_key` is not an Iceberg identifier and is not unique here.
 
 Columns, in order:
 
