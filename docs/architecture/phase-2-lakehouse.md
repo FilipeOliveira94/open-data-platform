@@ -44,9 +44,9 @@ raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_na
 
 `dt=` is the UTC date of `_ingestion_ts`. It is not an event-time partition. Layout: [raw storage](raw-storage-layout.md).
 
-Bronze, Silver, and Gold Iceberg tables have no partition spec. `CREATE TABLE` sets `format-version` 2 and a location. It does not set `PARTITIONED BY`. dbt does not set `partitioned_by`.
+Bronze tables are `PARTITIONED BY (dt)` since P3-08 ([ADR-0026](../decisions/0026-bronze-partitions-and-run-metadata.md)). `dt` is the `STRING` column copied from the raw key, an identity partition. The scheduled Bronze `MERGE` adds `target.dt IN (<staged dt values>)` to its `ON` clause, so it scans only the partitions it writes ([review R5](../reviews/2026-11-21-verified-issues-review.md)); `table_io` in `lakehouse_state` records the files and bytes each `MERGE` scanned. A table created before P3-08 fails the next incremental write until `make live-rebuild` recreates it.
 
-Bronze keeps `dt` as a `STRING` column copied from the raw key. It is not an Iceberg partition. Since P3-13 the scheduled Bronze write is one `MERGE` per dataset, and without a partition that `MERGE` joins against the whole table; P3-08 partitions Bronze by `dt` to bound it ([review R5](../reviews/2026-11-21-verified-issues-review.md)).
+Silver and Gold Iceberg tables have no partition spec. `CREATE TABLE` sets `format-version` 2 and a location. dbt does not set `partitioned_by`.
 
 Silver `PARTITION BY` is the window of `ROW_NUMBER` used to keep one survivor per key. The contract primary key is that list, except geolocation, which uses the payload columns. That clause does not create an Iceberg partition.
 
@@ -121,7 +121,7 @@ Headline anchors match the 2026-11-05 / 2026-11-06 baseline, including Silver ge
 ## Limitations
 
 - Bronze and Silver implement full overwrite only. The other write modes fail if selected.
-- Iceberg tables are unpartitioned. File size is the engine default. A per-table partition spec for Silver and Gold is listed under Candidates, not issues, in [`ROADMAP.md`](../../ROADMAP.md). It is not scheduled. `INSERT OVERWRITE` and Gold table replace leave previous Parquet files in the bucket until P5-07.
+- Silver and Gold tables are unpartitioned; Bronze is partitioned by `dt` (P3-08). File size is the engine default. A per-table partition spec for Silver and Gold is listed under Candidates, not issues, in [`ROADMAP.md`](../../ROADMAP.md). It is not scheduled. `INSERT OVERWRITE` and Gold table replace leave previous Parquet files in the bucket until P5-07.
 - Exactly-once end-to-end is not claimed.
 - The JDBC catalog is not the Glue protocol. Both sides are pinned to schema `V1`.
 - The Hadoop catalog is a single-writer probe. Bronze, Silver, and Gold do not use it.

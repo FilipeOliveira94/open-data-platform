@@ -4,6 +4,27 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-23 — P3-08 execution metadata, Bronze `dt` partitions, Trino client
+
+ADR-0026 approved. Bronze tables are `PARTITIONED BY (dt)` and the incremental `MERGE` adds `target.dt IN (<staged dt values>)` to its `ON` clause (`lakehouse/bronze.py`). Before an incremental `MERGE` the Bronze step reads the table's Iceberg metadata through the JDBC catalog and fails, naming `make live-rebuild`, when the default spec has no `dt` identity field (`lakehouse/iceberg_catalog.py`). `medallion_build` records `lakehouse_state.step_runs` (every attempt: status, seconds, exception type, one-line message), `dataset_runs` (per run, layer, dataset: objects, rows read and written, table total, seconds; Gold rows from dbt `run_results.json`), and `table_io` (per Iceberg table a dataset's Spark script touched: scan files, skipped files, bytes, rows; commit files and rows) (`lakehouse/run_log.py`). Scan counts come from the Spark event log and commit counts from Iceberg `LoggingMetricsReporter` lines, both captured per script in a mode-700 directory, parsed for counts, and deleted (`lakehouse/spark_metrics.py`, `docker/spark/log4j2-metrics.properties`). A probe showed that Iceberg 1.12 does not send Spark scans to `LoggingMetricsReporter`, so the plan's scan-report source moved to the event log. Trino errors name `errorName`, `errorType`, `errorCode`; the `nextUri` loop stops at `ODP_TRINO_QUERY_TIMEOUT` (default 600 s) and cancels the query. `bronze_refreshes` is kept.
+
+Review of the Silver audit table (asked by Filipe): every Silver write `MERGE`d into `silver_audit.quality_counts` with `WHEN NOT MATCHED BY SOURCE`, so it scanned and rewrote the whole table. The `ON` clause now fixes the run and dataset and that clause is gone.
+
+| Run (local stack) | Result |
+| --- | --- |
+| Probe, partitioned table with 3 `dt` files | `MERGE` with `target.dt IN (…)` scanned 1 file and skipped 2; the same `MERGE` without it scanned 4 of 4 |
+| `make live-bronze` on pre-P3-08 tables, window `[2026-10-18, 2026-10-19)` | `bronze` failed in 1.0 s: `bronze.postgres_oltp__sellers has no dt partition spec; run make live-rebuild once`. `step_runs` `failed` with `RefreshError`; the objects stayed unregistered |
+| `make live-rebuild` | 10 min 35 s. Bronze 276.4 s (18 tables, 142 objects, 1_571_774 rows; 18 checks passed), Silver 282.0 s (18 tables, 9_429_824 Bronze rows scanned, 1_303_814 written; 43 checks passed), stage-quarantine 14.9 s, dbt-build 36.5 s (55 models, 768_196 rows affected) |
+| `quality_counts` during that rebuild (old `MERGE`) | Each write scanned the whole table: 153 rows at the first dataset, 256 at the last; one file removed and one added per commit |
+| `make live-refresh`, window `[2026-10-19, 2026-10-20)` | 2 min 22 s. `orders` and `order_items` 1 row each; their `MERGE` scanned 0 files (the `dt=2026-11-23` partition was empty). `quality_counts` writes added 1 file each, removed 0, scanned 2 files (8_918 bytes) each while skipped files grew 0, 2, 4, 6 |
+| Re-extract of `[2026-10-19, 2026-10-20)` into the same `dt`, `make live-bronze` | `orders` `MERGE` scanned 1 file (6_877 bytes) of the table's 3, `order_items` 1 (6_437 bytes) of 3: only the partition it writes |
+| `make live-refresh`, nothing new | Six steps `skipped`, each 0.2 to 0.6 s |
+| Airflow `transform_lakehouse` `manual__p3-08-check` | Six `step_runs` rows under the run id; the DummyJSON snapshot `MERGE` scanned 1 file and skipped 1 (58_580 bytes), 194 rows. The catch-up runs after Airflow started were recorded too (`dbt-reconcile` 632.9 s) |
+
+`uv run pytest tests/unit`: 582 passed. `make lint` and `ruff format --check` passed. Not exercised live: the Trino total timeout (unit test with a fake clock) and a Spark script failure after the event log started (unit test; the live failure path was the partition guard). `quality_counts` files are pruned by dataset only: Iceberg truncates `run_label` bounds to 16 characters, so a dataset's write still scans one more small file per run until compaction (P5-07).
+
+---
+
 ### 2026-11-23 — P3-07 quality checks, quarantine, cast-failure counts, and volume guard
 
 `on_invalid` becomes `quarantine_exclude`, `quarantine_flag`, or `fail_batch`; the plain `quarantine` value is rejected. Filipe approved the per-source choice: exclude for `postgres_oltp` (4) and `demo_storefront.clickstream`, flag for the 9 Olist e-commerce datasets, the 2 funnel datasets, DummyJSON products, and IBGE municipalities. `snapshot` and `full_refresh` contracts declare `volume_guard.min_row_ratio` (Olist and funnel 1.0, DummyJSON 0.9, IBGE 0.99); the loader requires it on those patterns and rejects it elsewhere. All 18 contracts got a new version.

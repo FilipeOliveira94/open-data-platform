@@ -44,13 +44,38 @@ packages="${packages},org.postgresql:postgresql:42.7.14"
 # container scratch directory (the earlier Spark image used its work-dir).
 cd "${TMPDIR:-/tmp}"
 
+# P3-08: medallion_build sets both paths to a mode-700 directory of the run.
+# ODP_SPARK_EVENT_DIR receives the Spark event log (scan files, bytes, and
+# rows); ODP_SPARK_METRICS_FILE receives the Iceberg commit reports. The
+# caller parses the counts and deletes both. Without them, Spark keeps its
+# default logging and writes no event log.
+metrics_opts=(--conf "spark.eventLog.enabled=false")
+if [[ -n "${ODP_SPARK_METRICS_FILE:-}" || -n "${ODP_SPARK_EVENT_DIR:-}" ]]; then
+  for metrics_path in "${ODP_SPARK_METRICS_FILE:?}" "${ODP_SPARK_EVENT_DIR:?}"; do
+    case "${metrics_path}" in
+      /*[!A-Za-z0-9._/-]* | [!/]*)
+        echo "spark metrics paths must be plain absolute paths" >&2
+        exit 1
+        ;;
+    esac
+  done
+  log4j_conf="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/log4j2-metrics.properties"
+  metrics_opts=(
+    --driver-java-options "-Dlog4j.configurationFile=${log4j_conf} -Dodp.metrics.file=${ODP_SPARK_METRICS_FILE}"
+    --conf "spark.sql.catalog.local.metrics-reporter-impl=org.apache.iceberg.metrics.LoggingMetricsReporter"
+    --conf "spark.eventLog.enabled=true"
+    --conf "spark.eventLog.dir=file://${ODP_SPARK_EVENT_DIR}"
+    --conf "spark.eventLog.compress=false"
+  )
+fi
+
 exec /opt/spark/bin/spark-sql \
   --master "local[*]" \
   --packages "${packages}" \
   --properties-file "${SECRET_PROPS}" \
+  "${metrics_opts[@]}" \
   --conf "spark.redaction.regex=(?i)secret|password|token|access[.]key" \
   --conf "spark.ui.enabled=false" \
-  --conf "spark.eventLog.enabled=false" \
   --conf "spark.jars.ivy=/tmp/.ivy2" \
   --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
   --conf "spark.sql.defaultCatalog=local" \

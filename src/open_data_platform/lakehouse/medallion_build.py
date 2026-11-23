@@ -31,6 +31,7 @@ import sys
 import time
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
         OpenCheck,
         PromotionRegistry,
     )
+    from open_data_platform.lakehouse.run_log import RunLog
+    from open_data_platform.lakehouse.spark_metrics import SparkMetrics
 
 DEFAULT_SPARK_DIR = "/opt/odp/spark"
 DEFAULT_DBT_BIN = "/opt/dbt-venv/bin/dbt"
@@ -151,35 +154,101 @@ def run_spark_scripts(
     return len(files)
 
 
+class SparkScriptError(MedallionBuildError):
+    """A Spark script exited non-zero. ``metrics`` is what it measured."""
+
+    def __init__(self, message: str, metrics: SparkMetrics) -> None:
+        super().__init__(message)
+        self.metrics = metrics
+
+
 def spark_runner(
     script: str,
     env: Mapping[str, str],
     run_command: ProcessRunner = run_process,
-) -> Callable[[Path], None]:
-    """Return a callable that runs ``script`` for one SQL file or raises."""
+) -> Callable[[Path], SparkMetrics]:
+    """Return a callable that runs ``script`` for one SQL file or raises.
+
+    Each run captures the Spark event log and the Iceberg commit reports in
+    a mode-700 directory next to the SQL file and returns the measured table
+    counts (P3-08). A failure raises ``SparkScriptError`` with the counts
+    measured before it. Unreadable metrics are reported and give empty
+    counts; they do not fail a write that Spark committed.
+    """
+    from open_data_platform.lakehouse.spark_metrics import (
+        MetricsCapture,
+        SparkMetrics,
+        SparkMetricsError,
+    )
+
     spark_dir = env.get("ODP_SPARK_DIR", DEFAULT_SPARK_DIR)
 
-    def run(path: Path) -> None:
+    def run(path: Path) -> SparkMetrics:
+        capture = MetricsCapture(path.parent / f".metrics-{path.stem}")
         status = run_command(
             ["bash", f"{spark_dir}/{script}"],
-            {**env, "ODP_SPARK_SQL": str(path)},
+            {**env, "ODP_SPARK_SQL": str(path), **capture.prepare()},
         )
+        try:
+            metrics = capture.collect()
+        except SparkMetricsError as exc:
+            print(f"{path.name}: {exc}", file=sys.stderr, flush=True)
+            metrics = SparkMetrics()
         if status != 0:
             msg = f"spark {script} failed for {path.name} with status {status}"
-            raise MedallionBuildError(msg)
+            raise SparkScriptError(msg, metrics)
+        return metrics
 
     return run
 
 
-def trino_scalar(statement: str, env: Mapping[str, str]) -> str:
+TRINO_TIMEOUT_SECONDS = 600.0
+
+
+class TrinoQueryError(MedallionBuildError):
+    """Trino rejected a query. Carries the error name, type, and code only."""
+
+    def __init__(self, name: str, error_type: str, code: object) -> None:
+        super().__init__(
+            f"trino query failed: errorName={name} errorType={error_type} "
+            f"errorCode={code}"
+        )
+        self.error_name = name
+        self.error_type = error_type
+        self.error_code = code
+
+
+def trino_scalar(
+    statement: str,
+    env: Mapping[str, str],
+    *,
+    opener: Callable[..., object] | None = None,
+    clock: Callable[[], float] = time.monotonic,
+) -> str:
     """Return the first column of the last row of ``statement`` as text.
 
     Uses the Trino HTTP protocol (``/v1/statement``) with the standard library.
     The value is the same text the Trino CLI prints, without quotes.
+
+    ``ODP_TRINO_QUERY_TIMEOUT`` (seconds, default 600) bounds the whole
+    ``nextUri`` loop, not each request. When it runs out, the query is
+    cancelled with a ``DELETE`` on its ``nextUri`` and the call fails. An
+    error names Trino's ``errorName``, ``errorType``, and ``errorCode``;
+    Trino's message is not repeated because it can quote values.
     """
+    opener = opener or urllib.request.urlopen
     host = env.get("ODP_TRINO_HOST", "trino")
     port = env.get("ODP_TRINO_PORT", "8080")
     user = env.get("ODP_TRINO_USER", "odp")
+    try:
+        budget = float(env.get("ODP_TRINO_QUERY_TIMEOUT", TRINO_TIMEOUT_SECONDS))
+    except ValueError as exc:
+        msg = "ODP_TRINO_QUERY_TIMEOUT must be a number of seconds"
+        raise MedallionBuildError(msg) from exc
+    if budget <= 0:
+        msg = "ODP_TRINO_QUERY_TIMEOUT must be positive"
+        raise MedallionBuildError(msg)
+    deadline = clock() + budget
     request = urllib.request.Request(
         f"http://{host}:{port}/v1/statement",
         data=statement.encode("utf-8"),
@@ -188,13 +257,28 @@ def trino_scalar(statement: str, env: Mapping[str, str]) -> str:
     )
     last: object = None
     while True:
-        with urllib.request.urlopen(request, timeout=300) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        remaining = deadline - clock()
+        if remaining <= 0:
+            _cancel_trino(request, user, opener)
+            msg = f"trino query exceeded ODP_TRINO_QUERY_TIMEOUT={budget:g}s"
+            raise MedallionBuildError(msg)
+        try:
+            with opener(request, timeout=min(remaining, 300.0)) as response:  # type: ignore[attr-defined]
+                payload = json.loads(response.read().decode("utf-8"))
+        except OSError as exc:
+            if clock() >= deadline:
+                _cancel_trino(request, user, opener)
+                msg = f"trino query exceeded ODP_TRINO_QUERY_TIMEOUT={budget:g}s"
+                raise MedallionBuildError(msg) from exc
+            msg = f"trino request failed: {type(exc).__name__}"
+            raise MedallionBuildError(msg) from exc
         error = payload.get("error")
         if error:
-            name = error.get("errorName", "UNKNOWN")
-            msg = f"trino query failed: {name}"
-            raise MedallionBuildError(msg)
+            raise TrinoQueryError(
+                str(error.get("errorName", "UNKNOWN")),
+                str(error.get("errorType", "UNKNOWN")),
+                error.get("errorCode", "UNKNOWN"),
+            )
         for row in payload.get("data") or ():
             last = row[0] if row else None
         next_uri = payload.get("nextUri")
@@ -202,6 +286,22 @@ def trino_scalar(statement: str, env: Mapping[str, str]) -> str:
             break
         request = urllib.request.Request(next_uri, headers={"X-Trino-User": user})
     return "" if last is None else str(last)
+
+
+def _cancel_trino(
+    request: urllib.request.Request, user: str, opener: Callable[..., object]
+) -> None:
+    """Best-effort ``DELETE`` of a running query's ``nextUri``."""
+    if request.get_method() != "GET":
+        return
+    cancel = urllib.request.Request(
+        request.full_url, headers={"X-Trino-User": user}, method="DELETE"
+    )
+    try:
+        with opener(cancel, timeout=10):  # type: ignore[attr-defined]
+            pass
+    except OSError:
+        print("trino cancel request failed", file=sys.stderr, flush=True)
 
 
 def run_checks(
@@ -291,22 +391,66 @@ def run_step(
     full_rebuild: bool = False,
     registry: PromotionRegistry | None = None,
     allow_volume_drop: frozenset[tuple[str, str]] = frozenset(),
+    run_log: RunLog | None = None,
 ) -> bool:
     """Run one named step with ``work`` as the scratch directory.
 
     Return ``False`` when the step had nothing to do and wrote nothing.
     ``allow_volume_drop`` applies to the ``silver`` step only.
+
+    With a ``run_log``, the step records one ``step_runs`` row for this
+    attempt (ran, skipped, or failed with the exception type and a one-line
+    message), and the write steps record their datasets (P3-08).
     """
     from open_data_platform.lakehouse.promotion_registry import RegistryError
     from open_data_platform.lakehouse.refresh import RefreshError
+    from open_data_platform.lakehouse.run_log import (
+        STEP_FAILED,
+        STEP_RAN,
+        STEP_SKIPPED,
+        StepRun,
+        one_line,
+    )
 
     work.mkdir(parents=True, exist_ok=True)
+    started = datetime.now(UTC)
+
+    def record(status: str, exc: BaseException | None = None) -> None:
+        if run_log is None:
+            return
+        run_log.record_step(
+            StepRun(
+                run_label=work.name,
+                step=step,
+                started_at=started,
+                finished_at=datetime.now(UTC),
+                status=status,
+                full_rebuild=full_rebuild,
+                error_type=None if exc is None else type(exc).__name__,
+                error_message=None if exc is None else one_line(str(exc)),
+            )
+        )
+
     try:
-        return _run_step(
-            step, work, env, run_command, full_rebuild, registry, allow_volume_drop
+        wrote = _run_step(
+            step,
+            work,
+            env,
+            run_command,
+            full_rebuild,
+            registry,
+            allow_volume_drop,
+            run_log,
         )
     except (RefreshError, RegistryError) as exc:
-        raise MedallionBuildError(f"{step}: {exc}") from exc
+        error = MedallionBuildError(f"{step}: {exc}")
+        record(STEP_FAILED, exc)
+        raise error from exc
+    except BaseException as exc:
+        record(STEP_FAILED, exc)
+        raise
+    record(STEP_RAN if wrote else STEP_SKIPPED)
+    return wrote
 
 
 def _bronze_checks(
@@ -417,6 +561,7 @@ def _run_step(
     full_rebuild: bool,
     registry: PromotionRegistry | None,
     allow_volume_drop: frozenset[tuple[str, str]] = frozenset(),
+    run_log: RunLog | None = None,
 ) -> bool:
     from open_data_platform.lakehouse import refresh
 
@@ -429,8 +574,9 @@ def _run_step(
 
         ensure_catalog_database(env)
         registry = registry or _registry(env)
+        client = client_from_env(env)
         result = refresh.refresh_bronze(
-            client_from_env(env),
+            client,
             contracts=load_contracts(),
             registry=registry,
             run_label=work.name,
@@ -439,6 +585,8 @@ def _run_step(
             warehouse_bucket=env["ODP_WAREHOUSE_BUCKET"],
             run_spark=spark_runner("run_bronze.sh", env, run_command),
             full_rebuild=full_rebuild,
+            run_log=run_log,
+            partition_columns=_bronze_partition_reader(client, env),
         )
         if result.wrote:
             return True
@@ -470,6 +618,7 @@ def _run_step(
             run_spark=spark_runner("run_silver.sh", env, run_command),
             full_rebuild=full_rebuild,
             allow_volume_drop=allow_volume_drop,
+            run_log=run_log,
         )
         if done:
             return True
@@ -506,7 +655,14 @@ def _run_step(
             print("dbt-build: Gold is not pending; no model built")
             return False
         refresh.require_gold_inputs_checked(registry)
-        _run_dbt(step, work, env, run_command)
+        try:
+            _run_dbt(step, work, env, run_command)
+        finally:
+            if run_log is not None:
+                run_log.record_datasets(
+                    work.name,
+                    refresh.read_dbt_runs(work / "dbt-target" / "run_results.json"),
+                )
         refresh.complete_gold(registry, work.name, marked)
         return True
     if step in {"dbt-parse", "dbt-reconcile", "dbt-unit"}:
@@ -514,6 +670,25 @@ def _run_step(
         return True
     msg = f"unknown step: {step}"
     raise MedallionBuildError(msg)
+
+
+def _bronze_partition_reader(
+    client: object, env: Mapping[str, str]
+) -> Callable[[str], tuple[str, ...] | None]:
+    """Read a Bronze table's identity partition columns from the catalog."""
+    from open_data_platform.lakehouse.iceberg_catalog import (
+        CatalogMetadataError,
+        table_partition_columns,
+    )
+    from open_data_platform.lakehouse.refresh import RefreshError
+
+    def read(table: str) -> tuple[str, ...] | None:
+        try:
+            return table_partition_columns(client, env, "bronze", table)  # type: ignore[arg-type]
+        except CatalogMetadataError as exc:
+            raise RefreshError(str(exc)) from exc
+
+    return read
 
 
 def _run_dbt(
@@ -572,6 +747,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Exit status when the step had nothing to do (Airflow passes 99).",
     )
     args = parser.parse_args(argv)
+    from open_data_platform.lakehouse.run_log import BestEffortRunLog
+
     try:
         work = run_dir(args.work_root, args.run_label)
         started = time.monotonic()
@@ -581,6 +758,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             os.environ,
             full_rebuild=args.full_rebuild,
             allow_volume_drop=parse_dataset_names(args.allow_volume_drop),
+            run_log=BestEffortRunLog(os.environ),
         )
         print(
             f"step {args.step}: {'ran' if wrote else 'skipped'} "

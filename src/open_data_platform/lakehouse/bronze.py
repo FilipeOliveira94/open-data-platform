@@ -15,10 +15,13 @@ key that carries the run label. The Spark script per dataset is either:
 - ``INCREMENTAL_APPEND``: one ``MERGE INTO`` that inserts staged rows not
   already present (same ``raw_object_key``, ``_raw_etag``, ``record_index``).
   When a registered key has a new ETag, the same ``MERGE`` deletes that key's
-  old rows.
+  old rows. Since P3-08 the ``ON`` clause also limits the target to the
+  ``dt`` partitions of the staged objects, so the ``MERGE`` scans those
+  partitions only (2026-11-21 review R5).
 - ``FULL_OVERWRITE``: one ``CREATE OR REPLACE TABLE ... AS SELECT`` from every
   complete object, for ``--full-rebuild`` and for a dataset the registry has
-  never seen.
+  never seen. The table is partitioned by ``dt`` (P3-08, ADR-0026), the
+  ingestion date of the raw key.
 
 A dataset with nothing new gets no script and its table is not written.
 """
@@ -74,6 +77,10 @@ METADATA_COLUMNS: tuple[str, ...] = (
     "dt",
     "_execution_completed_ts",
 )
+
+# Identity partition of every Bronze table (P3-08, ADR-0026): the ingestion
+# date segment of the raw key.
+PARTITION_COLUMN = "dt"
 
 # Bronze-only lineage: the ETag of the raw object a row came from. Silver
 # does not carry it.
@@ -343,11 +350,13 @@ def render_dataset_sql(
     run_label: str = "adhoc",
     write_mode: WriteMode = REBUILD_WRITE_MODE,
     replaced_keys: Sequence[str] = (),
+    partition_dates: Sequence[str] = (),
 ) -> str:
     """Spark SQL for one Bronze table.
 
     A Spark invocation runs one of these scripts. A failure then leaves the
-    other selected tables at their previous snapshot.
+    other selected tables at their previous snapshot. An incremental write
+    takes the ``dt`` values of the staged objects as ``partition_dates``.
     """
     if row_count < 0:
         msg = "row_count must be >= 0"
@@ -362,6 +371,7 @@ def render_dataset_sql(
             run_label=require_run_label(run_label),
             write_mode=write_mode,
             replaced_keys=replaced_keys,
+            partition_dates=partition_dates,
         ).rstrip()
         + "\n"
     )
@@ -573,6 +583,7 @@ def _promote_dataset(
                 run_label=run_label,
                 write_mode=mode,
                 replaced_keys=replaced,
+                partition_dates=sorted({_parse_key(item.key).dt for item in selected}),
             ),
         )
     local.unlink(missing_ok=True)
@@ -1047,6 +1058,7 @@ def _table_sql(
     run_label: str,
     write_mode: WriteMode,
     replaced_keys: Sequence[str],
+    partition_dates: Sequence[str] = (),
 ) -> str:
     context = f"{contract.source_id}.{contract.dataset}"
     try:
@@ -1108,6 +1120,7 @@ def _table_sql(
                 *source_view,
                 f"CREATE OR REPLACE TABLE bronze.{quoted_table}",
                 "USING iceberg",
+                f"PARTITIONED BY ({_quote_ident(PARTITION_COLUMN)})",
                 f"LOCATION '{location}'",
                 "TBLPROPERTIES ('format-version' = '2')",
                 "AS " + "\n".join(source_select) + ";",
@@ -1119,7 +1132,13 @@ def _table_sql(
                 f"-- write_mode={write_mode.value} "
                 "(new raw objects only, one MERGE commit)",
                 *source_view,
-                *_merge_sql(quoted_table, columns, source_select, replaced_keys),
+                *_merge_sql(
+                    quoted_table,
+                    columns,
+                    source_select,
+                    replaced_keys,
+                    _partition_literals(context, partition_dates),
+                ),
             ]
         )
     lines.append(f"SELECT COUNT(*) AS row_count FROM bronze.{quoted_table};")
@@ -1131,6 +1150,7 @@ def _merge_sql(
     columns: Sequence[str],
     source_select: Sequence[str],
     replaced_keys: Sequence[str],
+    partition_literals: str,
 ) -> list[str]:
     """``MERGE`` that inserts staged rows not yet present.
 
@@ -1139,11 +1159,20 @@ def _merge_sql(
     whose ETag changed, the old rows of that key are deleted in the same
     commit. Object keys are paths that match the raw layout; no row value is
     rendered into the statement.
+
+    ``target.dt IN (...)`` lists the partitions of the staged objects. A raw
+    key carries its ``dt``, so a matching row and a replaced key's old rows
+    are always in those partitions, and Iceberg prunes every other one.
     """
     quoted = [_quote_ident(name) for name in columns]
     match = " AND ".join(
-        f"target.{_quote_ident(name)} = source.{_quote_ident(name)}"
-        for name in ("raw_object_key", ETAG_COLUMN, "record_index")
+        [
+            f"target.{_quote_ident(PARTITION_COLUMN)} IN ({partition_literals})",
+            *(
+                f"target.{_quote_ident(name)} = source.{_quote_ident(name)}"
+                for name in ("raw_object_key", ETAG_COLUMN, "record_index")
+            ),
+        ]
     )
     lines = [
         f"MERGE INTO bronze.{quoted_table} AS target",
@@ -1165,6 +1194,25 @@ def _merge_sql(
         )
     lines[-1] += ";"
     return lines
+
+
+def _partition_literals(context: str, partition_dates: Sequence[str]) -> str:
+    """``dt`` values as SQL literals. Only ISO dates are accepted."""
+    if not partition_dates:
+        msg = f"{context}: an incremental MERGE needs the staged dt partitions"
+        raise BronzeError(msg)
+    literals = []
+    for value in sorted(set(partition_dates)):
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            msg = f"{context}: partition value is not an ISO date"
+            raise BronzeError(msg) from exc
+        if parsed.isoformat() != value:
+            msg = f"{context}: partition value is not an ISO date"
+            raise BronzeError(msg)
+        literals.append(f"'{value}'")
+    return ", ".join(literals)
 
 
 def _key_literal(key: str) -> str:

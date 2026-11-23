@@ -90,6 +90,7 @@ def test_scheduled_bronze_merge_never_drops_or_replaces_the_table(
             run_label="scheduled",
             write_mode=BRONZE_WRITE_MODE,
             replaced_keys=keys,
+            partition_dates=("2026-11-01",),
         )
         upper = sql.upper()
         assert "DROP TABLE" not in upper

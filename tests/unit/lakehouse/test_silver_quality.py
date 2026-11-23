@@ -106,7 +106,14 @@ def test_counts_merge_on_the_run_key_and_replace_a_rerun() -> None:
     assert "MERGE INTO silver_audit.`quality_counts` AS target" in sql
     assert "SELECT 'run-7' AS run_label, 'postgres_oltp' AS source_id" in sql
     assert "WHEN MATCHED THEN UPDATE SET" in sql
-    assert "  AND target.run_label = 'run-7'\n" in sql
+    # The target is fixed to this run and dataset in the ON clause, with no
+    # NOT MATCHED BY SOURCE clause, so other runs' files are pruned (P3-08).
+    merge = sql[sql.index("MERGE INTO silver_audit") :]
+    assert (
+        "ON target.run_label = 'run-7' AND target.source_id = 'postgres_oltp' "
+        "AND target.dataset = 'orders' AND " in merge
+    )
+    assert "NOT MATCHED BY SOURCE" not in merge
     # The counts are written after the replace, from the same typed view.
     assert sql.index("CREATE OR REPLACE TABLE silver.") < sql.index("MERGE INTO")
     assert sql.count("FROM `typed_postgres_oltp__orders`") == 2

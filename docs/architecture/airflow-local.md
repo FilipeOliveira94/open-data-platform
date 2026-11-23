@@ -423,6 +423,40 @@ The URI is `odp-raw://{source_id}`. `transform_lakehouse` is scheduled on any of
 
 Each write task of the transform after `bronze` uses the trigger rule `none_failed`, so a skipped step does not stop a layer that is still pending from an earlier failed run. A check task keeps `all_success` and is skipped when its write step was skipped. A step with nothing to do exits 99, which `run_python_args` turns into a skipped task. Since P3-16 a write step does not skip while a check of its layer is open, so the check task still runs; see [Quality gate](#quality-gate-p3-16).
 
+## Execution metadata (P3-08)
+
+Every `medallion_build` step, from Make or from `transform_lakehouse`, records its run in `lakehouse_state` in the catalog database ([ADR-0026](../decisions/0026-bronze-partitions-and-run-metadata.md)). `run_label` is the Airflow run id, or `make-<UTC time>` for Make.
+
+| Table | Grain | Columns |
+| --- | --- | --- |
+| `step_runs` | One attempt of one step | `started_at`, `finished_at`, `seconds`, `status` (`ran`, `skipped`, `failed`), `full_rebuild`, `error_type`, `error_message` (one line, no values) |
+| `dataset_runs` | Run, layer (`bronze`, `silver`, `gold`), dataset | `status`, `mode`, `objects_read`, `rows_read`, `rows_written`, `table_rows`, `seconds`. Gold rows are dbt models: `source_id` is the model schema |
+| `table_io` | Run, layer, dataset, Iceberg table | `scanned_files`, `skipped_files`, `scanned_bytes`, `rows_scanned`; `added_files`, `removed_files`, `added_rows`, `removed_rows`, `total_rows` |
+
+An Airflow retry of the same run adds a `step_runs` row and replaces the `dataset_runs` and `table_io` rows of its datasets. The rows are kept across runs; P5-03 charts them. A run-log write failure prints `run log: … not recorded` to stderr and does not fail the step.
+
+Bronze `rows_read` is the rows staged from new raw objects. Silver `rows_read` is the rows its Spark script scanned from the Bronze table. `rows_written` is what the Iceberg commit added. The scan and commit counts come from the Spark event log and the Iceberg commit reports of each script, parsed and deleted after the run; nothing from them is printed.
+
+```sql
+-- Duration and status of each step, latest runs first.
+SELECT run_label, step, status, seconds, error_type
+FROM lakehouse_state.step_runs ORDER BY started_at DESC LIMIT 20;
+
+-- What each Bronze MERGE scanned, per run and table.
+SELECT d.run_label, io.table_name, io.scanned_files, io.skipped_files,
+       io.scanned_bytes, io.added_files, d.rows_read, d.seconds
+FROM lakehouse_state.dataset_runs d
+JOIN lakehouse_state.table_io io USING (run_label, layer, source_id, dataset)
+WHERE d.layer = 'bronze' ORDER BY d.recorded_at;
+```
+
+```bash
+docker compose exec postgres psql -U "$POSTGRES_USER" -d iceberg -c \
+  "SELECT run_label, step, status, seconds FROM lakehouse_state.step_runs ORDER BY started_at DESC LIMIT 10"
+```
+
+Trino errors in the check steps name `errorName`, `errorType`, and `errorCode`. The `nextUri` loop stops after `ODP_TRINO_QUERY_TIMEOUT` seconds in total (default 600), cancels the query, and fails the step.
+
 ## Quality gate (P3-16)
 
 Until P3-16 a check step checked only the tables its own run wrote. A refresh with no new raw object after a failed check skipped the check, and the `none_failed` rule then built Silver, and later Gold, on data that had failed (review R1). The check state now lives in the promotion registry, table `lakehouse_state.layer_checks`:

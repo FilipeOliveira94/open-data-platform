@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
@@ -226,6 +226,36 @@ def catalog_db(env: Mapping[str, str]) -> str:
     return name
 
 
+@contextmanager
+def state_transaction(
+    env: Mapping[str, str], label: str
+) -> Iterator[psycopg.Connection]:
+    """One transaction on the catalog database. Errors name ``label`` only."""
+    import psycopg
+
+    for name in ("POSTGRES_USER", "POSTGRES_PASSWORD"):
+        if name not in env:
+            msg = f"{label} needs {name}"
+            raise RegistryError(msg)
+    try:
+        conn = psycopg.connect(
+            host=env.get("POSTGRES_HOST", "postgres"),
+            port=int(env.get("POSTGRES_PORT", "5432")),
+            user=env["POSTGRES_USER"],
+            password=env["POSTGRES_PASSWORD"],
+            dbname=catalog_db(env),
+        )
+    except psycopg.Error as exc:
+        msg = f"cannot connect to the {label}"
+        raise RegistryError(msg) from exc
+    try:
+        with conn, conn.transaction():
+            yield conn
+    except psycopg.Error as exc:
+        msg = f"{label} statement failed: {type(exc).__name__}"
+        raise RegistryError(msg) from exc
+
+
 def _require_layer(layer: str) -> None:
     if layer not in LAYERS:
         msg = f"unknown layer: {layer!r}"
@@ -249,33 +279,13 @@ class PostgresPromotionRegistry:
             msg = f"promotion registry needs {', '.join(missing)}"
             raise RegistryError(msg)
         self._env = dict(env)
-        self._dbname = catalog_db(env)
+        catalog_db(env)
         with self._connect() as conn:
             for statement in DDL:
                 conn.execute(statement)
 
-    @contextmanager
-    def _connect(self) -> Iterator[psycopg.Connection]:
-        import psycopg
-
-        env = self._env
-        try:
-            conn = psycopg.connect(
-                host=env.get("POSTGRES_HOST", "postgres"),
-                port=int(env.get("POSTGRES_PORT", "5432")),
-                user=env["POSTGRES_USER"],
-                password=env["POSTGRES_PASSWORD"],
-                dbname=self._dbname,
-            )
-        except psycopg.Error as exc:
-            msg = "cannot connect to the promotion registry"
-            raise RegistryError(msg) from exc
-        try:
-            with conn, conn.transaction():
-                yield conn
-        except psycopg.Error as exc:
-            msg = f"promotion registry statement failed: {type(exc).__name__}"
-            raise RegistryError(msg) from exc
+    def _connect(self) -> AbstractContextManager[psycopg.Connection]:
+        return state_transaction(self._env, "promotion registry")
 
     def promoted(self, source_id: str, dataset: str) -> dict[str, str]:
         with self._connect() as conn:

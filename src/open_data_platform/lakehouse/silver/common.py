@@ -506,6 +506,13 @@ def _quality_counts_sql(
     Counts are over the Bronze rows Silver reads, before deduplication. The
     key is ``(run_label, source_id, dataset, column_name, metric)``, so the
     same run written again replaces its counts. Zero counts are recorded.
+
+    The ``ON`` clause fixes the target to this run and dataset, and there is
+    no ``WHEN NOT MATCHED BY SOURCE`` clause, so Iceberg prunes the files of
+    every other run instead of scanning and rewriting the whole table on
+    each write (P3-08). A retry of the same run with a changed metric set
+    would keep the dropped metric's row; the Silver check, which counts the
+    metrics of the latest run, then fails.
     """
     sums: list[str] = []
     stacked: list[str] = []
@@ -527,8 +534,21 @@ def _quality_counts_sql(
         f"'{contract.dataset}' AS dataset"
     )
     match = " AND ".join(
-        f"target.{name} = source.{name}"
-        for name in ("run_label", "source_id", "dataset", "column_name", "metric")
+        [
+            f"target.run_label = '{run_label}'",
+            f"target.source_id = '{contract.source_id}'",
+            f"target.dataset = '{contract.dataset}'",
+            *(
+                f"target.{name} = source.{name}"
+                for name in (
+                    "run_label",
+                    "source_id",
+                    "dataset",
+                    "column_name",
+                    "metric",
+                )
+            ),
+        ]
     )
     return [
         f"-- Quality counts of run {run_label}: cast NULLs, null keys, quarantine.",
@@ -558,12 +578,7 @@ def _quality_counts_sql(
         "WHEN MATCHED THEN UPDATE SET",
         "  target.row_count = source.row_count,",
         "  target.recorded_at = source.recorded_at",
-        "WHEN NOT MATCHED THEN INSERT *",
-        "WHEN NOT MATCHED BY SOURCE",
-        f"  AND target.run_label = '{run_label}'",
-        f"  AND target.source_id = '{contract.source_id}'",
-        f"  AND target.dataset = '{contract.dataset}'",
-        "THEN DELETE;",
+        "WHEN NOT MATCHED THEN INSERT *;",
     ]
 
 
