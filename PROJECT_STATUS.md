@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-22 (P3-18 verified) |
+| Last updated | 2026-11-23 (P3-07 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,18 +22,18 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard). Not started.
+**P3-08** — Execution metadata and failure logging (also the Bronze partition spec, review R5). Not started.
 
-P3-18 is verified. Money fields are `decimal(12,2)` from the contract to Gold: Olist item price and freight, payment value, OLTP item price and freight, DummyJSON price, and, added by Filipe, `closed_deals.declared_monthly_revenue`. Each names its currency; the [currency rules](docs/architecture/data-contracts.md#money-p3-18) say how another minor unit or a mixed-currency field would be handled. The PostgreSQL extract writes `numeric` as exact text, and Silver casts only text that fits, so nothing is rounded. After `make live-rebuild`, item GMV is 15843553.24 in the fact and every mart, reconciliation passes with exact equality (PASS=56), and `payment_amount_mismatch` falls from 381 to 303 orders: 78 one-cent differences had crossed the 0.01 threshold through binary rounding ([before and after](docs/architecture/gold-model-design.md#p3-18-exact-money-2026-11-22)).
+P3-07 is verified. Silver drops a quarantined record for `postgres_oltp` and the clickstream (`quarantine_exclude`) and keeps it with `_quarantined = true` for Olist, the funnel, DummyJSON, and IBGE (`quarantine_flag`); Gold quality facts carry `silver_action`. Each Silver write records cast NULLs per column, null-key drops, and quarantined rows in `silver_audit.quality_counts`. A `snapshot` or `full_refresh` execution below `volume_guard.min_row_ratio` of the previous one does not replace Silver; `--allow-volume-drop` accepts a real shrink. Live: a planted invalid event was excluded and counted, a 30-of-194 DummyJSON execution stopped at the guard with Silver still 194, and a corrected record re-entered Silver ([data contracts](docs/architecture/data-contracts.md#silver-handling-of-quarantined-records-p3-07), [status log](docs/status-log.md)).
 
-The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-07 to P3-10, P3-15, and later phases.
+The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-08 to P3-10, P3-15, and later phases.
 
-Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13, P3-16, P3-17): the progress table below and [`docs/status-log.md`](docs/status-log.md).
+Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](docs/status-log.md).
 
 ## Next work
 
-1. **P3-07** — Quality checks and quarantine (now also cast-failure counts and a volume guard). Acceptance: `ROADMAP.md` → P3-07.
-2. **P3-08** — Execution metadata and failure logging (also the Bronze partition spec, review R5).
+1. **P3-08** — Execution metadata and failure logging (also the Bronze partition spec, review R5). Acceptance: `ROADMAP.md` → P3-08.
+2. **P3-09** — Orchestration success/failure tests.
 
 ---
 
@@ -47,7 +47,7 @@ Earlier Phase 3 results (P3-01 to P3-06, P3-11 to P3-13, P3-16, P3-17): the prog
 | P3-04 | Daily batch schedule (PostgreSQL) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
 | P3-05 | Weekly batch schedule (PostgreSQL) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#weekly-postgresql-re-extract-p3-05) |
 | P3-06 | Window coverage, gap report, and backfill | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#window-coverage-gap-report-and-backfill-p3-06) |
-| P3-07 | Quality checks and quarantine | Not started | — |
+| P3-07 | Quality checks and quarantine | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#silver-handling-of-quarantined-records-p3-07) |
 | P3-08 | Execution metadata and failure logging | Not started | — |
 | P3-09 | Orchestration success/failure tests | Not started | — |
 | P3-10 | Orchestration runtime hardening | Not started | — |
@@ -74,7 +74,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
 - [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
 - [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing, Silver rebuilds of `incremental_window`/`append_only` datasets (ADR-0024), and the Bronze `MERGE` over the whole unpartitioned table (review R5, P3-08) still do.
-- [ ] Invalid records are identified and handled per documented rules.
+- [x] Invalid records are identified and handled per documented rules (P3-07).
 - [ ] Success and failure scenarios have tests or reproducible evidence.
 - [ ] A live run result is recorded and compared to the source windows (P3-14).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-15).
@@ -85,10 +85,10 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | Validation | Detail |
 | --- | --- |
-| Date | 2026-11-22 |
+| Date | 2026-11-23 |
 | Environment | Local Compose with the Airflow services stopped. PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` with the branch source mounted |
-| Checks | `make live-rebuild`; a Trino join of Bronze and Silver for each money column; Gold money totals before and after; `make dbt-test-reconciliation`; `make dbt-unit`; a re-extract of the covered window [2026-10-19, 2026-10-20) and `make live-refresh`; a refresh with no new raw objects. `uv run pytest tests/integration`, `make test`, `make lint`, `make dbt-parse` |
-| Result | PASS. Rebuild 570 s (125 objects, 1_571_543 rows; dbt PASS=287). Every money column: no value differs between Bronze and Silver, equal non-null counts, `decimal(12,2)`. Reconciliation PASS=56 with exact equality. dbt unit PASS=27. Re-extract: landed text equals `numeric::text`, Silver counts and sums unchanged. No-new-data refresh wrote nothing. Integration 9 passed. Unit 530 passed |
+| Checks | `make live-rebuild`; a planted clickstream execution and `make live-refresh`; a truncated DummyJSON execution, `make live-refresh`, then `REFRESH_FLAGS="--allow-volume-drop dummyjson_products.products"`; a restored DummyJSON execution and a corrected clickstream rerun; a refresh with no new raw objects; `make dbt-unit`; `uv run pytest tests/integration`; `make lint`; `make dbt-parse` |
+| Result | PASS. Rebuild 632 s: Bronze checks 18, Silver checks 43, dbt PASS=294, 101 quality-count rows all zero. Planted event: `cast_null` 1, `null_key_dropped` 1, `quarantine_excluded` 2, Silver 100 → 102. Guard: Spark failed with "30 rows, previous has 194", Silver stayed 194 and pending; the flag replaced it with 30; the restore brought 194. Rerun: Silver 104, findings 2 → 0. No-new-data refresh wrote nothing. dbt unit PASS=34. Integration 9 passed. Unit 568 passed |
 
 ---
 
@@ -184,6 +184,9 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 - Since P3-13 a refresh reads only new raw objects, but it still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table. The Bronze `MERGE` joins against the whole unpartitioned table, so its scan grows with history (review R5, P3-08). Raw executions without a `_COMPLETE` marker never enter Bronze.
 - dbt unit tests need Trino and the built parents, so CI does not run them; `make dbt-unit` runs them locally.
 - A contract type change takes effect on `make live-rebuild`. Until it runs, an incremental refresh retypes only the Silver datasets it rebuilds, and the Gold `column_types` tests fail `dbt_build`. Olist and DummyJSON quarantine findings stored before P3-18 come from the earlier contract versions until those sources are ingested again.
+- `stage-quarantine` still lists the whole `quarantine/` prefix. The 1_603 `order_reviews` findings in Gold come from the legacy sidecar of `execution_id=run-001` (contract v1 key, no `_COMPLETE` marker), which never entered Bronze; their `silver_action` says `flagged` although Silver holds no such row. Staging only the sidecars of promoted objects is a follow-up (P3-07).
+- The P3-07 live evidence left synthetic executions in raw and Bronze: `demo_storefront` `p307-planted` (4 events, now valid) and `dummyjson_products` `p307-truncated` and `p307-restored`. Silver clickstream holds the 4 `p307-*` events.
+- `--allow-volume-drop` is a `make live-refresh` flag; the Airflow `transform_lakehouse` DAG does not take it, so a real shrink is accepted from the host. The guard failure inside Airflow was not exercised; the task runs the same `medallion_build silver` step.
 - Silver and Gold are visible to readers before their checks run, and Gold models are replaced one at a time (review R6, P6-09).
 - Integration tests write to `ODP_TEST_RAW_BUCKET` (default `odp-test-raw`) and seed a scratch PostgreSQL database. Before that fix, the PostgreSQL integration test truncated the local `oltp` tables (review T8); a run on 2026-11-21 reset local PostgreSQL to the fixture.
 - The windowed batch extract does not see hard deletes. A deleted row stays in Silver and Gold on the batch path; the CDC path (Phase 4) handles deletes.

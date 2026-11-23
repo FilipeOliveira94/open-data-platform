@@ -51,7 +51,14 @@ P1-10 (2026-10-26):
 - The sidecar put uses the same `write_raw_object` with prefix `quarantine`
 - Key: `quarantine/{source_id}/{dataset}/dt=…/execution_id=…/{object_name}.jsonl` in `ODP_RAW_BUCKET`
 - Raw bytes stay intact. A clean rerun deletes that execution's sidecar
-- Reprocess path remains P3-07
+- Reprocess path: P3-07
+
+P3-07 (2026-11-23):
+
+- `on_invalid` is `quarantine_exclude`, `quarantine_flag`, or `fail_batch`. Both quarantine policies write the same sidecar; Silver drops the record or keeps it with `_quarantined = true`
+- Bronze carries the sidecar reasons per row (`_quarantine_reasons`); Silver counts cast NULLs, null-key drops, and quarantined rows per run in `silver_audit.quality_counts`
+- `snapshot` and `full_refresh` contracts declare `volume_guard.min_row_ratio`; a shorter execution does not replace Silver
+- Per-source choice, metrics, guard, and reprocess path: [data contracts](../architecture/data-contracts.md#silver-handling-of-quarantined-records-p3-07)
 
 Approved 2026-10-26 by the platform architect. The contract vocabulary, the loader, and the Phase 1 invalid-record behavior are in the repository.
 

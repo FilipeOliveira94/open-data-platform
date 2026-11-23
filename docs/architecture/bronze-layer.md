@@ -32,6 +32,7 @@ Columns, in order:
 | `dt` | `dt=` segment of the raw key. A column, not an Iceberg partition. |
 | `_execution_completed_ts` | `completed_at` of the execution's `_COMPLETE` marker (P3-12). Never null for rows promoted since P3-13. |
 | `_raw_etag` | ETag of the raw object the row came from (P3-13). Bronze only; Silver does not carry it. |
+| `_quarantine_reasons` | Reasons the ingestion sidecar `quarantine/…/{object_name}.jsonl` records for this row, sorted and comma-joined; NULL when the row has no finding (P3-07). Bronze reads the sidecar of each object it promotes, takes only `record_index` and `reason`, and fails the object if a line does not parse or names a record past the payload. Silver excludes or flags the row ([data contracts](data-contracts.md#silver-handling-of-quarantined-records-p3-07)) |
 | Contract fields | Contract order. |
 | Envelope fields | Page fields other than the `record_locator`, in contract order. |
 
