@@ -16,11 +16,15 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 
-from open_data_platform.contracts.model import DataContract
-from open_data_platform.lakehouse.bronze import bronze_table_name
+from open_data_platform.contracts.model import QUARANTINE_EXCLUDE, DataContract
+from open_data_platform.lakehouse.bronze import QUARANTINE_COLUMN, bronze_table_name
 from open_data_platform.lakehouse.silver.common import (
+    AUDIT_SCHEMA,
+    AUDIT_TABLE,
+    QUARANTINED_COLUMN,
     DedupPolicy,
     partition_key_names,
+    quality_metrics,
     silver_table_name,
 )
 
@@ -108,8 +112,51 @@ def silver_live_checks(
     relational = tuple(
         ("ok", silver_relation_sql(contract, policy)) for contract, policy in entries
     )
+    quality = tuple(
+        check
+        for contract, policy in entries
+        for check in silver_quality_checks(contract, policy)
+    )
     rebuilt = {(contract.source_id, contract.dataset) for contract, _p in entries}
-    return relational + shape_checks(rebuilt)
+    return relational + quality + shape_checks(rebuilt)
+
+
+def silver_quality_checks(
+    contract: DataContract, policy: DedupPolicy
+) -> tuple[tuple[str, str], ...]:
+    """P3-07 checks: counts recorded by the latest write, and exclusion held.
+
+    The latest run that wrote quality counts for the dataset recorded every
+    metric ``quality_metrics`` names. A ``quarantine_exclude`` table holds no
+    row with ``_quarantined = true``.
+    """
+    label = f"{contract.source_id}.{contract.dataset}"
+    audit = _qualified(AUDIT_SCHEMA, AUDIT_TABLE)
+    expected = len(quality_metrics(contract, policy))
+    scope = f"source_id = '{contract.source_id}' AND dataset = '{contract.dataset}'"
+    recorded = (
+        "SELECT CASE "
+        f"WHEN recorded = {expected} THEN 'ok' "
+        f"ELSE 'mismatch {label} quality_counts=' || CAST(recorded AS varchar) "
+        f"|| ' expected={expected}' END "
+        f"FROM (SELECT COUNT(*) AS recorded FROM {audit} WHERE {scope} "
+        "AND run_label = ("
+        f"SELECT max_by(run_label, recorded_at) FROM {audit} WHERE {scope}))"
+    )
+    checks = [("ok", _one_line(recorded))]
+    if contract.on_invalid == QUARANTINE_EXCLUDE:
+        silver = _qualified(
+            "silver", silver_table_name(contract.source_id, contract.dataset)
+        )
+        excluded = (
+            "SELECT CASE WHEN kept = 0 THEN 'ok' "
+            f"ELSE 'mismatch {label} quarantined_in_silver=' "
+            "|| CAST(kept AS varchar) END "
+            f"FROM (SELECT COUNT(*) AS kept FROM {silver} "
+            f"WHERE {trino_ident(QUARANTINED_COLUMN)})"
+        )
+        checks.append(("ok", _one_line(excluded)))
+    return tuple(checks)
 
 
 def silver_relation_sql(contract: DataContract, policy: DedupPolicy) -> str:
@@ -117,6 +164,9 @@ def silver_relation_sql(contract: DataContract, policy: DedupPolicy) -> str:
     keys = partition_key_names(contract, policy)
     quoted_keys = ", ".join(trino_ident(name) for name in keys)
     present = " AND ".join(f"{trino_ident(name)} IS NOT NULL" for name in keys)
+    if contract.on_invalid == QUARANTINE_EXCLUDE:
+        # Silver drops a quarantined row before it picks a survivor (P3-07).
+        present += f" AND {trino_ident(QUARANTINE_COLUMN)} IS NULL"
     bronze = _qualified(
         "bronze",
         bronze_table_name(contract.source_id, contract.dataset),

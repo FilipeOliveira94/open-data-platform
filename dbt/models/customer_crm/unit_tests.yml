@@ -84,3 +84,31 @@ unit_tests:
     rows:
     - {municipality_id: 1, municipality_name: Campinas, buyer_count: 1, repeat_buyer_count: 1, mean_review_score: 4.0}
     - {municipality_id: null, municipality_name: null, buyer_count: 1, repeat_buyer_count: 0, mean_review_score: 2.0}
+- name: fct_crm_quality_findings_contract_and_order_rules
+  description: >-
+    A review duplicate in quarantine carries the Silver action. An order
+    without a municipality, an unknown ZIP prefix, and a review whose order is
+    absent are one finding each; a matched order is none (P3-07).
+  model: fct_crm_quality_findings
+  given:
+  - input: source('gold_staging', 'quarantine_findings')
+    rows:
+    - {source_id: olist_brazilian_ecommerce, dataset: order_reviews, source_dataset: olist_brazilian_ecommerce.order_reviews, reason: duplicate_primary_key, field_name: null, business_key: '{"order_id":"o1","review_id":"r1"}', record_index: 0, detail: 'duplicate_primary_key at record_index=0', silver_action: flagged}
+    - {source_id: olist_brazilian_ecommerce, dataset: orders, source_dataset: olist_brazilian_ecommerce.orders, reason: null_violation, field_name: customer_id, business_key: '{"order_id":"o2"}', record_index: 0, detail: 'null_violation at record_index=0', silver_action: flagged}
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, municipality_id: 1, purchase_zip_prefix: "01001"}
+    - {order_id: o2, municipality_id: null, purchase_zip_prefix: "99999"}
+  - input: ref('dim_zip_prefix')
+    rows:
+    - {zip_prefix: "01001"}
+  - input: ref('fct_reviews')
+    rows:
+    - {review_id: r1, order_id: o1}
+    - {review_id: r2, order_id: o3}
+  expect:
+    rows:
+    - {issue_class: contract_violation, reason: duplicate_primary_key, source_dataset: olist_brazilian_ecommerce.order_reviews, business_key: '{"order_id":"o1","review_id":"r1"}', field: null, silver_action: flagged}
+    - {issue_class: business_anomaly, reason: address_without_municipality, source_dataset: olist_brazilian_ecommerce.orders, business_key: 'o2', field: purchase_city, silver_action: null}
+    - {issue_class: business_anomaly, reason: zip_prefix_unknown, source_dataset: olist_brazilian_ecommerce.orders, business_key: 'o2', field: purchase_zip_prefix, silver_action: null}
+    - {issue_class: business_anomaly, reason: review_without_order, source_dataset: olist_brazilian_ecommerce.order_reviews, business_key: 'r2:o3', field: null, silver_action: null}

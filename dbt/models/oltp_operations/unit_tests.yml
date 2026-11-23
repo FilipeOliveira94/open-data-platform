@@ -107,3 +107,31 @@ unit_tests:
   expect:
     rows:
     - {purchase_date: "2018-01-02", order_count: 2, delivered_order_count: 1, item_gmv: 35.0}
+- name: fct_oltp_quality_findings_contract_and_order_rules
+  description: >-
+    An OLTP quarantine finding says Silver excluded the record. An order with
+    no items, a delivered order without a delivery time, an order without a
+    municipality, and an unknown ZIP prefix are one finding each (P3-07).
+  model: fct_oltp_quality_findings
+  given:
+  - input: source('gold_staging', 'quarantine_findings')
+    rows:
+    - {source_id: postgres_oltp, dataset: orders, source_dataset: postgres_oltp.orders, reason: type_mismatch, field_name: updated_at, business_key: '{"order_id":"o9"}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: excluded}
+    - {source_id: olist_brazilian_ecommerce, dataset: orders, source_dataset: olist_brazilian_ecommerce.orders, reason: null_violation, field_name: customer_id, business_key: '{"order_id":"o8"}', record_index: 0, detail: 'null_violation at record_index=0', silver_action: flagged}
+  - input: ref('fct_oltp_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, order_delivered_customer_date: "2026-01-10 00:00:00", municipality_id: 1, purchase_zip_prefix: "01001"}
+    - {order_id: o2, order_status: delivered, order_delivered_customer_date: null, municipality_id: null, purchase_zip_prefix: "99999"}
+  - input: ref('fct_oltp_order_items')
+    rows:
+    - {order_id: o1}
+  - input: ref('dim_zip_prefix')
+    rows:
+    - {zip_prefix: "01001"}
+  expect:
+    rows:
+    - {issue_class: contract_violation, reason: type_mismatch, source_dataset: postgres_oltp.orders, business_key: '{"order_id":"o9"}', field: updated_at, silver_action: excluded}
+    - {issue_class: business_anomaly, reason: order_without_items, source_dataset: postgres_oltp.orders, business_key: 'o2', field: null, silver_action: null}
+    - {issue_class: business_anomaly, reason: delivered_without_timestamp, source_dataset: postgres_oltp.orders, business_key: 'o2', field: order_delivered_customer_date, silver_action: null}
+    - {issue_class: business_anomaly, reason: address_without_municipality, source_dataset: postgres_oltp.orders, business_key: 'o2', field: purchase_city, silver_action: null}
+    - {issue_class: business_anomaly, reason: zip_prefix_unknown, source_dataset: postgres_oltp.orders, business_key: 'o2', field: purchase_zip_prefix, silver_action: null}

@@ -15,7 +15,8 @@ The directory and file stem must match `source_id` and `dataset`. Those identifi
 | Identity | `contract_version`, `source_id`, `dataset`, `description`, `grain`, `primary_key` | What one record is, and which fields identify it |
 | Payload | `payload_format` (`csv`, `json`, or `jsonl`), optional `record_locator` + `envelope_fields` | How the raw object is shaped |
 | Schema | `fields[]` with `name`, `type`, `nullable`, `classification`, `description`; `precision` and `scale` on a `decimal` field | Expected columns or object keys |
-| Invalid rows | `on_invalid` (`quarantine` or `fail_batch`) | Declared row-level policy |
+| Invalid rows | `on_invalid` (`quarantine_exclude`, `quarantine_flag`, or `fail_batch`) | Declared row-level policy: [Silver handling](#silver-handling-of-quarantined-records-p3-07) |
+| Volume guard | `volume_guard.min_row_ratio` (in `(0, 1]`) | Required on `snapshot` and `full_refresh`, rejected on the others: [volume guard](#volume-guard-p3-07) |
 | Structural errors | `on_structural_error` | Always `fail_batch` (missing column, unreadable payload) |
 | Change pattern | `update_pattern` | `snapshot`, `full_refresh`, `incremental_window`, or `append_only`. Downstream behavior: [Update patterns](#update-patterns-p3-12) |
 | Governance | `governance.source_family`, `governance.owner` | Ingest source family and owning role |
@@ -32,7 +33,7 @@ Field classification is `public`, `internal`, or `pii`. The dataset classificati
 
 ## Invalid records
 
-Every shipped contract uses `on_invalid: quarantine` and `on_structural_error: fail_batch`. The loader checks that those values are in the allowed set. Runtime classification is `open_data_platform.contracts.records`. Each ingestor calls `prepare_quarantine` and then `write_raw_object` for the raw payload. The sidecar put also goes through `write_raw_object` with the `quarantine` prefix. Reprocessing a quarantined row is P3-07. Choosing which duplicate survives in Silver is documented in [silver layer](silver-layer.md).
+Every shipped contract uses `on_invalid: quarantine_exclude` or `quarantine_flag`, and `on_structural_error: fail_batch`. The loader checks that those values are in the allowed set. Both `quarantine_*` policies write the same sidecar at ingestion; they differ only in what Silver does. Runtime classification is `open_data_platform.contracts.records`. Each ingestor calls `prepare_quarantine` and then `write_raw_object` for the raw payload. The sidecar put also goes through `write_raw_object` with the `quarantine` prefix. Reprocessing a quarantined row is described [below](#reprocessing-a-quarantined-record-p3-07). Choosing which duplicate survives in Silver is documented in [silver layer](silver-layer.md).
 
 A structural error fails the batch before that object is written. That covers an unreadable payload, a CSV header or data row whose width does not match the contract, a JSON key set that does not match, and an empty IBGE array. Objects already written in the same execution stay, including any sidecar they already have. The failing object gets no raw put and no quarantine put.
 
@@ -47,7 +48,7 @@ After the shape is readable, each record is classified. The raw bytes are still 
 
 Olist geolocation is the empty-key case: the ZIP prefix repeats and is not a duplicate finding.
 
-`on_invalid: quarantine` writes the original payload under `raw/` and the findings under:
+`on_invalid: quarantine_exclude` and `quarantine_flag` write the original payload under `raw/` and the findings under:
 
 ```text
 quarantine/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_name}.jsonl
@@ -56,6 +57,58 @@ quarantine/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{ob
 The sidecar is in the same bucket (`ODP_RAW_BUCKET`). Each line has `record_index`, `reason`, `field`, `primary_key`, and `record`. The same execution identity overwrites that key. A rerun with no invalid records deletes it. Another `execution_id` keeps the previous sidecar.
 
 `on_invalid: fail_batch` writes neither object. No shipped contract uses that policy. A synthetic contract covers it in the unit tests.
+
+### Silver handling of quarantined records (P3-07)
+
+Bronze reads the sidecar of each raw object it promotes and stores the reasons of each record, sorted and comma-joined, in `_quarantine_reasons` (NULL for a clean record). The record values in the sidecar are not copied. Silver then applies the contract:
+
+| `on_invalid` | Silver | Gold `silver_action` |
+| --- | --- | --- |
+| `quarantine_exclude` | The record is dropped before deduplication and counted as `quarantine_excluded` | `excluded` |
+| `quarantine_flag` | The record is kept with `_quarantined = true` and its `_quarantine_reasons`, and counted as `quarantine_flagged` | `flagged` |
+
+Every Silver table has both columns; in an exclude dataset `_quarantined` is always false.
+
+| Source | `on_invalid` | Why |
+| --- | --- | --- |
+| `postgres_oltp` (4 datasets) | `quarantine_exclude` | Operational facts: an invalid order or item would change GMV and counts |
+| `demo_storefront.clickstream` | `quarantine_exclude` | An invalid event should not become a session |
+| `olist_brazilian_ecommerce` (9) | `quarantine_flag` | A fixed historical release: excluding breaks joins and the published counts. In `order_reviews` the sidecar quarantines every row of a duplicate key group, so excluding would remove real reviews |
+| `olist_marketing_funnel` (2) | `quarantine_flag` | Same reason |
+| `dummyjson_products.products` | `quarantine_flag` | Catalog dimension referenced by facts |
+| `ibge_localidades.municipios` | `quarantine_flag` | Reference dimension |
+
+### Quality counts (P3-07)
+
+The Silver script of each dataset records, after its replace, one row per metric in `iceberg.silver_audit.quality_counts` with the key `(run_label, source_id, dataset, column_name, metric)`. A rerun of the same run replaces its rows. Zero counts are recorded. Counts are over the Bronze rows Silver reads (the selection of the update pattern), before exclusion and deduplication.
+
+| Metric | `column_name` | Counts |
+| --- | --- | --- |
+| `cast_null` | The Silver column | Rows where the source text is not NULL and the typed value is NULL: a failed `TRY_CAST`, timestamp or date parse, decimal that does not fit, boolean that is not `true` or `false`, or a DummyJSON JSON path or array that does not parse. Plain strings are not counted |
+| `null_key_dropped` | The key columns, comma-joined | Rows dropped because a key column is NULL (for geolocation, any payload column) |
+| `quarantine_excluded` or `quarantine_flagged` | `_quarantine_reasons` | Rows with a sidecar finding |
+
+The Silver check reads that table: the latest run that wrote counts for a dataset recorded every metric, and an exclude table holds no `_quarantined` row. The statements name tables, columns, paths, and the run label; no value reaches the SQL.
+
+### Volume guard (P3-07)
+
+A `snapshot` or `full_refresh` Silver table is the latest complete execution, so a short fetch would remove records. Before the replace, the Silver script compares the Bronze row counts of the latest and the previous complete execution (same order as the Silver selection). When `latest < previous * min_row_ratio`, `assert_true` fails the script with both counts: Silver keeps its previous snapshot, the dataset stays pending for Silver, and the Airflow `silver` task fails. The first execution has no previous one and passes.
+
+| Source | `min_row_ratio` |
+| --- | --- |
+| `olist_brazilian_ecommerce`, `olist_marketing_funnel` | 1.0 (a fixed release never shrinks) |
+| `dummyjson_products.products` | 0.9 |
+| `ibge_localidades.municipios` | 0.99 |
+
+To accept a real shrink, run the refresh with `--allow-volume-drop SOURCE.DATASET` (repeatable), for example `make live-refresh REFRESH_FLAGS="--allow-volume-drop dummyjson_products.products"`. The flag skips that dataset's guard for that run only; a name that is not a guarded dataset fails the step.
+
+### Reprocessing a quarantined record (P3-07)
+
+| Situation | Path |
+| --- | --- |
+| The source sends a corrected record | Ingest the window again. A clean rerun of the same execution deletes the sidecar; the next refresh re-promotes the object by its new ETag, the Bronze row loses `_quarantine_reasons`, Silver rebuilds, and the finding leaves Gold |
+| The contract was wrong (a type too narrow, a field that is nullable) | Change the contract, bump `contract_version`, and re-ingest the affected executions so the sidecar is classified again; then `make live-rebuild` |
+| The record stays invalid | Nothing: it stays in raw, in the sidecar, in Bronze, and in the Gold findings with its `silver_action` |
 
 ## Update patterns (P3-12)
 
@@ -157,7 +210,6 @@ BrasilAPI CEP is not a contracted source ([ADR-0021](../decisions/0021-withdraw-
 
 ## Out of scope
 
-- Reprocessing a quarantined record (P3-07)
 - OpenLineage events, discovery catalogs, retention periods, SLAs, and cost tags
 - Masking or tokenization of `pii` fields
 

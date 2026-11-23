@@ -29,7 +29,7 @@ Spark writes. Trino reads `iceberg.silver.{table}`. `spark.sql.caseSensitive` st
 
 ## Typing
 
-Contract logical types become Iceberg types. Metadata columns (`source_id`, `execution_id`, `_ingestion_ts`, `raw_object_key`, `record_index`, `dt`) stay `STRING`.
+Contract logical types become Iceberg types. Metadata columns (`source_id`, `execution_id`, `_ingestion_ts`, `raw_object_key`, `record_index`, `dt`) stay `STRING`. Since P3-07 every table also has `_quarantined BOOLEAN` and `_quarantine_reasons STRING`, from the Bronze sidecar column ([quarantine handling](#quarantine-quality-counts-and-volume-guard-p3-07)).
 
 | Contract | Iceberg |
 | --- | --- |
@@ -42,7 +42,7 @@ Contract logical types become Iceberg types. Metadata columns (`source_id`, `exe
 | `date` | `DATE` |
 | `json` (default) | `STRING` unless the source module expands it |
 
-Casts use Spark `TRY_*` helpers. A failed cast becomes null; the row remains if the partition key is still non-null. Olist CSV timestamps use `yyyy-MM-dd HH:mm:ss` first. ISO sources parse ISO-8601 text. Closed-deal booleans accept `True` / `False` text.
+Casts use Spark `TRY_*` helpers. A failed cast becomes null; the row remains if the partition key is still non-null. Since P3-07 each such NULL is counted per column (`cast_null`), and each row dropped for a null key is counted (`null_key_dropped`), in `silver_audit.quality_counts`. Olist CSV timestamps use `yyyy-MM-dd HH:mm:ss` first. ISO sources parse ISO-8601 text. Closed-deal booleans accept `True` / `False` text.
 
 A `decimal` cast runs only on plain text that fits as written: `CASE WHEN col RLIKE '^-?(0|[1-9][0-9]{0,9})([.][0-9]{1,2})?$' THEN TRY_CAST(col AS DECIMAL(12,2)) END` for `(12,2)` (`decimal_sql` in `silver/common.py`). A plain Spark cast rounds `'9.999'` to `10.00`; the guard makes that value NULL, like any other failed cast, so Silver never holds a number the source did not send. The same value is a `type_mismatch` finding at ingestion ([data contracts](data-contracts.md#money-p3-18)). Old PostgreSQL raw objects carry the float text of an amount (`10.5`) and new ones its exact text (`10.50`); both cast to the same `DECIMAL`, so a window extracted before and after P3-18 does not change a row.
 
@@ -78,6 +78,35 @@ Before deduplication, Silver selects Bronze rows by the contract `update_pattern
 
 The write is a full-table overwrite. There is no `MERGE` and no exactly-once claim.
 
+## Quarantine, quality counts, and volume guard (P3-07)
+
+One Silver script per dataset now runs, in order:
+
+1. The guard that a complete execution exists (`snapshot`, `full_refresh`, `append_only`).
+2. The volume guard (`snapshot`, `full_refresh`): the latest complete execution must hold at least `min_row_ratio` of the previous one's Bronze rows, or `assert_true` fails with both counts. `--allow-volume-drop SOURCE.DATASET` skips it for one run.
+3. A temporary view of the typed Bronze selection, with one boolean per typed column that is true when the source text was present and the cast returned NULL.
+4. The `CREATE OR REPLACE TABLE` from that view. A `quarantine_exclude` dataset also filters `NOT _quarantined` before `ROW_NUMBER`.
+5. One `MERGE` into `silver_audit.quality_counts` (`run_label`, `source_id`, `dataset`, `column_name`, `metric`, `row_count`, `recorded_at`) from the same view. The table is created on first use at `s3a://{ODP_WAREHOUSE_BUCKET}/silver_audit/quality_counts`.
+
+The metric definitions and the per-source policy are in [Data contracts](data-contracts.md#silver-handling-of-quarantined-records-p3-07). The Silver checks add, per dataset, one statement that the latest run's counts cover every metric, and for an exclude dataset one statement that no `_quarantined` row is in Silver; the relation check leaves excluded rows out of the Bronze groups.
+
+The replace and the counts are two commits. A failure between them fails the script: the new Silver snapshot stays, the dataset stays pending, and the next refresh writes the table and the counts again. The view is read twice; Bronze is written only by the earlier step of the same refresh, so both reads see the same snapshot.
+
+### Pipeline design checklist (P3-07)
+
+| Question | P3-07 answer |
+| --- | --- |
+| Change type | `update_pattern` semantics unchanged. `snapshot` and `full_refresh` gain the volume guard. Exclusion or flag applies to every pattern. Bronze gains `_quarantine_reasons`, Silver `_quarantined` and `_quarantine_reasons` |
+| Window and watermark | Unchanged. The guard compares the two latest complete executions in Bronze |
+| Re-run and backfill | The same run writes the same table and replaces its own counts (`MERGE` on the run key). `--full-rebuild` re-reads every sidecar with its raw object |
+| Deletes | Unchanged (P3-12). An excluded record leaves Silver and Gold metrics; it stays in raw, the sidecar, Bronze, and the Gold findings |
+| What a run reads | Bronze reads one sidecar GET per promoted object (404 when clean). Silver reads what it read before (review R11 stays with P4-04) |
+| Reader view | The Silver replace is still one commit. A guard failure happens before it, so readers keep the previous snapshot |
+| Ownership and concurrency | Spark Silver writes `silver_audit.quality_counts`; `transform_lakehouse` runs one at a time |
+| Trigger | Unchanged |
+| Failure | A guard or cast failure fails the `silver` task, leaves the table and the pending flag, and the next refresh retries. A sidecar that does not parse fails that Bronze object before staging |
+| Evidence | Live run below: full rebuild, a planted invalid event excluded and counted, a flagged Olist dataset, a truncated snapshot stopped by the guard and then accepted with the flag, a reprocessed record, and a refresh with no new data |
+
 ## Live run vs unit fixtures
 
 | Mode | Command | Data |
@@ -99,6 +128,10 @@ uv run python -m open_data_platform.lakehouse.silver \
   --source demo_storefront \
   --sql-out .local/silver-sql
 ```
+
+## Result (2026-11-23, P3-07)
+
+`make live-rebuild` wrote 18 Silver tables and passed 43 Silver checks (18 relation, 18 quality-count, 5 exclusion, 2 shape); 101 quality-count rows, all zero. A planted clickstream execution was excluded and counted (`cast_null` 1, `null_key_dropped` 1, `quarantine_excluded` 2), a 30-of-194 DummyJSON execution failed the volume guard with Silver left at 194, and a corrected rerun re-entered Silver. Detail: [status log](../status-log.md).
 
 ## Result (2026-11-05 full-data live)
 

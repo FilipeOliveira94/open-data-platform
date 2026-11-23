@@ -215,3 +215,41 @@ unit_tests:
     rows:
     - {product_id: p1, category_portuguese: beleza_saude, category_english: health_beauty}
     - {product_id: p2, category_portuguese: pc_gamer, category_english: gaming_pc}
+- name: fct_operations_quality_findings_contract_and_order_rules
+  description: >-
+    An order-dataset quarantine finding carries the Silver action; a review
+    finding belongs to customer_crm. A 0.01 payment gap is within tolerance
+    and 0.02 is not. An order with no items and no payment, a delivered order
+    without a delivery time, and a product without a category are one finding
+    each (P3-07).
+  model: fct_operations_quality_findings
+  given:
+  - input: source('gold_staging', 'quarantine_findings')
+    rows:
+    - {source_id: olist_brazilian_ecommerce, dataset: order_items, source_dataset: olist_brazilian_ecommerce.order_items, reason: type_mismatch, field_name: price, business_key: '{"order_id":"o9","order_item_id":1}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: flagged}
+    - {source_id: olist_brazilian_ecommerce, dataset: order_reviews, source_dataset: olist_brazilian_ecommerce.order_reviews, reason: duplicate_primary_key, field_name: null, business_key: '{"order_id":"o1","review_id":"r1"}', record_index: 0, detail: 'duplicate_primary_key at record_index=0', silver_action: flagged}
+  - input: ref('fct_orders')
+    rows:
+    - {order_id: o1, order_status: delivered, order_delivered_customer_date: "2018-01-10 00:00:00"}
+    - {order_id: o2, order_status: delivered, order_delivered_customer_date: null}
+    - {order_id: o3, order_status: shipped, order_delivered_customer_date: null}
+  - input: ref('fct_order_items')
+    rows:
+    - {order_id: o1, item_gmv: 10.00}
+    - {order_id: o2, item_gmv: 5.00}
+  - input: ref('fct_payments')
+    rows:
+    - {order_id: o1, payment_value: 10.01}
+    - {order_id: o2, payment_value: 5.02}
+  - input: ref('dim_products')
+    rows:
+    - {product_id: p1, category_portuguese: beleza_saude}
+    - {product_id: p2, category_portuguese: null}
+  expect:
+    rows:
+    - {issue_class: contract_violation, reason: type_mismatch, source_dataset: olist_brazilian_ecommerce.order_items, business_key: '{"order_id":"o9","order_item_id":1}', field: price, silver_action: flagged}
+    - {issue_class: business_anomaly, reason: order_without_items, source_dataset: olist_brazilian_ecommerce.orders, business_key: 'o3', field: null, silver_action: null}
+    - {issue_class: business_anomaly, reason: order_without_payment, source_dataset: olist_brazilian_ecommerce.orders, business_key: 'o3', field: null, silver_action: null}
+    - {issue_class: business_anomaly, reason: payment_amount_mismatch, source_dataset: olist_brazilian_ecommerce.orders, business_key: 'o2', field: null, silver_action: null}
+    - {issue_class: business_anomaly, reason: delivered_without_timestamp, source_dataset: olist_brazilian_ecommerce.orders, business_key: 'o2', field: order_delivered_customer_date, silver_action: null}
+    - {issue_class: business_anomaly, reason: product_without_category, source_dataset: olist_brazilian_ecommerce.products, business_key: 'p2', field: product_category_name, silver_action: null}

@@ -55,3 +55,23 @@ unit_tests:
     rows:
     - {user_id: u1, session_count: 1, purchase_session_count: 0, products_touched: 1, cart_no_purchase_sessions: 1, last_session_time: "2026-01-01 10:00:00"}
     - {user_id: u2, session_count: 0, purchase_session_count: 0, products_touched: 0, cart_no_purchase_sessions: 0, last_session_time: null}
+- name: fct_storefront_quality_findings_contract_and_cart_rule
+  description: >-
+    A clickstream quarantine finding says Silver excluded the event. A cart or
+    purchase event without a product is a finding; a page view without one is
+    not (P3-07).
+  model: fct_storefront_quality_findings
+  given:
+  - input: source('gold_staging', 'quarantine_findings')
+    rows:
+    - {source_id: demo_storefront, dataset: clickstream, source_dataset: demo_storefront.clickstream, reason: type_mismatch, field_name: event_time, business_key: '{"event_id":"e9"}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: excluded}
+    - {source_id: dummyjson_products, dataset: products, source_dataset: dummyjson_products.products, reason: type_mismatch, field_name: price, business_key: '{"id":7}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: flagged}
+  - input: ref('fct_storefront_events')
+    rows:
+    - {event_id: e1, event_type: add_to_cart, product_id: null}
+    - {event_id: e2, event_type: purchase, product_id: p1}
+    - {event_id: e3, event_type: page_view, product_id: null}
+  expect:
+    rows:
+    - {issue_class: contract_violation, reason: type_mismatch, source_dataset: demo_storefront.clickstream, business_key: '{"event_id":"e9"}', field: event_time, silver_action: excluded}
+    - {issue_class: business_anomaly, reason: cart_or_purchase_without_product, source_dataset: demo_storefront.clickstream, business_key: 'e1', field: product_id, silver_action: null}

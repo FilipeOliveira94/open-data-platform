@@ -51,6 +51,11 @@ class FakeS3:
         self.put_object(Bucket=Bucket, Key=Key, Body=Path(Filename).read_bytes())
 
     def get_object(self, *, Bucket: str, Key: str) -> dict[str, object]:
+        if (Bucket, Key) not in self.objects:
+            raise ClientError(
+                {"Error": {"Code": "NoSuchKey", "Message": "Not Found"}},
+                "GetObject",
+            )
         item = self.objects[(Bucket, Key)]
         body = item["Body"]
         assert isinstance(body, bytes)

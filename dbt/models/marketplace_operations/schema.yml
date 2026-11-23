@@ -429,7 +429,16 @@ models:
           business_key: varchar
           field: varchar
           detail: varchar
+          silver_action: varchar
   columns:
+  - name: silver_action
+    description: What Silver did with the quarantined record (contract on_invalid, P3-07); null for a business anomaly.
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - excluded
+          - flagged
   - name: finding_id
     data_tests:
     - not_null

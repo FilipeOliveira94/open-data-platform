@@ -225,7 +225,7 @@ Each `fct_*_quality_findings` has one row per finding. The same source row can e
 | `field` | Column involved, when there is one |
 | `detail` | Short explanation. No comment body and no extra `pii` beyond the key |
 
-`contract_violation` reads the quarantine sidecar for the datasets in that domain (`null_violation`, `type_mismatch`, `duplicate_primary_key`). P2-06 unions those lines into the fact. Reprocessing a quarantined row stays P3-07. `business_anomaly` is computed from Silver.
+`contract_violation` reads the quarantine sidecar for the datasets in that domain (`null_violation`, `type_mismatch`, `duplicate_primary_key`). P2-06 unions those lines into the fact. Since P3-07 a contract violation carries `silver_action` (`excluded` when the contract drops the record from Silver, `flagged` when Silver keeps it with `_quarantined = true`), so a reader knows whether the record is in the Gold metrics. `business_anomaly` is computed from Silver and has a NULL `silver_action`. A dbt unit test per domain covers the contract filter, the out-of-domain filter, and each business rule.
 
 A late delivery is not a quality finding. It is `mart_late_orders`. An allowed null is not a finding: page-view product, nullable deal attributes, nullable brand, nullable microregion.
 

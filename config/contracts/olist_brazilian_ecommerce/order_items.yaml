@@ -1,4 +1,4 @@
-contract_version: 4
+contract_version: 5
 source_id: olist_brazilian_ecommerce
 dataset: order_items
 description: "Items inside historical Olist orders. seller_id matches closed_deals.seller_id in the marketing funnel."
@@ -8,8 +8,10 @@ primary_key:
   - order_id
   - order_item_id
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -64,3 +66,5 @@ changelog:
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
   - version: 4
     note: "price and freight_value are decimal(12,2): exact BRL amounts with at most two decimal places. They were number, read as a binary double (P3-18)."
+  - version: 5
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."

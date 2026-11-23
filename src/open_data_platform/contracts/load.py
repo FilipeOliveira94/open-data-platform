@@ -15,6 +15,7 @@ import yaml
 from open_data_platform.contracts.model import (
     CLASSIFICATIONS,
     FIELD_TYPES,
+    GUARDED_UPDATE_PATTERNS,
     MAX_DECIMAL_PRECISION,
     ON_INVALID_POLICIES,
     PAYLOAD_FORMATS,
@@ -46,6 +47,7 @@ _TOP_LEVEL_KEYS: frozenset[str] = frozenset(
         "changelog",
         "record_locator",
         "envelope_fields",
+        "volume_guard",
     }
 )
 _FIELD_KEYS: frozenset[str] = frozenset(
@@ -56,9 +58,11 @@ _DECIMAL_KEYS: frozenset[str] = frozenset({"precision", "scale"})
 _GOVERNANCE_KEYS: frozenset[str] = frozenset({"source_family", "owner"})
 _PROVENANCE_KEYS: frozenset[str] = frozenset({"system"})
 _CHANGELOG_KEYS: frozenset[str] = frozenset({"version", "note"})
+_VOLUME_GUARD_KEYS: frozenset[str] = frozenset({"min_row_ratio"})
 _REQUIRED_TOP_LEVEL: frozenset[str] = _TOP_LEVEL_KEYS - {
     "record_locator",
     "envelope_fields",
+    "volume_guard",
 }
 
 
@@ -182,6 +186,10 @@ def contract_from_mapping(data: dict[str, Any], *, origin: str) -> DataContract:
     provenance = _mapping(data["provenance"], origin, "provenance")
     _reject_unknown(provenance, _PROVENANCE_KEYS, origin, "provenance")
     _require_keys(provenance, _PROVENANCE_KEYS, origin, "provenance")
+    update_pattern = _choice(
+        data["update_pattern"], UPDATE_PATTERNS, origin, "update_pattern"
+    )
+    min_row_ratio = _volume_guard(data.get("volume_guard"), update_pattern, origin)
 
     contract = DataContract(
         contract_version=version,
@@ -198,9 +206,7 @@ def contract_from_mapping(data: dict[str, Any], *, origin: str) -> DataContract:
             data["on_invalid"], ON_INVALID_POLICIES, origin, "on_invalid"
         ),
         on_structural_error=on_structural_error,
-        update_pattern=_choice(
-            data["update_pattern"], UPDATE_PATTERNS, origin, "update_pattern"
-        ),
+        update_pattern=update_pattern,
         source_family=_choice(
             governance["source_family"],
             SOURCE_FAMILIES,
@@ -217,9 +223,37 @@ def contract_from_mapping(data: dict[str, Any], *, origin: str) -> DataContract:
         changelog=changelog,
         record_locator=parsed_locator,
         envelope_fields=envelope_fields,
+        min_row_ratio=min_row_ratio,
     )
     _assert_raw_path_segments(contract, origin)
     return contract
+
+
+def _volume_guard(value: object, update_pattern: str, origin: str) -> float | None:
+    """``volume_guard.min_row_ratio``: required exactly on guarded patterns.
+
+    Silver fails a ``snapshot`` or ``full_refresh`` execution whose row count
+    is below this share of the previous complete execution.
+    """
+    if update_pattern not in GUARDED_UPDATE_PATTERNS:
+        if value is not None:
+            msg = f"{origin}: volume_guard applies only to snapshot and full_refresh"
+            raise ContractError(msg)
+        return None
+    if value is None:
+        msg = f"{origin}: update_pattern {update_pattern} requires volume_guard"
+        raise ContractError(msg)
+    guard = _mapping(value, origin, "volume_guard")
+    _reject_unknown(guard, _VOLUME_GUARD_KEYS, origin, "volume_guard")
+    _require_keys(guard, _VOLUME_GUARD_KEYS, origin, "volume_guard")
+    ratio = guard["min_row_ratio"]
+    if isinstance(ratio, bool) or not isinstance(ratio, int | float):
+        msg = f"{origin}: volume_guard.min_row_ratio must be a number"
+        raise ContractError(msg)
+    if not 0 < ratio <= 1:
+        msg = f"{origin}: volume_guard.min_row_ratio must be in (0, 1]"
+        raise ContractError(msg)
+    return float(ratio)
 
 
 def _assert_raw_path_segments(contract: DataContract, origin: str) -> None:

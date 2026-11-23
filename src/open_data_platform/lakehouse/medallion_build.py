@@ -68,6 +68,18 @@ class MedallionBuildError(RuntimeError):
 ProcessRunner = Callable[[Sequence[str], Mapping[str, str]], int]
 
 
+def parse_dataset_names(values: Sequence[str]) -> frozenset[tuple[str, str]]:
+    """``source.dataset`` arguments as identities; reject any other shape."""
+    names: set[tuple[str, str]] = set()
+    for value in values:
+        source, dot, dataset = value.partition(".")
+        if not dot or not source or not dataset or "." in dataset:
+            msg = f"expected SOURCE.DATASET, got {value!r}"
+            raise MedallionBuildError(msg)
+        names.add((source, dataset))
+    return frozenset(names)
+
+
 def run_process(command: Sequence[str], env: Mapping[str, str]) -> int:
     """Run ``command`` without a shell and return the exit status."""
     return subprocess.run(list(command), env=dict(env), check=False).returncode
@@ -278,17 +290,21 @@ def run_step(
     *,
     full_rebuild: bool = False,
     registry: PromotionRegistry | None = None,
+    allow_volume_drop: frozenset[tuple[str, str]] = frozenset(),
 ) -> bool:
     """Run one named step with ``work`` as the scratch directory.
 
     Return ``False`` when the step had nothing to do and wrote nothing.
+    ``allow_volume_drop`` applies to the ``silver`` step only.
     """
     from open_data_platform.lakehouse.promotion_registry import RegistryError
     from open_data_platform.lakehouse.refresh import RefreshError
 
     work.mkdir(parents=True, exist_ok=True)
     try:
-        return _run_step(step, work, env, run_command, full_rebuild, registry)
+        return _run_step(
+            step, work, env, run_command, full_rebuild, registry, allow_volume_drop
+        )
     except (RefreshError, RegistryError) as exc:
         raise MedallionBuildError(f"{step}: {exc}") from exc
 
@@ -400,6 +416,7 @@ def _run_step(
     run_command: ProcessRunner,
     full_rebuild: bool,
     registry: PromotionRegistry | None,
+    allow_volume_drop: frozenset[tuple[str, str]] = frozenset(),
 ) -> bool:
     from open_data_platform.lakehouse import refresh
 
@@ -452,6 +469,7 @@ def _run_step(
             warehouse_bucket=env["ODP_WAREHOUSE_BUCKET"],
             run_spark=spark_runner("run_silver.sh", env, run_command),
             full_rebuild=full_rebuild,
+            allow_volume_drop=allow_volume_drop,
         )
         if done:
             return True
@@ -538,6 +556,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--allow-volume-drop",
+        action="append",
+        default=[],
+        metavar="SOURCE.DATASET",
+        help=(
+            "Skip the Silver volume guard of one snapshot or full_refresh "
+            "dataset for this run, to accept a real shrink. Repeatable."
+        ),
+    )
+    parser.add_argument(
         "--skip-exit-code",
         type=int,
         default=0,
@@ -547,7 +575,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         work = run_dir(args.work_root, args.run_label)
         started = time.monotonic()
-        wrote = run_step(args.step, work, os.environ, full_rebuild=args.full_rebuild)
+        wrote = run_step(
+            args.step,
+            work,
+            os.environ,
+            full_rebuild=args.full_rebuild,
+            allow_volume_drop=parse_dataset_names(args.allow_volume_drop),
+        )
         print(
             f"step {args.step}: {'ran' if wrote else 'skipped'} "
             f"in {time.monotonic() - started:.1f}s",

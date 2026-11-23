@@ -7,6 +7,13 @@ covered:
 - dim_customers
 - dim_products
 - dim_zip_prefix
+- fct_acquisition_quality_findings
+- fct_catalog_quality_findings
+- fct_crm_quality_findings
+- fct_geography_quality_findings
+- fct_oltp_quality_findings
+- fct_operations_quality_findings
+- fct_storefront_quality_findings
 - int_order_primary_payment
 - mart_catalog_review_patterns
 - mart_customer_geography
@@ -54,11 +61,4 @@ exempt:
   mart_oltp_order_milestones: plain counts per month
   mart_payment_mix: plain group by two keys
   mart_seller_buyer_geography: plain group by over a many-to-one join
-pending:
-  fct_catalog_quality_findings: finding rules; proposed for P3-07
-  fct_crm_quality_findings: finding rules; proposed for P3-07
-  fct_geography_quality_findings: finding rules; proposed for P3-07
-  fct_acquisition_quality_findings: finding rules; proposed for P3-07
-  fct_oltp_quality_findings: finding rules; proposed for P3-07
-  fct_operations_quality_findings: finding rules; proposed for P3-07
-  fct_storefront_quality_findings: finding rules; proposed for P3-07
+pending: {}

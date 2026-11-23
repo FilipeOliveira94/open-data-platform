@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: olist_marketing_funnel
 dataset: qualified_leads
 description: "Marketing qualified leads. File olist_marketing_qualified_leads_dataset.csv."
@@ -7,8 +7,10 @@ grain: "One row per marketing qualified lead."
 primary_key:
   - mql_id
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -40,3 +42,5 @@ changelog:
     note: "Initial contract. Columns follow the published Marketing Funnel by Olist (Kaggle olistbr/marketing-funnel-olist). No sample rows are stored."
   - version: 2
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 3
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."

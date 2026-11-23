@@ -38,9 +38,12 @@ def test_bronze_replaces_each_table_in_one_statement(row_count: int) -> None:
 
 
 def test_silver_replaces_each_table_in_one_statement() -> None:
+    audit = "CREATE TABLE IF NOT EXISTS silver_audit.`quality_counts` ("
     for contract in load_contracts():
         sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
-        _assert_one_atomic_replace(sql, "silver.")
+        # The audit table is created once and then merged into, never replaced.
+        assert sql.count(audit) == 1
+        _assert_one_atomic_replace(sql.replace(audit, ""), "silver.")
 
 
 @pytest.mark.parametrize("row_count", [0, 3])

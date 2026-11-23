@@ -44,3 +44,37 @@ unit_tests:
   expect:
     rows:
     - {origin: organic_search, lead_count: 4, win_count: 2, win_rate: 0.5, matched_seller_item_gmv: 20.0, top_declared_segment: pet}
+- name: fct_acquisition_quality_findings_contract_and_funnel_rules
+  description: >-
+    A funnel quarantine finding carries the Silver action. A won deal whose
+    seller has no orders, a win before first contact, a lead without origin,
+    and a deal without a lead are one finding each; a clean won lead is none
+    (P3-07).
+  model: fct_acquisition_quality_findings
+  given:
+  - input: source('gold_staging', 'quarantine_findings')
+    rows:
+    - {source_id: olist_marketing_funnel, dataset: closed_deals, source_dataset: olist_marketing_funnel.closed_deals, reason: type_mismatch, field_name: won_date, business_key: '{"mql_id":"m9"}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: flagged}
+    - {source_id: ibge_localidades, dataset: municipios, source_dataset: ibge_localidades.municipios, reason: null_violation, field_name: municipio-nome, business_key: '{"municipio-id":1}', record_index: 0, detail: 'null_violation at record_index=0', silver_action: flagged}
+  - input: ref('mart_lead_outcome')
+    rows:
+    - {mql_id: m1, is_won: true, seller_matched_in_orders: true, days_to_win: 3}
+    - {mql_id: m2, is_won: true, seller_matched_in_orders: false, days_to_win: -1}
+    - {mql_id: m3, is_won: false, seller_matched_in_orders: false, days_to_win: null}
+  - input: ref('fct_leads')
+    rows:
+    - {mql_id: m1, origin: organic_search}
+    - {mql_id: m2, origin: " "}
+    - {mql_id: m3, origin: paid_search}
+  - input: ref('fct_closed_deals')
+    rows:
+    - {mql_id: m1}
+    - {mql_id: m2}
+    - {mql_id: m4}
+  expect:
+    rows:
+    - {issue_class: contract_violation, reason: type_mismatch, source_dataset: olist_marketing_funnel.closed_deals, business_key: '{"mql_id":"m9"}', field: won_date, silver_action: flagged}
+    - {issue_class: business_anomaly, reason: won_seller_not_in_orders, source_dataset: olist_marketing_funnel.closed_deals, business_key: 'm2', field: seller_id, silver_action: null}
+    - {issue_class: business_anomaly, reason: won_before_first_contact, source_dataset: olist_marketing_funnel.closed_deals, business_key: 'm2', field: won_date, silver_action: null}
+    - {issue_class: business_anomaly, reason: lead_without_origin, source_dataset: olist_marketing_funnel.qualified_leads, business_key: 'm2', field: origin, silver_action: null}
+    - {issue_class: business_anomaly, reason: deal_without_lead, source_dataset: olist_marketing_funnel.closed_deals, business_key: 'm4', field: null, silver_action: null}

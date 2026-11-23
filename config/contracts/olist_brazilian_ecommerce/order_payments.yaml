@@ -1,4 +1,4 @@
-contract_version: 3
+contract_version: 4
 source_id: olist_brazilian_ecommerce
 dataset: order_payments
 description: "Payment rows for historical Olist orders."
@@ -8,8 +8,10 @@ primary_key:
   - order_id
   - payment_sequential
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -50,3 +52,5 @@ changelog:
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
   - version: 3
     note: "payment_value is decimal(12,2): exact BRL amounts with at most two decimal places. It was number, read as a binary double (P3-18)."
+  - version: 4
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."

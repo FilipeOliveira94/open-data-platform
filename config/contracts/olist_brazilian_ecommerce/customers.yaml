@@ -1,4 +1,4 @@
-contract_version: 3
+contract_version: 4
 source_id: olist_brazilian_ecommerce
 dataset: customers
 description: "Order-scoped Olist customers. customer_id changes per order; customer_unique_id is the stable person identifier."
@@ -7,8 +7,10 @@ grain: "One row per order-scoped customer."
 primary_key:
   - customer_id
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -47,3 +49,5 @@ changelog:
     note: "customer_zip_code_prefix is text. The published file keeps leading zeros."
   - version: 3
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 4
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."
