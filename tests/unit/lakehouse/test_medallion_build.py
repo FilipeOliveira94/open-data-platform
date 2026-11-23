@@ -146,15 +146,58 @@ def test_trino_scalar_follows_next_uri(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_trino_error_names_the_error_not_the_query(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    payload = {"error": {"errorName": "TABLE_NOT_FOUND", "message": "row 'x'"}}
+    payload = {
+        "error": {
+            "errorName": "TABLE_NOT_FOUND",
+            "errorType": "USER_ERROR",
+            "errorCode": 46,
+            "message": "row 'planted-value-731'",
+        }
+    }
     monkeypatch.setattr(
         medallion_build.urllib.request,
         "urlopen",
         lambda request, timeout: _Response(json.dumps(payload).encode("utf-8")),
     )
-    with pytest.raises(MedallionBuildError) as raised:
+    with pytest.raises(medallion_build.TrinoQueryError) as raised:
         medallion_build.trino_scalar("SELECT 1", {})
-    assert str(raised.value) == "trino query failed: TABLE_NOT_FOUND"
+    assert str(raised.value) == (
+        "trino query failed: errorName=TABLE_NOT_FOUND errorType=USER_ERROR "
+        "errorCode=46"
+    )
+    assert "planted-value-731" not in str(raised.value)
+    assert raised.value.error_type == "USER_ERROR"
+
+
+def test_trino_polling_stops_at_the_total_timeout_and_cancels() -> None:
+    """Each page is fast; the loop as a whole runs out of time (P3-08)."""
+    now = [0.0]
+    seen: list[tuple[str, str, float]] = []
+
+    def opener(request, timeout):
+        seen.append((request.get_method(), request.full_url, timeout))
+        now[0] += 4.0
+        return _Response(
+            json.dumps({"nextUri": "http://trino:8080/v1/statement/q/n"}).encode()
+        )
+
+    with pytest.raises(MedallionBuildError, match="ODP_TRINO_QUERY_TIMEOUT=10s"):
+        medallion_build.trino_scalar(
+            "SELECT 1",
+            {"ODP_TRINO_QUERY_TIMEOUT": "10"},
+            opener=opener,
+            clock=lambda: now[0],
+        )
+    methods = [method for method, _url, _timeout in seen]
+    assert methods == ["POST", "GET", "GET", "DELETE"]
+    assert seen[-1][1] == "http://trino:8080/v1/statement/q/n"
+    # Each request waits at most for the time left in the budget.
+    assert [timeout for _m, _u, timeout in seen[:3]] == [10.0, 6.0, 2.0]
+
+
+def test_trino_timeout_must_be_positive() -> None:
+    with pytest.raises(MedallionBuildError, match="must be positive"):
+        medallion_build.trino_scalar("SELECT 1", {"ODP_TRINO_QUERY_TIMEOUT": "0"})
 
 
 def test_main_reports_a_failed_step(

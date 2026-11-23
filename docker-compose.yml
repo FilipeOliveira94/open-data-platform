@@ -42,6 +42,8 @@ x-lakehouse-env: &lakehouse-env
   ODP_WORK_ROOT: /opt/odp/work
   ODP_TRINO_HOST: trino
   ODP_TRINO_PORT: "8080"
+  # Total seconds for one Trino check query, nextUri polling included (P3-08).
+  ODP_TRINO_QUERY_TIMEOUT: ${ODP_TRINO_QUERY_TIMEOUT:-600}
 
 x-airflow-env: &airflow-env
   <<: *lakehouse-env

@@ -17,6 +17,13 @@ report the step as skipped.
   pending or failed; the check step runs it again on the next refresh even
   when no new raw object arrives.
 
+Execution metadata (P3-08): each dataset a step writes gets a
+``run_log.DatasetRun`` with its objects, rows read and written, duration,
+and the measured scan and commit counts of its Spark script, recorded even
+when the step fails. Before an incremental Bronze ``MERGE`` the table must
+have the ``dt`` partition spec (ADR-0026); a table created before P3-08
+fails the step until ``make live-rebuild`` recreates it.
+
 ``full_rebuild`` rebuilds every dataset from all complete raw objects and
 every Silver table, and runs Gold. It is for a contract version change or
 recovery and is never the scheduled path.
@@ -34,8 +41,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from open_data_platform.lakehouse.bronze import (
+    PARTITION_COLUMN,
     BronzeError,
     DatasetPromotion,
+    bronze_table_name,
     promote_bronze,
 )
 from open_data_platform.lakehouse.promotion_registry import (
@@ -47,6 +56,13 @@ from open_data_platform.lakehouse.promotion_registry import (
     PromotionRegistry,
     RefreshRecord,
 )
+from open_data_platform.lakehouse.run_log import (
+    DATASET_FAILED,
+    DATASET_RAN,
+    DatasetRun,
+    RunLog,
+)
+from open_data_platform.lakehouse.spark_metrics import SparkMetrics, TableIO
 from open_data_platform.lakehouse.write_mode import WriteMode
 
 if TYPE_CHECKING:
@@ -54,8 +70,11 @@ if TYPE_CHECKING:
 
     from open_data_platform.contracts.model import DataContract
 
-# Run one Spark SQL file; raise when Spark fails.
-SparkRunner = Callable[[Path], None]
+# Run one Spark SQL file and return what it measured; raise when Spark fails.
+# A runner that measures nothing may return ``None``.
+SparkRunner = Callable[[Path], SparkMetrics | None]
+# Identity partition columns of ``bronze.<table>``, or ``None`` when absent.
+PartitionReader = Callable[[str], tuple[str, ...] | None]
 
 COUNTS_FILE = "bronze-source-counts.tsv"
 SILVER_DATASETS_FILE = "silver-datasets.txt"
@@ -89,6 +108,8 @@ def refresh_bronze(
     warehouse_bucket: str,
     run_spark: SparkRunner,
     full_rebuild: bool = False,
+    run_log: RunLog | None = None,
+    partition_columns: PartitionReader | None = None,
 ) -> BronzeRefresh:
     """Promote new raw objects, write the changed tables, and register them.
 
@@ -116,15 +137,29 @@ def refresh_bronze(
     _write_scripts(sql_dir, promotion.scripts)
     table_rows: dict[str, int] = {}
     records: list[RefreshRecord] = []
+    runs: list[DatasetRun] = []
     try:
         for entry in promotion.datasets:
             total: int | None = None
+            metrics = SparkMetrics()
+            spark_started = time.monotonic()
             if entry.script is not None:
-                print(f"spark bronze: {entry.script}", flush=True)
                 try:
-                    run_spark(sql_dir / entry.script)
-                except Exception:
+                    if entry.mode is not WriteMode.FULL_OVERWRITE:
+                        _require_bronze_partition(entry, partition_columns)
+                    print(f"spark bronze: {entry.script}", flush=True)
+                    metrics = run_spark(sql_dir / entry.script) or SparkMetrics()
+                except Exception as exc:
                     records.append(_record(entry, None, failed=True))
+                    runs.append(
+                        _bronze_run(
+                            entry,
+                            _failure_metrics(exc),
+                            time.monotonic() - spark_started,
+                            None,
+                            failed=True,
+                        )
+                    )
                     raise
             if entry.objects:
                 total = registry.record_promotion(
@@ -139,8 +174,14 @@ def refresh_bronze(
             if entry.staging_key is not None:
                 client.delete_object(Bucket=warehouse_bucket, Key=entry.staging_key)
             records.append(_record(entry, total))
+            if entry.script is not None or entry.objects:
+                runs.append(
+                    _bronze_run(entry, metrics, time.monotonic() - spark_started, total)
+                )
     finally:
         registry.record_refresh(run_label, records)
+        if run_log is not None:
+            run_log.record_datasets(run_label, runs)
         _write_counts(work / COUNTS_FILE, table_rows)
     seconds = time.monotonic() - started
     for entry in promotion.datasets:
@@ -174,6 +215,7 @@ def refresh_silver(
     run_spark: SparkRunner,
     full_rebuild: bool = False,
     allow_volume_drop: frozenset[tuple[str, str]] = frozenset(),
+    run_log: RunLog | None = None,
 ) -> tuple[tuple[str, str], ...]:
     """Rebuild the Silver tables pending for Silver. Return the datasets.
 
@@ -234,8 +276,24 @@ def refresh_silver(
         if (contract.source_id, contract.dataset) in allow_volume_drop:
             print(f"silver volume guard skipped: {name}", flush=True)
         print(f"spark silver: {name}", flush=True)
-        run_spark(sql_dir / name)
         identity = (contract.source_id, contract.dataset)
+        started = time.monotonic()
+        try:
+            metrics = run_spark(sql_dir / name) or SparkMetrics()
+        except Exception as exc:
+            if run_log is not None:
+                run_log.record_datasets(
+                    run_label,
+                    [
+                        _silver_run(
+                            identity,
+                            _failure_metrics(exc),
+                            time.monotonic() - started,
+                            failed=True,
+                        )
+                    ],
+                )
+            raise
         registry.complete(
             SILVER,
             identity,
@@ -243,6 +301,11 @@ def refresh_silver(
             run_label=run_label,
             mark_next=GOLD,
         )
+        if run_log is not None:
+            run_log.record_datasets(
+                run_label,
+                [_silver_run(identity, metrics, time.monotonic() - started)],
+            )
         done.append(identity)
     (work / SILVER_DATASETS_FILE).write_text(
         "".join(f"{source}/{dataset}\n" for source, dataset in done),
@@ -283,6 +346,48 @@ def complete_gold(
     registry.complete(GOLD, GOLD_DATASET, marked, run_label=run_label, mark_next=None)
 
 
+def read_dbt_runs(path: Path) -> list[DatasetRun]:
+    """Gold ``DatasetRun`` rows from a dbt ``run_results.json``, one per model.
+
+    ``source_id`` is the model schema and ``dataset`` the model name. dbt
+    writes the file even when the build fails, so failed models are kept.
+    ``rows_written`` is the adapter's ``rows_affected`` when it reports one,
+    else ``None``. Tests and skipped nodes are not datasets. A missing or
+    unreadable file gives no rows.
+    """
+    import json
+
+    try:
+        results = json.loads(path.read_text(encoding="utf-8")).get("results") or ()
+    except (OSError, ValueError, AttributeError):
+        return []
+    runs: list[DatasetRun] = []
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        unique_id = str(item.get("unique_id", ""))
+        status = str(item.get("status", ""))
+        if not unique_id.startswith("model.") or status not in {"success", "error"}:
+            continue
+        relation = str(item.get("relation_name") or "")
+        parts = [part.strip('"`') for part in relation.split(".")]
+        if len(parts) < 2 or not parts[-2] or not parts[-1]:
+            continue
+        rows = (item.get("adapter_response") or {}).get("rows_affected")
+        runs.append(
+            DatasetRun(
+                layer=GOLD,
+                source_id=parts[-2],
+                dataset=parts[-1],
+                status=DATASET_RAN if status == "success" else DATASET_FAILED,
+                mode="dbt",
+                seconds=float(item.get("execution_time") or 0.0),
+                rows_written=rows if isinstance(rows, int) and rows >= 0 else None,
+            )
+        )
+    return runs
+
+
 def read_silver_datasets(work: Path) -> tuple[tuple[str, str], ...] | None:
     """Datasets the Silver step of this run rebuilt, or ``None`` without a file."""
     path = work / SILVER_DATASETS_FILE
@@ -294,6 +399,83 @@ def read_silver_datasets(work: Path) -> tuple[tuple[str, str], ...] | None:
         if source and dataset:
             found.append((source, dataset))
     return tuple(found)
+
+
+def _require_bronze_partition(
+    entry: DatasetPromotion, partition_columns: PartitionReader | None
+) -> None:
+    """Fail before an incremental ``MERGE`` into a table without ``dt``."""
+    if partition_columns is None:
+        return
+    table = bronze_table_name(entry.source_id, entry.dataset)
+    columns = partition_columns(table)
+    if columns is not None and PARTITION_COLUMN not in columns:
+        msg = (
+            f"bronze.{table} has no {PARTITION_COLUMN} partition spec; "
+            "run make live-rebuild once to recreate it (ADR-0026)"
+        )
+        raise RefreshError(msg)
+
+
+def _failure_metrics(exc: BaseException) -> SparkMetrics:
+    metrics = getattr(exc, "metrics", None)
+    return metrics if isinstance(metrics, SparkMetrics) else SparkMetrics()
+
+
+def _tables(metrics: SparkMetrics) -> tuple[TableIO, ...]:
+    return tuple(metrics.tables[name] for name in sorted(metrics.tables))
+
+
+def _bronze_run(
+    entry: DatasetPromotion,
+    metrics: SparkMetrics,
+    seconds: float,
+    total: int | None,
+    *,
+    failed: bool = False,
+) -> DatasetRun:
+    """Objects and rows staged, rows the commit added, the registry total."""
+    table = metrics.get(f"bronze.{bronze_table_name(entry.source_id, entry.dataset)}")
+    return DatasetRun(
+        layer=BRONZE,
+        source_id=entry.source_id,
+        dataset=entry.dataset,
+        status=DATASET_FAILED if failed else DATASET_RAN,
+        mode=entry.mode.value if entry.script is not None else "none",
+        seconds=seconds,
+        objects_read=len(entry.objects),
+        rows_read=entry.rows_staged,
+        rows_written=None if table is None else table.added_rows,
+        table_rows=total,
+        tables=_tables(metrics),
+    )
+
+
+def _silver_run(
+    identity: tuple[str, str],
+    metrics: SparkMetrics,
+    seconds: float,
+    *,
+    failed: bool = False,
+) -> DatasetRun:
+    """Rows scanned from the Bronze table, rows the Silver commit wrote."""
+    from open_data_platform.lakehouse.silver.common import silver_table_name
+
+    source_id, dataset = identity
+    bronze = metrics.get(f"bronze.{bronze_table_name(source_id, dataset)}")
+    silver = metrics.get(f"silver.{silver_table_name(source_id, dataset)}")
+    return DatasetRun(
+        layer=SILVER,
+        source_id=source_id,
+        dataset=dataset,
+        status=DATASET_FAILED if failed else DATASET_RAN,
+        mode=WriteMode.FULL_OVERWRITE.value,
+        seconds=seconds,
+        rows_read=None if bronze is None else bronze.rows_scanned,
+        rows_written=None if silver is None else silver.added_rows,
+        table_rows=None if silver is None else silver.total_rows,
+        tables=_tables(metrics),
+    )
 
 
 def _record(
