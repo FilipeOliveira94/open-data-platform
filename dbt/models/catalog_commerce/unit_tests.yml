@@ -16,3 +16,23 @@ unit_tests:
   expect:
     rows:
     - {category: beauty, rating: 5, review_count: 4, mean_comment_length: 25.0, repeated_reviewer_email_share: 0.5}
+- name: fct_catalog_quality_findings_contract_and_repeated_email
+  description: >-
+    A DummyJSON quarantine finding carries the Silver action. A reviewer email
+    repeated on one product is one finding; the same email on another product
+    is not (P3-07).
+  model: fct_catalog_quality_findings
+  given:
+  - input: source('gold_staging', 'quarantine_findings')
+    rows:
+    - {source_id: dummyjson_products, dataset: products, source_dataset: dummyjson_products.products, reason: type_mismatch, field_name: price, business_key: '{"id":7}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: flagged}
+    - {source_id: demo_storefront, dataset: clickstream, source_dataset: demo_storefront.clickstream, reason: null_violation, field_name: event_id, business_key: '{}', record_index: 0, detail: 'null_violation at record_index=0', silver_action: excluded}
+  - input: ref('fct_catalog_reviews')
+    rows:
+    - {product_id: 1, reviewer_email: a@x.test}
+    - {product_id: 1, reviewer_email: a@x.test}
+    - {product_id: 2, reviewer_email: a@x.test}
+  expect:
+    rows:
+    - {issue_class: contract_violation, reason: type_mismatch, source_dataset: dummyjson_products.products, business_key: '{"id":7}', field: price, silver_action: flagged}
+    - {issue_class: business_anomaly, reason: repeated_reviewer_email, source_dataset: dummyjson_products.products, business_key: '1:a@x.test', field: reviewer_email, silver_action: null}

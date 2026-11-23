@@ -1,4 +1,4 @@
-contract_version: 3
+contract_version: 4
 source_id: olist_brazilian_ecommerce
 dataset: product_category_name_translation
 description: "Portuguese to English product category labels published with Olist. The published CSV starts with a UTF-8 BOM. Column names are the names below."
@@ -7,8 +7,10 @@ grain: "One row per Portuguese category name."
 primary_key:
   - product_category_name
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -32,3 +34,5 @@ changelog:
     note: "Record that the published file starts with a UTF-8 BOM. Logical column names are unchanged."
   - version: 3
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 4
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."

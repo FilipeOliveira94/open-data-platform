@@ -1,4 +1,4 @@
-contract_version: 3
+contract_version: 4
 source_id: olist_brazilian_ecommerce
 dataset: order_reviews
 description: "Customer reviews for historical Olist orders. Comment title and message are often null. The published file reuses review_id across different order_id values; the natural key is the (review_id, order_id) pair."
@@ -8,8 +8,10 @@ primary_key:
   - review_id
   - order_id
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -58,3 +60,5 @@ changelog:
     note: "Primary key is (review_id, order_id). The published file reuses review_id with different order_id values; that pair is unique and is the Silver grain."
   - version: 3
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 4
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."

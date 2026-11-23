@@ -1,4 +1,4 @@
-contract_version: 4
+contract_version: 5
 source_id: olist_brazilian_ecommerce
 dataset: sellers
 description: "Olist sellers. Location describes the business, not a customer. seller_id matches closed_deals.seller_id in the marketing funnel."
@@ -7,8 +7,10 @@ grain: "One row per seller."
 primary_key:
   - seller_id
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -44,3 +46,5 @@ changelog:
     note: "seller_zip_code_prefix is text. The published file keeps leading zeros."
   - version: 4
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 5
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."

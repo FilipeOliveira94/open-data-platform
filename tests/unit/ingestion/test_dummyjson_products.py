@@ -398,7 +398,7 @@ def test_marker_is_cleared_first_and_written_after_the_last_page() -> None:
 
 def test_short_final_page_accepts_the_returned_count_as_limit() -> None:
     contract = _contract()
-    assert contract.contract_version == 4
+    assert contract.contract_version == 5
     client = _client()
     body = _page(
         contract,

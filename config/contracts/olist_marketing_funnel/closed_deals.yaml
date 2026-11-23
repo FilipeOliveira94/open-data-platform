@@ -1,4 +1,4 @@
-contract_version: 5
+contract_version: 6
 source_id: olist_marketing_funnel
 dataset: closed_deals
 description: "Closed seller deals. File olist_closed_deals_dataset.csv. seller_id equals olist_brazilian_ecommerce sellers.seller_id or order_items.seller_id. Self-declared commercial attributes are often null."
@@ -7,8 +7,10 @@ grain: "One row per closed marketing qualified lead."
 primary_key:
   - mql_id
 update_pattern: snapshot
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 1.0
 governance:
   source_family: olist_analysis
   owner: platform
@@ -98,3 +100,5 @@ changelog:
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
   - version: 5
     note: "declared_monthly_revenue is decimal(12,2): exact BRL amounts with at most two decimal places. It was number, read as a binary double (P3-18)."
+  - version: 6
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 1.0: an execution below that share of the previous one does not replace Silver."

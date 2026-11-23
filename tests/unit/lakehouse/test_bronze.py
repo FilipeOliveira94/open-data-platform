@@ -68,9 +68,10 @@ def _contract(**overrides: object) -> DataContract:
         "grain": "one row",
         "primary_key": ("id",),
         "fields": (_field("id", "integer"),),
-        "on_invalid": "quarantine",
+        "on_invalid": "quarantine_flag",
         "on_structural_error": "fail_batch",
         "update_pattern": "snapshot",
+        "min_row_ratio": 1.0,
         "source_family": "product_analysis",
         "owner": "platform",
         "provenance_system": "generator",
@@ -472,7 +473,10 @@ def test_quarantine_objects_are_not_promoted() -> None:
         "Metadata": {},
     }
     store.objects[("odp-bronze-live", quarantine_key)] = {
-        "Body": b'{"record":"QUARANTINE_ONLY"}\n',
+        "Body": (
+            b'{"record_index":0,"reason":"null_violation","field":"x",'
+            b'"primary_key":{},"record":{"x":"QUARANTINE_ONLY"}}\n'
+        ),
         "Metadata": {
             "source_id": "olist_brazilian_ecommerce",
             "execution_id": CSV_EXECUTION_ID,
@@ -497,6 +501,8 @@ def test_quarantine_objects_are_not_promoted() -> None:
     ]["Body"]
     assert isinstance(staging, bytes)
     assert b"QUARANTINE_ONLY" not in staging
+    # The sidecar reason is lineage on the row; the record values are not.
+    assert b'"_quarantine_reasons":"null_violation"' in staging
     assert "CREATE OR REPLACE TABLE bronze." in promotion.sql
     assert "WHERE 1 = 0" not in promotion.sql
 

@@ -1,4 +1,4 @@
-contract_version: 2
+contract_version: 3
 source_id: postgres_oltp
 dataset: orders
 description: "PostgreSQL OLTP orders. JSON array of rows. Extract windows filter on updated_at."
@@ -7,7 +7,7 @@ grain: "One row per order."
 primary_key:
   - order_id
 update_pattern: incremental_window
-on_invalid: quarantine
+on_invalid: quarantine_exclude
 on_structural_error: fail_batch
 governance:
   source_family: olist_analysis
@@ -65,3 +65,5 @@ changelog:
     note: "Initial v1 contract. Columns align with the Olist dataset of the same grain, plus updated_at for the P1-06 watermark."
   - version: 2
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 3
+    note: "on_invalid is quarantine_exclude: Silver drops a quarantined record (P3-07)."

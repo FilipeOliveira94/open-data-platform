@@ -14,7 +14,8 @@ with contract_violations as (
     source_dataset,
     business_key,
     field_name as field,
-    detail
+    detail,
+    silver_action
   from {{ source('gold_staging', 'quarantine_findings') }}
   where source_id = 'postgres_oltp'
     and dataset in ('customers', 'orders', 'order_items', 'sellers')
@@ -74,5 +75,6 @@ business as (
 )
 select * from contract_violations
 union all
-select * from business
+-- A business anomaly is computed from Silver; no record was quarantined.
+select b.*, cast(null as varchar) as silver_action from business b
 

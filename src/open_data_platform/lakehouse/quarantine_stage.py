@@ -3,8 +3,8 @@
 Findings are written as a warehouse JSONL object. Spark SQL names that path
 and the columns. It does not inline finding values, so the driver log and the
 Trino query history stay free of primary keys. P2-06 unions contract
-violations into ``fct_*_quality_findings``. Reprocessing quarantined rows
-remains P3-07.
+violations into ``fct_*_quality_findings``. Since P3-07 each row carries
+``silver_action``: whether Silver excluded the record or kept it flagged.
 """
 
 from __future__ import annotations
@@ -54,7 +54,14 @@ _COLUMNS: tuple[tuple[str, str], ...] = (
     ("record_index", "BIGINT"),
     ("quarantine_object_key", "STRING"),
     ("detail", "STRING"),
+    ("silver_action", "STRING"),
 )
+
+# What Silver did with the quarantined record, from the contract (P3-07).
+SILVER_ACTIONS: dict[str, str] = {
+    "quarantine_exclude": "excluded",
+    "quarantine_flag": "flagged",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +77,7 @@ class QuarantineFindingRow:
     record_index: int
     quarantine_object_key: str
     detail: str
+    silver_action: str = "flagged"
 
 
 class QuarantineStageError(ValueError):
@@ -111,6 +119,7 @@ def parse_finding_line(
     source_id: str,
     dataset: str,
     object_key: str,
+    silver_action: str = "flagged",
 ) -> QuarantineFindingRow:
     """Map one JSONL finding into a staging row."""
     payload = json.loads(line)
@@ -147,17 +156,39 @@ def parse_finding_line(
         record_index=record_index,
         quarantine_object_key=object_key,
         detail=detail,
+        silver_action=silver_action,
     )
+
+
+def silver_actions() -> dict[tuple[str, str], str]:
+    """``(source_id, dataset) -> excluded | flagged`` from the shipped contracts."""
+    from open_data_platform.contracts.load import load_contracts
+
+    return {
+        (contract.source_id, contract.dataset): SILVER_ACTIONS[contract.on_invalid]
+        for contract in load_contracts()
+        if contract.on_invalid in SILVER_ACTIONS
+    }
 
 
 def iter_quarantine_rows(
     client: BaseClient,
     bucket: str,
     keys: Sequence[str] | None = None,
+    actions: Mapping[tuple[str, str], str] | None = None,
 ) -> Iterator[QuarantineFindingRow]:
-    """Yield staged rows for every quarantine object (or ``keys``)."""
+    """Yield staged rows for every quarantine object (or ``keys``).
+
+    ``actions`` maps each dataset to what Silver did with its quarantined
+    records; a sidecar of a dataset without a quarantine policy fails.
+    """
+    known = silver_actions() if actions is None else actions
     for key in keys if keys is not None else list_quarantine_keys(client, bucket):
         source_id, dataset = parse_quarantine_key(key)
+        action = known.get((source_id, dataset))
+        if action is None:
+            msg = f"{key}: no quarantine policy for {source_id}.{dataset}"
+            raise QuarantineStageError(msg)
         body = client.get_object(Bucket=bucket, Key=key)["Body"].read().decode("utf-8")
         for line_no, line in enumerate(body.splitlines()):
             if line == "":
@@ -168,6 +199,7 @@ def iter_quarantine_rows(
                     source_id=source_id,
                     dataset=dataset,
                     object_key=key,
+                    silver_action=action,
                 )
             except json.JSONDecodeError as exc:
                 msg = f"{key}: line {line_no} is not JSON"
@@ -190,6 +222,7 @@ def encode_findings_jsonl(rows: Sequence[QuarantineFindingRow]) -> bytes:
                 row.quarantine_object_key, "quarantine_object_key"
             ),
             "detail": _text(row.detail, "detail"),
+            "silver_action": _text(row.silver_action, "silver_action"),
         }
         lines.append(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
     if not lines:

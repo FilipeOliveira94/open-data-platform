@@ -1,4 +1,4 @@
-contract_version: 4
+contract_version: 5
 source_id: dummyjson_products
 dataset: products
 description: "DummyJSON GET /products page. The raw object is the JSON page. The record grain is one element of products. DummyJSON id is not an Olist product_id."
@@ -7,8 +7,10 @@ grain: "One product object inside the products array of a paginated response."
 primary_key:
   - id
 update_pattern: full_refresh
-on_invalid: quarantine
+on_invalid: quarantine_flag
 on_structural_error: fail_batch
+volume_guard:
+  min_row_ratio: 0.9
 governance:
   source_family: product_analysis
   owner: platform
@@ -158,3 +160,5 @@ changelog:
     note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
   - version: 4
     note: "price is decimal(12,2): an exact amount with at most two decimal places. The API states no currency. It was number, read as a binary double (P3-18)."
+  - version: 5
+    note: "on_invalid is quarantine_flag: Silver keeps a quarantined record with _quarantined = true (P3-07). volume_guard.min_row_ratio 0.9: an execution below that share of the previous one does not replace Silver."

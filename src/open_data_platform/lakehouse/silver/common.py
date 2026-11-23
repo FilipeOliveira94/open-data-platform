@@ -12,7 +12,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from open_data_platform.lakehouse.bronze import METADATA_COLUMNS, bronze_table_name
+from open_data_platform.contracts.model import QUARANTINE_EXCLUDE, QUARANTINE_FLAG
+from open_data_platform.lakehouse.bronze import (
+    METADATA_COLUMNS,
+    QUARANTINE_COLUMN,
+    bronze_table_name,
+)
 from open_data_platform.lakehouse.write_mode import (
     SILVER_WRITE_MODE,
     WriteMode,
@@ -26,6 +31,32 @@ if TYPE_CHECKING:
     from open_data_platform.contracts.model import ContractField, DataContract
 
 _SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_RUN_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+# Silver columns that carry the quarantine sidecar finding of a row (P3-07).
+# ``quarantine_exclude`` datasets keep no such row, so ``_quarantined`` is
+# always false there; the columns exist on every table for one schema.
+QUARANTINED_COLUMN = "_quarantined"
+REASONS_COLUMN = QUARANTINE_COLUMN
+
+# Run-level quality counts that the Silver script of each dataset records.
+AUDIT_SCHEMA = "silver_audit"
+AUDIT_TABLE = "quality_counts"
+AUDIT_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("run_label", "STRING"),
+    ("source_id", "STRING"),
+    ("dataset", "STRING"),
+    ("column_name", "STRING"),
+    ("metric", "STRING"),
+    ("row_count", "BIGINT"),
+    ("recorded_at", "TIMESTAMP"),
+)
+CAST_NULL = "cast_null"
+NULL_KEY_DROPPED = "null_key_dropped"
+QUARANTINE_METRICS: dict[str, str] = {
+    QUARANTINE_EXCLUDE: "quarantine_excluded",
+    QUARANTINE_FLAG: "quarantine_flagged",
+}
 _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
 ICEBERG_TYPES: dict[str, str] = {
@@ -59,11 +90,17 @@ class TimestampStyle(Enum):
 
 @dataclass(frozen=True, slots=True)
 class OutputColumn:
-    """One Silver column: DDL type and SELECT expression over Bronze names."""
+    """One Silver column: DDL type and SELECT expression over Bronze names.
+
+    ``raw_sql`` is the text the typed expression reads, for a column whose
+    expression can turn a present value into NULL. Silver counts each row
+    where ``raw_sql`` is not NULL and ``select_sql`` is (``cast_null``).
+    """
 
     name: str
     iceberg_type: str
     select_sql: str
+    raw_sql: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,13 +170,26 @@ def default_output_columns(
                 select_sql=_quote_ident(name),
             )
         )
+    reasons = _quote_ident(QUARANTINE_COLUMN)
+    columns.append(
+        OutputColumn(
+            name=QUARANTINED_COLUMN,
+            iceberg_type="BOOLEAN",
+            select_sql=f"{reasons} IS NOT NULL",
+        )
+    )
+    columns.append(
+        OutputColumn(name=REASONS_COLUMN, iceberg_type="STRING", select_sql=reasons)
+    )
     for name in _payload_column_names(contract):
         field_def = _field_by_name(contract, name)
+        quoted = _quote_ident(name)
         columns.append(
             OutputColumn(
                 name=name,
                 iceberg_type=column_type(field_def),
-                select_sql=_cast_expr(_quote_ident(name), field_def, style),
+                select_sql=_cast_expr(quoted, field_def, style),
+                raw_sql=None if field_def.field_type in {"string", "json"} else quoted,
             )
         )
     return tuple(columns)
@@ -285,6 +335,9 @@ def render_silver_sql(
     contract: DataContract,
     warehouse_bucket: str,
     policy: DedupPolicy,
+    *,
+    run_label: str = "adhoc",
+    allow_volume_drop: bool = False,
 ) -> str:
     """Spark SQL that replaces one Silver table from Bronze in one commit.
 
@@ -294,6 +347,14 @@ def render_silver_sql(
     A failed write leaves the previous snapshot. A new contract schema lands
     in the same commit. Incremental modes branch to placeholders in
     ``lakehouse.write_mode``.
+
+    P3-07: a row with a quarantine finding is dropped (``quarantine_exclude``)
+    or kept with ``_quarantined = true`` (``quarantine_flag``). A ``snapshot``
+    or ``full_refresh`` execution below ``min_row_ratio`` of the previous
+    complete execution fails before the replace, unless ``allow_volume_drop``.
+    After the replace, one ``MERGE`` records this run's counts of cast NULLs,
+    null-key drops, and quarantined rows in ``silver_audit.quality_counts``.
+    The statements name tables, columns, paths, and the run label only.
     """
     context = f"{contract.source_id}.{contract.dataset}"
     try:
@@ -307,23 +368,43 @@ def render_silver_sql(
     if policy.write_mode is not WriteMode.FULL_OVERWRITE:
         msg = f"{context}: Silver implements only full_overwrite per dataset"
         raise SilverError(msg)
+    if contract.on_invalid not in {*QUARANTINE_METRICS, "fail_batch"}:
+        msg = f"{context}: unsupported on_invalid {contract.on_invalid!r}"
+        raise SilverError(msg)
     bucket = require_bucket_name(warehouse_bucket)
+    label = require_run_label(run_label)
     source_id = _require_segment("source_id", contract.source_id)
     dataset = _require_segment("dataset", contract.dataset)
     table = silver_table_name(source_id, dataset)
     bronze = bronze_table_name(source_id, dataset)
     quoted_silver = _quote_ident(table)
     quoted_bronze = _quote_ident(bronze)
+    quoted_view = _quote_ident(f"typed_{table}")
     columns = resolve_output_columns(contract, policy)
+    checked = tuple(col for col in columns if col.raw_sql is not None)
     location = f"s3a://{bucket}/silver/{source_id}/{dataset}"
     typed_select = ",\n".join(
-        f"  {col.select_sql} AS {_quote_ident(col.name)}" for col in columns
+        [
+            *(f"  {col.select_sql} AS {_quote_ident(col.name)}" for col in columns),
+            *(
+                f"  ({col.raw_sql} IS NOT NULL AND {col.select_sql} IS NULL)"
+                f" AS {_quote_ident(_cast_flag(index))}"
+                for index, col in enumerate(checked)
+            ),
+        ]
     )
-    partition = _partition_columns(contract, policy)
+    keys = partition_key_names(contract, policy)
+    partition = ", ".join(_quote_ident(name) for name in keys)
     pattern = contract.update_pattern
     order_sql = _order_by_sql(policy, ascending=pattern == "append_only")
     pk_filter = _primary_key_filter(partition)
+    survivor_filter = pk_filter
+    if contract.on_invalid == QUARANTINE_EXCLUDE:
+        survivor_filter = f"{pk_filter} AND NOT {_quote_ident(QUARANTINED_COLUMN)}"
     guard, source_lines = _bronze_selection(pattern, quoted_bronze, context)
+    volume = _volume_guard(
+        contract, quoted_bronze, context, allow_volume_drop=allow_volume_drop
+    )
     names = tuple(col.name for col in columns)
     outer_select = ",\n".join(
         f"  CAST({_quote_ident(col.name)} AS {col.iceberg_type})"
@@ -335,9 +416,18 @@ def render_silver_sql(
         f"-- {source_id}.{dataset}",
         f"-- write_mode={policy.write_mode.value} (full load, one atomic replace)",
         f"-- update_pattern={pattern}: {_SELECTION_NOTES[pattern]}",
+        f"-- on_invalid={contract.on_invalid}: {_INVALID_NOTES[contract.on_invalid]}",
         "CREATE NAMESPACE IF NOT EXISTS silver;",
         "",
         *guard,
+        *volume,
+        "-- Typed Bronze rows read once by the replace and by the quality counts.",
+        f"CREATE OR REPLACE TEMPORARY VIEW {quoted_view} AS",
+        "SELECT",
+        typed_select,
+        *source_lines,
+        ";",
+        "",
         f"CREATE OR REPLACE TABLE silver.{quoted_silver}",
         "USING iceberg",
         f"LOCATION '{location}'",
@@ -351,29 +441,219 @@ def render_silver_sql(
         f"      PARTITION BY {partition}",
         f"      ORDER BY {order_sql}",
         "    ) AS _silver_rn",
-        "  FROM (",
-        "    SELECT",
-        typed_select,
-        *source_lines,
-        "  ) typed",
-        f"  WHERE {pk_filter}",
+        f"  FROM {quoted_view}",
+        f"  WHERE {survivor_filter}",
         ") ranked",
         "WHERE _silver_rn = 1;",
+        "",
+        *_quality_counts_sql(
+            contract,
+            bucket,
+            label,
+            quoted_view,
+            checked,
+            keys=keys,
+            pk_filter=pk_filter,
+        ),
         "",
         f"SELECT COUNT(*) AS row_count FROM silver.{quoted_silver};",
     ]
     return "\n".join(lines) + "\n"
 
 
+def require_run_label(run_label: str) -> str:
+    """Reject a run label that is not one safe path segment."""
+    if _RUN_LABEL_RE.fullmatch(run_label) is None:
+        msg = f"run label must be a path segment: {run_label!r}"
+        raise SilverError(msg)
+    return run_label
+
+
+def quality_metrics(
+    contract: DataContract, policy: DedupPolicy
+) -> tuple[tuple[str, str], ...]:
+    """``(column_name, metric)`` pairs the Silver script records for a dataset.
+
+    One ``cast_null`` per column whose typed expression can return NULL for a
+    present value, one ``null_key_dropped`` named by the key columns, and
+    one quarantine count named by ``_quarantine_reasons``.
+    """
+    columns = resolve_output_columns(contract, policy)
+    pairs = [(col.name, CAST_NULL) for col in columns if col.raw_sql is not None]
+    pairs.append((",".join(partition_key_names(contract, policy)), NULL_KEY_DROPPED))
+    metric = QUARANTINE_METRICS.get(contract.on_invalid)
+    if metric is not None:
+        pairs.append((REASONS_COLUMN, metric))
+    return tuple(pairs)
+
+
+def _cast_flag(index: int) -> str:
+    return f"_dq_cast_null_{index}"
+
+
+def _quality_counts_sql(
+    contract: DataContract,
+    bucket: str,
+    run_label: str,
+    quoted_view: str,
+    checked: Sequence[OutputColumn],
+    *,
+    keys: Sequence[str],
+    pk_filter: str,
+) -> list[str]:
+    """``MERGE`` this run's counts into ``silver_audit.quality_counts``.
+
+    Counts are over the Bronze rows Silver reads, before deduplication. The
+    key is ``(run_label, source_id, dataset, column_name, metric)``, so the
+    same run written again replaces its counts. Zero counts are recorded.
+    """
+    sums: list[str] = []
+    stacked: list[str] = []
+    for index, col in enumerate(checked):
+        sums.append(f"COUNT_IF({_quote_ident(_cast_flag(index))}) AS c{index}")
+        stacked.append(f"{_literal(col.name)}, '{CAST_NULL}', c{index}")
+    sums.append(f"COUNT_IF(NOT ({pk_filter})) AS c_key")
+    stacked.append(f"{_literal(','.join(keys))}, '{NULL_KEY_DROPPED}', c_key")
+    metric = QUARANTINE_METRICS.get(contract.on_invalid)
+    if metric is not None:
+        sums.append(f"COUNT_IF({_quote_ident(QUARANTINED_COLUMN)}) AS c_quarantine")
+        stacked.append(f"'{REASONS_COLUMN}', '{metric}', c_quarantine")
+    audit = f"{AUDIT_SCHEMA}.{_quote_ident(AUDIT_TABLE)}"
+    location = f"s3a://{bucket}/{AUDIT_SCHEMA}/{AUDIT_TABLE}"
+    ddl = ",\n".join(f"  {_quote_ident(name)} {kind}" for name, kind in AUDIT_COLUMNS)
+    identity = (
+        f"'{run_label}' AS run_label, "
+        f"'{contract.source_id}' AS source_id, "
+        f"'{contract.dataset}' AS dataset"
+    )
+    match = " AND ".join(
+        f"target.{name} = source.{name}"
+        for name in ("run_label", "source_id", "dataset", "column_name", "metric")
+    )
+    return [
+        f"-- Quality counts of run {run_label}: cast NULLs, null keys, quarantine.",
+        f"CREATE NAMESPACE IF NOT EXISTS {AUDIT_SCHEMA};",
+        f"CREATE TABLE IF NOT EXISTS {audit} (",
+        ddl,
+        ")",
+        "USING iceberg",
+        f"LOCATION '{location}'",
+        "TBLPROPERTIES ('format-version' = '2');",
+        f"MERGE INTO {audit} AS target",
+        "USING (",
+        f"  SELECT {identity},",
+        "    metric_rows.column_name, metric_rows.metric,",
+        "    CAST(metric_rows.row_count AS BIGINT) AS row_count,",
+        "    current_timestamp() AS recorded_at",
+        "  FROM (",
+        "    SELECT",
+        ",\n".join(f"      {item}" for item in sums),
+        f"    FROM {quoted_view}",
+        "  ) totals",
+        f"  LATERAL VIEW stack({len(stacked)}, "
+        + ", ".join(stacked)
+        + ") metric_rows AS column_name, metric, row_count",
+        ") AS source",
+        f"ON {match}",
+        "WHEN MATCHED THEN UPDATE SET",
+        "  target.row_count = source.row_count,",
+        "  target.recorded_at = source.recorded_at",
+        "WHEN NOT MATCHED THEN INSERT *",
+        "WHEN NOT MATCHED BY SOURCE",
+        f"  AND target.run_label = '{run_label}'",
+        f"  AND target.source_id = '{contract.source_id}'",
+        f"  AND target.dataset = '{contract.dataset}'",
+        "THEN DELETE;",
+    ]
+
+
+def _volume_guard(
+    contract: DataContract,
+    quoted_bronze: str,
+    context: str,
+    *,
+    allow_volume_drop: bool,
+) -> tuple[str, ...]:
+    """Fail before the replace when the latest execution shrank too much.
+
+    Compares the Bronze row counts of the latest and the previous complete
+    execution, ordered as the Silver selection orders them. The first
+    execution has no previous one and passes. The message carries counts.
+    """
+    if contract.update_pattern not in {"snapshot", "full_refresh"}:
+        return ()
+    ratio = contract.min_row_ratio
+    if ratio is None:
+        msg = f"{context}: {contract.update_pattern} needs volume_guard.min_row_ratio"
+        raise SilverError(msg)
+    if allow_volume_drop:
+        return (
+            "-- Volume guard skipped for this run (--allow-volume-drop).",
+            "",
+        )
+    table = f"bronze.{quoted_bronze}"
+    completed = _quote_ident(COMPLETED_COLUMN)
+    completed_at = timestamp_sql(completed, TimestampStyle.ISO)
+    return (
+        f"-- Volume guard: the latest complete execution keeps >= {ratio!r}"
+        " of the previous one's rows, or Silver keeps its previous snapshot.",
+        "SELECT assert_true(",
+        f"  previous_rows IS NULL OR latest_rows >= previous_rows * {ratio!r},",
+        f"  concat('volume guard: {context} latest complete execution has ',",
+        "    CAST(latest_rows AS STRING), ' rows, previous has ',",
+        f"    CAST(previous_rows AS STRING), '; min_row_ratio {ratio!r}')",
+        ") AS volume_guard",
+        "FROM (",
+        "  SELECT",
+        "    MAX(CASE WHEN execution_rank = 1 THEN execution_rows END) AS latest_rows,",
+        "    MAX(CASE WHEN execution_rank = 2 THEN execution_rows END)"
+        " AS previous_rows",
+        "  FROM (",
+        "    SELECT execution_rows, ROW_NUMBER() OVER (",
+        "      ORDER BY completed_at DESC, `dt` DESC, `execution_id` DESC",
+        "    ) AS execution_rank",
+        "    FROM (",
+        f"      SELECT `dt`, `execution_id`, MAX({completed_at}) AS completed_at,",
+        "        COUNT(*) AS execution_rows",
+        f"      FROM {table}",
+        f"      WHERE {completed} IS NOT NULL",
+        "      GROUP BY `dt`, `execution_id`",
+        "    ) executions",
+        "  ) ranked_executions",
+        ") volumes;",
+        "",
+    )
+
+
+def _literal(value: str) -> str:
+    if "'" in value or "\\" in value:
+        msg = f"value cannot be a SQL literal: {value!r}"
+        raise SilverError(msg)
+    return f"'{value}'"
+
+
 def render_source_scripts(
     entries: Sequence[tuple[DataContract, DedupPolicy]],
     warehouse_bucket: str,
+    *,
+    run_label: str = "adhoc",
+    allow_volume_drop: frozenset[tuple[str, str]] = frozenset(),
 ) -> tuple[tuple[str, str], ...]:
-    """One ``(filename, sql)`` pair per dataset."""
+    """One ``(filename, sql)`` pair per dataset.
+
+    ``allow_volume_drop`` names the datasets whose volume guard this run skips.
+    """
     return tuple(
         (
             dataset_sql_name(contract),
-            render_silver_sql(contract, warehouse_bucket, policy),
+            render_silver_sql(
+                contract,
+                warehouse_bucket,
+                policy,
+                run_label=run_label,
+                allow_volume_drop=(contract.source_id, contract.dataset)
+                in allow_volume_drop,
+            ),
         )
         for contract, policy in entries
     )
@@ -458,6 +738,13 @@ _SELECTION_NOTES: dict[str, str] = {
     "full_refresh": "survivors from the latest complete execution only",
     "incremental_window": "union of every window, latest row per key",
     "append_only": "every complete execution, first ingested row per key",
+}
+
+# What Silver does with a row that has a quarantine finding.
+_INVALID_NOTES: dict[str, str] = {
+    QUARANTINE_EXCLUDE: "a quarantined row is dropped and counted",
+    QUARANTINE_FLAG: "a quarantined row is kept with _quarantined = true",
+    "fail_batch": "ingestion writes no object with an invalid row",
 }
 
 

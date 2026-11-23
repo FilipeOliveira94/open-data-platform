@@ -1,7 +1,8 @@
 """Promote raw objects into Bronze staging rows and Spark SQL.
 
-Bronze keeps one string column per contract field, plus ingestion metadata.
-It does not cast logical types, drop invalid rows, or deduplicate keys.
+Bronze keeps one string column per contract field, plus ingestion metadata
+and the quarantine reasons of the row's sidecar finding (P3-07). It does
+not cast logical types, drop invalid rows, or deduplicate keys.
 Spark, invoked separately, loads the staging file into the JDBC catalog.
 
 Since P3-13 (ADR-0024) a promotion is incremental. Only data objects of a
@@ -39,6 +40,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from botocore.exceptions import ClientError
+
 from open_data_platform.contracts import decimals
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.records import (
@@ -75,6 +78,11 @@ METADATA_COLUMNS: tuple[str, ...] = (
 # Bronze-only lineage: the ETag of the raw object a row came from. Silver
 # does not carry it.
 ETAG_COLUMN = "_raw_etag"
+
+# The quarantine reasons the ingestion sidecar records for a row, sorted and
+# comma-joined, or NULL when the row has no finding (P3-07). Silver reads it
+# to exclude or flag the row as the contract ``on_invalid`` says.
+QUARANTINE_COLUMN = "_quarantine_reasons"
 
 # Name of the marker an ingestion writes after the last object of one
 # execution (``ingestion.writer.write_completion_marker``).
@@ -115,6 +123,7 @@ class RawObject:
     metadata: Mapping[str, str]
     execution_completed_ts: str | None = None
     etag: str | None = None
+    quarantine_reasons: Mapping[int, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,11 +198,12 @@ def bronze_table_name(source_id: str, dataset: str) -> str:
 
 
 def bronze_columns(contract: DataContract) -> tuple[str, ...]:
-    """Metadata columns, ``_raw_etag``, contract fields, then envelope fields.
+    """Metadata columns, ``_raw_etag``, ``_quarantine_reasons``, then payload.
 
-    The ``record_locator`` array is exploded and is not itself a column.
+    Payload is the contract fields, then envelope fields. The
+    ``record_locator`` array is exploded and is not itself a column.
     """
-    names = [*METADATA_COLUMNS, ETAG_COLUMN]
+    names = [*METADATA_COLUMNS, ETAG_COLUMN, QUARANTINE_COLUMN]
     seen = set(names)
     for name in _payload_column_names(contract):
         if name in seen:
@@ -267,8 +277,13 @@ def rows_from_object(
         msg = f"{raw.key}: missing _ingestion_ts"
         raise BronzeParseError(msg)
     columns = bronze_columns(contract)
+    payloads = parse_payload(contract, raw.body)
+    reasons = raw.quarantine_reasons or {}
+    if any(index >= len(payloads) for index in reasons):
+        msg = f"{raw.key}: quarantine sidecar names a record_index past the payload"
+        raise BronzeParseError(msg)
     staged: list[dict[str, str | None]] = []
-    for index, payload in enumerate(parse_payload(contract, raw.body)):
+    for index, payload in enumerate(payloads):
         row: dict[str, str | None] = {
             "source_id": source_id,
             "execution_id": execution_id,
@@ -278,6 +293,7 @@ def rows_from_object(
             "dt": parsed.dt,
             "_execution_completed_ts": raw.execution_completed_ts,
             ETAG_COLUMN: raw.etag,
+            QUARANTINE_COLUMN: reasons.get(index),
         }
         row.update(payload)
         missing = [name for name in columns if name not in row]
@@ -598,11 +614,63 @@ def _stage_object(
             metadata=response.get("Metadata") or {},
             execution_completed_ts=completion[execution_prefix(item.key)],
             etag=item.etag,
+            quarantine_reasons=read_quarantine_reasons(client, raw_bucket, item.key),
         ),
     )
     for row in rows:
         out.write(encode_staging_line(columns, row))
     return len(rows)
+
+
+def quarantine_key_for(raw_key: str) -> str:
+    """The sidecar key the ingestion writes next to one raw object."""
+    _parse_key(raw_key)
+    return "quarantine/" + raw_key.removeprefix("raw/") + ".jsonl"
+
+
+def parse_quarantine_reasons(body: bytes, *, key: str) -> dict[int, str]:
+    """``record_index -> reasons`` from one sidecar body.
+
+    Reasons of one record are sorted and comma-joined. Errors name the key
+    and line, never a finding value.
+    """
+    found: dict[int, set[str]] = {}
+    for line_no, line in enumerate(body.decode("utf-8").splitlines()):
+        if line.strip() == "":
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError as exc:
+            msg = f"{key}: line {line_no} is not JSON"
+            raise BronzeParseError(msg) from exc
+        if not isinstance(payload, dict):
+            msg = f"{key}: line {line_no} is not an object"
+            raise BronzeParseError(msg)
+        index = payload.get("record_index")
+        reason = payload.get("reason")
+        if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+            msg = f"{key}: line {line_no} has no valid record_index"
+            raise BronzeParseError(msg)
+        if not isinstance(reason, str) or re.fullmatch(r"[a-z_]+", reason) is None:
+            msg = f"{key}: line {line_no} has no valid reason"
+            raise BronzeParseError(msg)
+        found.setdefault(index, set()).add(reason)
+    return {index: ",".join(sorted(names)) for index, names in found.items()}
+
+
+def read_quarantine_reasons(
+    client: BaseClient, raw_bucket: str, raw_key: str
+) -> dict[int, str]:
+    """Reasons per record from the object's sidecar; empty when there is none."""
+    key = quarantine_key_for(raw_key)
+    try:
+        response = client.get_object(Bucket=raw_bucket, Key=key)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        if code in {"NoSuchKey", "404"}:
+            return {}
+        raise
+    return parse_quarantine_reasons(response["Body"].read(), key=key)
 
 
 def list_raw_objects(

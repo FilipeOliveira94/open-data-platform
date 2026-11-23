@@ -46,7 +46,32 @@ def test_shipped_contracts_cover_planned_sources() -> None:
 def test_shipped_contracts_declare_governance_and_invalid_policy() -> None:
     for contract in load_contracts():
         assert contract.owner == "platform"
-        assert contract.on_invalid == "quarantine"
+        assert contract.on_invalid == SILVER_POLICY[contract.source_id]
+
+
+# Silver drops a quarantined fact or event and keeps a quarantined reference
+# or historical record with a flag (P3-07).
+SILVER_POLICY = {
+    "postgres_oltp": "quarantine_exclude",
+    "demo_storefront": "quarantine_exclude",
+    "olist_brazilian_ecommerce": "quarantine_flag",
+    "olist_marketing_funnel": "quarantine_flag",
+    "dummyjson_products": "quarantine_flag",
+    "ibge_localidades": "quarantine_flag",
+}
+MIN_ROW_RATIO = {
+    "olist_brazilian_ecommerce": 1.0,
+    "olist_marketing_funnel": 1.0,
+    "dummyjson_products": 0.9,
+    "ibge_localidades": 0.99,
+}
+
+
+def test_guarded_patterns_declare_the_shipped_volume_guard() -> None:
+    for contract in load_contracts():
+        assert contract.min_row_ratio == MIN_ROW_RATIO.get(contract.source_id)
+        guarded = contract.update_pattern in {"snapshot", "full_refresh"}
+        assert (contract.min_row_ratio is not None) is guarded
 
 
 def test_classification_is_the_strictest_field() -> None:
@@ -72,7 +97,7 @@ def test_geolocation_has_no_primary_key() -> None:
 def test_order_reviews_primary_key_is_review_and_order() -> None:
     reviews = _by_identity()[("olist_brazilian_ecommerce", "order_reviews")]
     assert reviews.primary_key == ("review_id", "order_id")
-    assert reviews.contract_version == 3
+    assert reviews.contract_version == 4
     assert reviews.grain == "One row per review submission for one order."
 
 
@@ -143,8 +168,9 @@ def _minimal_mapping() -> dict[str, object]:
         "grain": "One product.",
         "primary_key": ["id"],
         "update_pattern": "full_refresh",
-        "on_invalid": "quarantine",
+        "on_invalid": "quarantine_flag",
         "on_structural_error": "fail_batch",
+        "volume_guard": {"min_row_ratio": 0.9},
         "governance": {"source_family": "product_analysis", "owner": "platform"},
         "provenance": {"system": "dummyjson"},
         "fields": [
@@ -177,6 +203,13 @@ def test_contract_from_mapping_accepts_minimal_document() -> None:
         ("structural_error_not_fail", "on_structural_error must be one of"),
         ("envelope_without_locator", "envelope_fields requires record_locator"),
         ("missing_source_family", "missing governance keys: source_family"),
+        ("legacy_quarantine", "on_invalid must be one of"),
+        ("guard_missing", "update_pattern full_refresh requires volume_guard"),
+        ("guard_zero", r"min_row_ratio must be in \(0, 1\]"),
+        ("guard_above_one", r"min_row_ratio must be in \(0, 1\]"),
+        ("guard_text", "min_row_ratio must be a number"),
+        ("guard_unknown_key", "unknown volume_guard keys: max_rows"),
+        ("guard_on_window", "volume_guard applies only to snapshot and full_refresh"),
     ],
 )
 def test_contract_from_mapping_rejects_structural_errors(
@@ -200,6 +233,20 @@ def test_contract_from_mapping_rejects_structural_errors(
         data["envelope_fields"] = data["fields"]
     elif mutate == "missing_source_family":
         del data["governance"]["source_family"]  # type: ignore[index]
+    elif mutate == "legacy_quarantine":
+        data["on_invalid"] = "quarantine"
+    elif mutate == "guard_missing":
+        del data["volume_guard"]
+    elif mutate == "guard_zero":
+        data["volume_guard"] = {"min_row_ratio": 0}
+    elif mutate == "guard_above_one":
+        data["volume_guard"] = {"min_row_ratio": 1.5}
+    elif mutate == "guard_text":
+        data["volume_guard"] = {"min_row_ratio": "0.9"}
+    elif mutate == "guard_unknown_key":
+        data["volume_guard"] = {"min_row_ratio": 0.9, "max_rows": 10}
+    elif mutate == "guard_on_window":
+        data["update_pattern"] = "incremental_window"
     with pytest.raises(ContractError, match=expected):
         contract_from_mapping(data, origin="test")
 

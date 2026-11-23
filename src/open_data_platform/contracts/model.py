@@ -16,7 +16,16 @@ MAX_DECIMAL_PRECISION = 38
 CLASSIFICATIONS: frozenset[str] = frozenset({"public", "internal", "pii"})
 CLASSIFICATION_RANK: dict[str, int] = {"public": 0, "internal": 1, "pii": 2}
 PAYLOAD_FORMATS: frozenset[str] = frozenset({"csv", "json", "jsonl"})
-ON_INVALID_POLICIES: frozenset[str] = frozenset({"quarantine", "fail_batch"})
+# Both ``quarantine_*`` policies write the same sidecar at ingestion. Silver
+# drops a quarantined record (``exclude``) or keeps it marked (``flag``).
+QUARANTINE_EXCLUDE = "quarantine_exclude"
+QUARANTINE_FLAG = "quarantine_flag"
+ON_INVALID_POLICIES: frozenset[str] = frozenset(
+    {QUARANTINE_EXCLUDE, QUARANTINE_FLAG, "fail_batch"}
+)
+# Update patterns where one execution replaces Silver, so a short execution
+# would remove records: they declare ``volume_guard.min_row_ratio``.
+GUARDED_UPDATE_PATTERNS: frozenset[str] = frozenset({"snapshot", "full_refresh"})
 UPDATE_PATTERNS: frozenset[str] = frozenset(
     {"snapshot", "full_refresh", "incremental_window", "append_only"}
 )
@@ -77,6 +86,12 @@ class DataContract:
     changelog: tuple[ChangelogEntry, ...]
     record_locator: str | None = None
     envelope_fields: tuple[ContractField, ...] = ()
+    min_row_ratio: float | None = None
+
+    @property
+    def quarantined(self) -> bool:
+        """Whether invalid records go to the quarantine sidecar."""
+        return self.on_invalid in {QUARANTINE_EXCLUDE, QUARANTINE_FLAG}
 
     @property
     def classification(self) -> str:

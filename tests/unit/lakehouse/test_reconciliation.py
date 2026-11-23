@@ -148,7 +148,14 @@ def test_cli_live_checks_match_every_silver_dataset() -> None:
     dataset_groups = [sql for _ok, sql in checks if "GROUP BY" in sql]
     dataset_count = sum(len(policies) for policies in SOURCE_MODULES.values())
     assert len(dataset_groups) == dataset_count
-    assert len(checks) == len(dataset_groups) + len(shape_checks())
+    excluded = sum(
+        1
+        for contract in load_contracts()
+        if contract.on_invalid == "quarantine_exclude"
+    )
+    # One relation and one quality-count check per dataset, plus one
+    # exclusion check per quarantine_exclude dataset (P3-07).
+    assert len(checks) == 2 * len(dataset_groups) + excluded + len(shape_checks())
     assert all("\t" not in sql for _ok, sql in checks)
 
 

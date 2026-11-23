@@ -173,12 +173,16 @@ def refresh_silver(
     warehouse_bucket: str,
     run_spark: SparkRunner,
     full_rebuild: bool = False,
+    allow_volume_drop: frozenset[tuple[str, str]] = frozenset(),
 ) -> tuple[tuple[str, str], ...]:
     """Rebuild the Silver tables pending for Silver. Return the datasets.
 
     Each dataset is one ``CREATE OR REPLACE`` (P3-11). Its pending flag is
     cleared only after its Spark script succeeds, in the same transaction
     that marks Gold pending, so a failure leaves it pending for the next run.
+    A volume guard failure (P3-07) is such a failure. ``allow_volume_drop``
+    names ``snapshot`` or ``full_refresh`` datasets whose guard this run
+    skips, to accept a real shrink of the source.
     """
     from open_data_platform.lakehouse.silver import cli as silver
     from open_data_platform.lakehouse.silver.common import (
@@ -188,6 +192,15 @@ def refresh_silver(
 
     pending = registry.pending(SILVER)
     available = silver.selected_entries(source_id=None, datasets=(), all_sources=True)
+    guarded = {
+        (contract.source_id, contract.dataset)
+        for contract, _policy in available
+        if contract.min_row_ratio is not None
+    }
+    unknown = sorted(f"{s}.{d}" for s, d in allow_volume_drop - guarded)
+    if unknown:
+        msg = f"--allow-volume-drop names no guarded dataset: {', '.join(unknown)}"
+        raise RefreshError(msg)
     if full_rebuild:
         entries = available
     else:
@@ -208,11 +221,18 @@ def refresh_silver(
     sql_dir = work / "silver-sql"
     done: list[tuple[str, str]] = []
     try:
-        scripts = render_source_scripts(entries, warehouse_bucket)
+        scripts = render_source_scripts(
+            entries,
+            warehouse_bucket,
+            run_label=run_label,
+            allow_volume_drop=allow_volume_drop,
+        )
     except SilverError as exc:
         raise RefreshError(f"silver render failed: {exc}") from exc
     _write_scripts(sql_dir, scripts)
     for (contract, _policy), (name, _sql) in zip(entries, scripts, strict=True):
+        if (contract.source_id, contract.dataset) in allow_volume_drop:
+            print(f"silver volume guard skipped: {name}", flush=True)
         print(f"spark silver: {name}", flush=True)
         run_spark(sql_dir / name)
         identity = (contract.source_id, contract.dataset)
