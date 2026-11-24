@@ -35,7 +35,7 @@ For each task:
 
 ### Size and risk (in force since 2026-11-24)
 
-- Every issue carries a Size (S, M, L) and a Risk (Low, Med, High) on the scale in `~/.agents/claude/workflow.md`. Ratings go in the roadmap's Expected and Seen columns (format in the same file); until an issue has one, Claude rates it in the plan.
+- Every issue carries a Size (S, M, L) and a Risk (Low, Med, High) on the scale in `~/.agents/claude/workflow.md`. Ratings go in the roadmap's "Expected/Seen Risk" and "Expected/Seen Size" columns (format in the same file); until an issue has one, Claude rates it in the plan.
 - **S + Low:** Claude plans and implements straight through to the PR (§13).
 - **Anything else:** Claude plans and STOPS: it runs `po-reviewer` on the plan, presents the plan with its verdict in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, sometimes with adjustments.
 - **High risk or L size:** the thread runs at Opus high effort, set when it starts; Claude never switches its own model or effort. A High-risk plan names what could go silently wrong and the tests written first; an L plan says whether to split the issue.
@@ -165,7 +165,7 @@ The user makes final architectural decisions and approves significant changes.
 
 Before the closing commit of an issue, check each item and update only what the verified evidence supports:
 
-- `ROADMAP.md`: the issue status, its Seen rating, one line in the Changelog section (what changed, no evidence; the evidence goes in `docs/status-log.md`), and Last updated.
+- `ROADMAP.md`: the issue status, the seen half of its Risk and Size, one line in the Changelog section (what changed, no evidence; the evidence goes in `docs/status-log.md`), and Last updated.
 - `PROJECT_STATUS.md`: the phase table, Current objective (the next issue and the latest result, not a history), Next work consistent with the current acceptance criteria, and Last updated. Do not copy log entries into it.
 - `docs/status-log.md`: a new entry.
 - An ADR or `DECISIONS.md` entry changes to `approved` only with evidence from a verified issue.
