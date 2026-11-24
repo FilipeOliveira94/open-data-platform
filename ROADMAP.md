@@ -52,6 +52,19 @@ Every issue that adds or changes a pipeline step (ingestion, Bronze, Silver, Gol
 | Failure | The state a failure leaves: raw, tables, markers, and what a retry does |
 | Evidence | The live check exercises the gap, re-run, failure, and no-new-data paths that apply, not only the happy path. Durations and row counts are measured, not estimated |
 
+## Size and risk
+
+Every issue carries a Size (S, M, L) and a Risk (Low, Med, High) on the scale in `~/.agents/claude/workflow.md` (repo `FilipeOliveira94/agent-config`). The rating decides whether Claude stops for plan approval, which reviewers run and the starting model effort (`AGENTS.md` §3). High risk here: a write, merge, delete or backfill that can silently lose or corrupt table data; CDC semantics; secrets or row values in query text, argv or logs; Terraform, cloud resources or cost; a change to a published number.
+
+The open issues of the current phase are rated below. A later phase's issues get rated when the phase opens, or in the plan of the issue. When an issue closes, write its actual size next to the estimate.
+
+| Issue | Size | Risk | Why |
+| --- | --- | --- | --- |
+| P3-09 | L | Med | Scripted evidence for many success, retry and failure scenarios across the daily, weekly, `transform_lakehouse` and `reconcile_gold` DAGs. Test code only, but a weak test gives false confidence. The plan proposes a split first |
+| P3-10 | M | Med | Several runtime changes: Spark caps, uv groups, work-folder retention, `ODP_TRINO_*` names, the UTC session timezone. Retention deletes per-run folders; raise to High if the timezone setting changes existing outputs |
+| P3-14 | M | Med | Live local runs with recorded counts and comparisons; no production data, but it is the phase's evidence |
+| P3-15 | S | Low | Documentation and status |
+
 ## Phase overview
 
 | Phase | Scope | Window | Depends on | Status |
