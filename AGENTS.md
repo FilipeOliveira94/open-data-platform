@@ -35,10 +35,10 @@ For each task:
 
 ### Size and risk (in force since 2026-11-24)
 
-- Every issue carries a Size (S, M, L) and a Risk (Low, Med, High) on the scale in `~/.agents/claude/workflow.md`. The current phase's ratings are in `ROADMAP.md` → "Size and risk"; an issue without one gets it in the plan.
+- Every issue carries a Size (S, M, L) and a Risk (Low, Med, High) on the scale in `~/.agents/claude/workflow.md`. Ratings go in the roadmap's Expected and Seen columns (format in the same file); until an issue has one, Claude rates it in the plan.
 - **S + Low:** Claude plans and implements straight through to the PR (§13).
 - **Anything else:** Claude plans and STOPS: it runs `po-reviewer` on the plan, presents the plan with its verdict in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, sometimes with adjustments.
-- **High risk or L size:** Claude starts at Opus high effort on its own. A High-risk plan names what could go silently wrong and the tests written first; an L plan proposes a split first.
+- **High risk or L size:** the thread runs at Opus high effort, set when it starts; Claude never switches its own model or effort. A High-risk plan names what could go silently wrong and the tests written first; an L plan says whether to split the issue.
 - Claude may raise a rating while planning and says why; it never lowers one without Filipe.
 
 ### Agent workflow

@@ -24,7 +24,7 @@ Return:
 8. Which items of the AGENTS.md §12 "Issue Close Checklist" this issue will touch, and which §8 "Runtime data exposure" rules it touches.
 9. For a pipeline step, one answer per row of the ROADMAP.md "Pipeline design checklist", each with the test or live check that proves it. "Not applicable" needs a reason.
 
-Rating: <S|M|L> / <Low|Med|High> (ROADMAP.md "Size and risk"; estimate it in the plan if missing). Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Above S + Low: run po-reviewer on the plan, show its verdict with the plan, and wait for my approval before editing. S + Low: implement after planning. If planning shows more work or risk than the rating, raise it, say why, and follow the new rating.
+Rating: <S|M|L> / <Low|Med|High> (the roadmap's Expected rating; estimate it in the plan if missing). Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Above S + Low: run po-reviewer on the plan, show its verdict with the plan, and wait for my approval before editing. S + Low: implement after planning. If planning shows more work or risk than the rating, raise it, say why, and follow the new rating.
 ```
 
 ## 2. Implement (after the plan is approved)
