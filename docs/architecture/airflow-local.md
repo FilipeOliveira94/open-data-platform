@@ -495,6 +495,53 @@ Pipeline design checklist:
 | Failure | A failed check leaves `failed` in the registry and fails its task with no retry. The next refresh runs it again before Silver or Gold. A blocked write step fails with the dataset and check names |
 | Evidence | Unit tests, `pytest tests/integration`, and `scripts/p3_16_gate_check.sh` (below) |
 
+## Orchestration success and failure scenarios (P3-09)
+
+`scripts/p3_09_orchestration_check.sh <scenario>...` drives the shipped DAGs on the local Airflow (`make airflow-up`, Trino up). It triggers runs with the Airflow CLI and reads three things, all read only: task states and try numbers from the Airflow metadata database, step results from `lakehouse_state.step_runs` (P3-08), and table versions from `iceberg_tables.metadata_location` in the JDBC catalog. Each check prints `PASS` or `FAIL`. The exit status is 1 when any check fails. Output goes to `.local/p3-09/<scenario>.log`: states, try numbers, counts, and durations, no row values.
+
+Faults are injected from outside the code and undone at the end. An `EXIT` trap restores them if the script stops early:
+
+| Fault | How | Undone by |
+| --- | --- | --- |
+| OLTP source down | `ALTER DATABASE odp ALLOW_CONNECTIONS false`. PostgreSQL itself stays up because it also holds the Airflow metadata database | `ALLOW_CONNECTIONS true` |
+| Query engine down | `docker compose stop trino` | `up -d --wait trino` |
+| Write killed mid-run | SIGTERM to the Silver step's process group, 5 s after its Spark JVM starts (the path an Airflow timeout takes) | Task retry |
+| Bronze check mismatch | `BEFORE UPDATE` trigger on `lakehouse_state.layer_checks` that adds 1 to the `orders` expected count | Trigger dropped; the count corrected |
+
+### Unit tests that cover the same logic
+
+| Behavior | Test |
+| --- | --- |
+| Exit status to task state (0 success, 99 skipped, other failed); the process group is stopped on timeout or kill | `tests/unit/infrastructure/test_run_python_args.py` |
+| Retries 2 on extract and write steps, 0 on check steps; `none_failed` on later write steps; `max_active_runs=1`; catchup and paused at creation | `tests/unit/infrastructure/test_dagbag.py` |
+| A refresh with nothing new writes nothing and exits 99; a failed Spark write leaves the dataset unregistered, and a retry stages it again | `tests/unit/lakehouse/test_refresh.py` |
+| A failed check blocks Silver and Gold on the next refresh until it passes | `tests/unit/lakehouse/test_refresh.py` (`test_a_failed_check_blocks_silver_and_gold_on_the_next_refresh`) |
+| Planted gap, trailing gap, and overlap in the coverage report | `tests/unit/ingestion/test_coverage.py` |
+
+### Result (2026-11-24, local Airflow 3.4.0, LocalExecutor)
+
+| Scenario | What was done | Result |
+| --- | --- | --- |
+| Missed day after a pause (`catchup`) | Daily DAG paused at 2026-11-23 23:19Z, over midnight. The OLTP database was refusing connections, then the DAG was unpaused at 00:08Z | One `scheduled__2026-11-24T00:00:00+00:00` run for `[11-23, 11-24)`. `settle` held it until 00:15:23Z. All 3 extract tries failed and the run failed. No coverage row and no Asset event, so no transform run. The gap report exited 1 with `gap [2026-11-23,2026-11-24)`. Connections were allowed and the run cleared: try 4 succeeded under the same run id, the report was `clean`, and one refresh followed (100 s, six steps ran) |
+| Happy path (`happy`) | Manual extract `[10-19, 10-20)`, daily backfill of 10-11, weekly run triggered with `-l now`, `reconcile_gold` | Every run succeeded. Each extract (about 10 s) was followed by one refresh: 120 s, 90 s, and 100 s. The weekly interval was `[11-16, 11-23)`. `reconcile_gold` took 580 s |
+| Retry, extract (`retry`) | Daily backfill of 10-07 with the OLTP database refusing try 1 | Try 1 failed and try 2 succeeded 2 min later. Both tries rendered the same `--ingestion-ts`: the execution's raw objects sit under one `dt=` prefix |
+| Retry, write step (`retry`) | Trino stopped while `dbt_build` ran try 1, started before the retry | `dbt_build` failed on try 1 and succeeded on try 2. The refresh succeeded (150 s) |
+| Retry and failed run, `reconcile_gold` (`reconcile`) | Trino down on try 1; then down for every try; then cleared | Try 1 failed (27 s) and try 2 succeeded (562 s). With Trino down, 3 tries failed (27, 25, 24 s) and the run failed. After the clear, try 4 succeeded (541 s) |
+| Failed Silver write (`write-failure`) | SIGTERM to the Silver process group during try 1, while a Trino count loop ran on the four Silver `postgres_oltp` tables | Try 1 failed after 9 s. All four Silver tables kept their previous `metadata_location` and count. 152 reader queries, none failed or saw an empty table. Try 2 rebuilt Silver (65 s) and the refresh succeeded |
+| Refresh with no new raw object (`no-new-raw`) | Manual `transform_lakehouse` with nothing pending | Run succeeded in 14 s. `bronze`, `silver`, `stage_quarantine`, and `dbt_build` skipped (`step_runs` 0.1 to 0.7 s). None of the 94 Iceberg tables got a new version |
+| Two upstream runs during one refresh (`coalesce`) | Extract A started a refresh; extracts B and C finished while it was still running | Two transform runs in total: the first and one follow-up. The follow-up consumed both Asset events (`dagrun_asset_event`) and succeeded |
+| Failed check, then a refresh with no new raw object (`gate`) | Planted mismatch on the Bronze `orders` check, extract, then two manual refreshes | r1: `bronze_checks` failed on its only try, and `silver`, `silver_checks`, `stage_quarantine`, `dbt_build` were `upstream_failed`. r2 (no new raw): `bronze` 1 s, `bronze_checks` failed again, Silver not built, Silver `orders` kept its version. r3, after the plant was removed: the check passed and Silver and Gold were built |
+
+### Airflow 3.4 behavior found by the script
+
+- A DAG with a data-interval timetable that is triggered without a logical date has no data interval. The extract rejects the empty bounds (by design, P3-04), so a manual daily or weekly run needs `airflow dags trigger -l <timestamp>`.
+- A one-day backfill of the day after an earlier one-day backfill was refused with `already exists`. The backfill run id carries the interval end (`backfill__<D+1>`). The script picks days that have no daily run on them or next to them.
+- `task_instance` keeps one row per try. The current state is the row with the highest `try_number`.
+- A manual run has no logical date, so `airflow tasks clear -s/-e` cannot select it. The script clears a run through the REST API (`clearTaskInstances` with `dag_run_id`). The admin password reaches the container as an environment variable, not an argument.
+- The runtime image has no `kill`, `ps`, or `pgrep` binaries. The script reads `/proc` and sends signals through `bash -c`.
+
+Not covered: a scheduler or worker crash during a task (as opposed to a task failure), and Spark driver resource limits (P3-10).
+
 ## Verification (2026-11-20, P3-04)
 
 Local Compose with PostgreSQL, MinIO, Trino, and the three Airflow services on `odp-runtime:airflow3.4.0-spark3.5.8`. Times are UTC.
@@ -628,4 +675,4 @@ The extract changes were tested in `tests/integration/ingestion/test_postgres_ol
 
 The existing round-trip test now sets `updated_at` explicitly in its rewrite, because the trigger would otherwise move the row out of its window.
 
-Not verified on a live scheduler: the `settle` sensor and the rendered `--ingestion-ts` on an actual retry. The DagBag tests render the vector and check the sensor settings. Run behavior on a live scheduler is P3-09.
+The `settle` sensor and the rendered `--ingestion-ts` on an actual retry were not run on a live scheduler here. P3-09 ran both on 2026-11-24: the sensor held the 2026-11-24 run until 00:15:23Z, and a retried extract wrote under one `dt=` prefix. See [Orchestration success and failure scenarios](#orchestration-success-and-failure-scenarios-p3-09).
