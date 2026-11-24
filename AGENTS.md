@@ -29,15 +29,25 @@ For each task:
 5. Implement the smallest coherent increment. When extracting repeated logic or choosing module boundaries (ingestion sources, Spark jobs, statement builders), use the `code-structure` skill; the principles in §4 take precedence.
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
-8. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
-9. Commit on the issue branch, push it and open a PR to `main` (see §13), then report to Filipe: the PR link, the last commit hash, changed files, commands executed, test results, limitations and the next step.
-10. Filipe reviews the PR and merges it. When he asks, the Reviewer de Projetos bot opens a T3 thread where Claude reviews the PR and summarizes the verdict; Filipe decides.
+8. Run the review gates in "Agent workflow" below and fix blocking findings.
+9. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
+10. Commit on the issue branch, push it and open a PR to `main` (see §13), then report to Filipe: the PR link, the last commit hash, changed files, commands executed, test results, reviewer verdicts, limitations and the next step.
+11. Filipe reviews the PR and merges it.
 
 ### Task size (rule in force since 2026-11-20)
 
 - **Small**: docs, text, a config tweak, a patch dependency bump, or a contained bugfix of up to ~50 lines in up to 3 files that touches none of: architecture, data model or schema, auth or security, infrastructure or deploy, public API, or pipeline logic. Claude plans and implements straight through to the PR (§13).
-- **Large**: everything else, or when in doubt. Claude plans and STOPS: it presents the plan in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, from Filipe directly or relayed by the PO de Projetos as "Plano aprovado pelo Filipe: implemente.", sometimes with adjustments.
+- **Large**: everything else, or when in doubt. Claude plans and STOPS: it runs `po-reviewer` on the plan, presents the plan with its verdict in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, sometimes with adjustments.
 - The issue prompt states which mode to follow. Claude may reclassify a task as large if planning shows it is bigger; it never reclassifies large as small.
+
+### Agent workflow
+
+Gates and model policy: `~/.agents/claude/workflow.md` (repo `FilipeOliveira94/agent-config`).
+
+- **Profile:** reviewed
+- **Extra reviewers:** none
+- **Skip review:** none
+- **Model exceptions:** none
 
 Do not mark a task complete unless its acceptance criteria have been verified.
 
@@ -162,14 +172,13 @@ Prompts for planning, implementing and closing an issue are in `docs/agent-workf
 
 ## 13. Git
 
-Roles (simplified flow, in force since 2026-11-20):
+Roles (flow in force since 2026-11-24):
 
-- **Filipe** asks for status, picks the issue, reviews the work, publishes it, and makes final decisions.
-- **Claude in T3 Code** (Claude Opus 5.5) implements each issue: plan, implement, run checks and tests, commit. Fallback: Grok 4.7 through the Cursor provider in T3, only when the Claude Pro limit runs out. The agent never merges.
-- **PO de Projetos** (bot), only when Filipe asks: status, sending an issue to T3, summarizing what was done after it lands, product view.
-- **Reviewer de Projetos** (bot), only when Filipe asks, for a harder change: opens a T3 thread where Claude reviews it, and summarizes the verdict. It never merges, pushes or deletes branches.
+- **Filipe** picks the issue, approves the plan of a large task, reviews the work, publishes it, and makes final decisions.
+- **Claude in T3 Code** (Claude Opus 5.5) implements each issue: plan, implement, run checks, tests and the review gates, commit. Fallback: Grok 4.7 through the Cursor provider in T3, only when the Claude Pro limit runs out; subagents do not run there, so the PR lists the gates it skipped. The agent never merges.
+- **Review subagents** (Sonnet 5.5): `po-reviewer` checks a large task's plan and finished branch against the acceptance criteria; `code-reviewer` checks the branch for bugs, security issues and regressions. They report; they never edit, merge or push.
 
-There is no double PO and Reviewer approval, no per-project dev, and no bot that pushes `main`.
+No agent pushes `main`.
 
 Branch and PR flow (in force since 2026-11-20, same as Filipe's other repositories):
 
