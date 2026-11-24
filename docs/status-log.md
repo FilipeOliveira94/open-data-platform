@@ -4,6 +4,34 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-24 — P3-09 orchestration success and failure scenarios
+
+`scripts/p3_09_orchestration_check.sh` drives the shipped DAGs on the local Airflow 3.4.0 (LocalExecutor). It reads task states and try numbers from the Airflow metadata database, step results from `lakehouse_state.step_runs`, and table versions from `iceberg_tables.metadata_location`. Faults come from outside the code: `ALTER DATABASE odp ALLOW_CONNECTIONS false`, `docker compose stop trino`, a SIGTERM to the Silver step's process group, and a `BEFORE UPDATE` trigger that adds 1 to the Bronze `orders` expected count. An `EXIT` trap undoes them. No DAG or package code changed.
+
+| Scenario | Result |
+| --- | --- |
+| `catchup` | Daily paused at 2026-11-23 23:19Z and unpaused at 00:08Z with the OLTP database refusing connections. One `scheduled__2026-11-24T00:00:00+00:00` run; `settle` released it at 00:15:23Z. Three extract tries failed and the run failed, with no coverage row and no transform run. The gap report exited 1 with `gap [2026-11-23,2026-11-24)`. After the clear, try 4 succeeded, the report was `clean`, and one refresh ran in 100 s |
+| `happy` | Manual extract, daily backfill of 2026-10-11, weekly run with `-l now` (interval `[11-16, 11-23)`), and `reconcile_gold` all succeeded. The refreshes took 120, 90, and 100 s; `dbt_reconcile` 580 s |
+| `retry` | Extract try 1 failed with the source closed and try 2 succeeded; one `dt=` prefix for the execution. `dbt_build` try 1 failed with Trino stopped and try 2 succeeded; the refresh took 150 s |
+| `reconcile` | Try 1 failed (27 s) and try 2 succeeded (562 s). With Trino down, 3 tries failed and the run failed. After the clear, try 4 succeeded (541 s) |
+| `write-failure` | Silver try 1 was killed after 9 s. Four Silver `postgres_oltp` tables kept their `metadata_location` and count, and 152 reader queries all succeeded with non-zero counts. Try 2 took 65 s |
+| `no-new-raw` | Four write steps skipped and none of the 94 Iceberg tables changed; the run took 14 s |
+| `coalesce` | Two extracts finished during a running refresh. One follow-up run consumed both Asset events and succeeded |
+| `gate` | r1: `bronze_checks` failed and the four later tasks were `upstream_failed`. r2 (no new raw): the check failed again and Silver `orders` kept its version. r3, after the plant was removed: the check passed and Silver was built |
+
+Airflow 3.4 behavior the script had to handle:
+- A data-interval DAG triggered without `-l` has no interval.
+- A one-day backfill of the day after an earlier one-day backfill was refused with `already exists`.
+- `task_instance` keeps one row per try.
+- A manual run, which has no logical date, is cleared through REST `clearTaskInstances`.
+- The runtime image has no `kill` binary.
+
+The first gate attempt planted the mismatch with a `BEFORE INSERT OR UPDATE` trigger. The registry's `INSERT ... ON CONFLICT DO UPDATE` fired both triggers and added 2, so the trigger is now `BEFORE UPDATE` only.
+
+`make lint` passed. `uv run pytest tests/unit`: 582 passed. `test_main_reports_a_failed_step` fails when `POSTGRES_USER` is exported in the shell (it expects the variable to be missing). Not covered: a scheduler crash during a task, and Spark resource limits (P3-10).
+
+---
+
 ### 2026-11-23 — P3-08 execution metadata, Bronze `dt` partitions, Trino client
 
 ADR-0026 approved. Bronze tables are `PARTITIONED BY (dt)` and the incremental `MERGE` adds `target.dt IN (<staged dt values>)` to its `ON` clause (`lakehouse/bronze.py`). Before an incremental `MERGE` the Bronze step reads the table's Iceberg metadata through the JDBC catalog and fails, naming `make live-rebuild`, when the default spec has no `dt` identity field (`lakehouse/iceberg_catalog.py`). `medallion_build` records `lakehouse_state.step_runs` (every attempt: status, seconds, exception type, one-line message), `dataset_runs` (per run, layer, dataset: objects, rows read and written, table total, seconds; Gold rows from dbt `run_results.json`), and `table_io` (per Iceberg table a dataset's Spark script touched: scan files, skipped files, bytes, rows; commit files and rows) (`lakehouse/run_log.py`). Scan counts come from the Spark event log and commit counts from Iceberg `LoggingMetricsReporter` lines, both captured per script in a mode-700 directory, parsed for counts, and deleted (`lakehouse/spark_metrics.py`, `docker/spark/log4j2-metrics.properties`). A probe showed that Iceberg 1.12 does not send Spark scans to `LoggingMetricsReporter`, so the plan's scan-report source moved to the event log. Trino errors name `errorName`, `errorType`, `errorCode`; the `nextUri` loop stops at `ODP_TRINO_QUERY_TIMEOUT` (default 600 s) and cancels the query. `bronze_refreshes` is kept.

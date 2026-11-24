@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-23 (P3-08 verified) |
+| Last updated | 2026-11-24 (P3-09 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,18 +22,18 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-09** — Orchestration success/failure tests. Not started.
+**P3-10** — Orchestration runtime hardening. Not started.
 
-P3-08 is verified (ADR-0026). Every `medallion_build` step records `lakehouse_state.step_runs`, and each written dataset records `dataset_runs` and `table_io` with measured scan and commit counts, kept across runs for P5-03. Bronze is partitioned by `dt` and its `MERGE` scans only the partitions it writes: live, a `MERGE` into an existing partition scanned 1 of the table's 3 files. A pre-P3-08 table fails the guard until `make live-rebuild`. The Silver audit `MERGE` no longer rewrites `quality_counts` on every write. Trino errors name `errorName`, `errorType`, `errorCode`, and polling has a total timeout ([execution metadata](docs/architecture/airflow-local.md#execution-metadata-p3-08), [status log](docs/status-log.md)).
+P3-09 is verified. `scripts/p3_09_orchestration_check.sh` ran eight scenarios on the local Airflow on 2026-11-24, and every check passed. The scenarios: a missed day caught up after a pause, including a failed run, a gap report and a clear; the happy path for daily, weekly, `transform_lakehouse`, and `reconcile_gold`; retries of the extract, `dbt_build`, and `dbt_reconcile`; a failed `reconcile_gold` run that was cleared; a Silver write killed mid-run that left the previous tables readable; a refresh with no new raw object that wrote nothing; two extracts during one refresh that gave one follow-up run; and a failed Bronze check that a refresh with no new raw object did not get past. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09) and [`docs/status-log.md`](docs/status-log.md).
 
-The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-08 to P3-10, P3-15, and later phases.
+The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-10, P3-15, and later phases.
 
 Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](docs/status-log.md).
 
 ## Next work
 
-1. **P3-09** — Orchestration success/failure tests. Acceptance: `ROADMAP.md` → P3-09. The P3-08 run log (`step_runs`, `dataset_runs`, `table_io`) is where its scenarios can read state and durations.
-2. **P3-10** — Orchestration runtime hardening.
+1. **P3-10** — Orchestration runtime hardening. Acceptance: `ROADMAP.md` → P3-10.
+2. **P3-14** — Live run, result, and consistency check (after P3-10).
 
 ---
 
@@ -49,7 +49,7 @@ Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](doc
 | P3-06 | Window coverage, gap report, and backfill | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#window-coverage-gap-report-and-backfill-p3-06) |
 | P3-07 | Quality checks and quarantine | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#silver-handling-of-quarantined-records-p3-07) |
 | P3-08 | Execution metadata and failure logging | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#execution-metadata-p3-08) |
-| P3-09 | Orchestration success/failure tests | Not started | — |
+| P3-09 | Orchestration success/failure tests | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09) |
 | P3-10 | Orchestration runtime hardening | Not started | — |
 | P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
 | P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
@@ -64,7 +64,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 ### Phase 3 acceptance
 
-- [ ] DAGs have clear dependencies and verifiable failure behavior.
+- [x] DAGs have clear dependencies and verifiable failure behavior (P3-09).
 - [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
 - [x] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily) (P3-05).
 - [ ] Backfills do not corrupt data or create undue duplication.
@@ -75,7 +75,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
 - [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing, Silver rebuilds of `incremental_window`/`append_only` datasets (ADR-0024), still do. The Bronze `MERGE` scans only the `dt` partitions it writes since P3-08.
 - [x] Invalid records are identified and handled per documented rules (P3-07).
-- [ ] Success and failure scenarios have tests or reproducible evidence.
+- [x] Success and failure scenarios have tests or reproducible evidence (P3-09).
 - [ ] A live run result is recorded and compared to the source windows (P3-14).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-15).
 
@@ -85,10 +85,10 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | Validation | Detail |
 | --- | --- |
-| Date | 2026-11-23 |
-| Environment | Local Compose: PostgreSQL, MinIO, Trino, and the runtime image `odp-runtime:airflow3.4.0-spark3.5.8` with the branch source mounted; Airflow started for one run, then stopped |
-| Checks | `make live-bronze` on pre-P3-08 tables; `make live-rebuild`; daily window `[2026-10-19, 2026-10-20)` and `make live-refresh`; a re-extract of that window into the same `dt` and `make live-bronze`; refreshes with nothing new; Airflow `transform_lakehouse` `manual__p3-08-check`; `uv run pytest tests/integration`; `make lint`; `make dbt-parse` |
-| Result | PASS. Guard failed the old table in 1.0 s and `step_runs` recorded `RefreshError`. Rebuild 635 s: Bronze checks 18, Silver checks 43, 55 dbt models recorded. Re-extract `MERGE`: 1 of 3 files scanned (6_877 bytes). Nothing-new refresh: six steps `skipped`. Airflow run: six `step_runs` rows under its run id. Integration 9 passed. Unit 582 passed |
+| Date | 2026-11-24 |
+| Environment | Local Compose: PostgreSQL, MinIO, Trino, and Airflow 3.4.0 (LocalExecutor) on `odp-runtime:airflow3.4.0-spark3.5.8` |
+| Checks | `scripts/p3_09_orchestration_check.sh` scenarios `catchup`, `happy`, `retry`, `reconcile`, `write-failure`, `no-new-raw`, `coalesce`, `gate`; `make lint`; `uv run pytest tests/unit` |
+| Result | PASS. Every scenario check passed (detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09)). Unit tests 582 passed. The script was corrected during the run for the Airflow 3.4 and runtime image behavior recorded there |
 
 ---
 
