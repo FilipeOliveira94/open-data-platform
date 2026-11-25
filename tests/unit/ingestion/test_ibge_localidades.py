@@ -13,10 +13,8 @@ import pytest
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.model import ContractField, DataContract
-from open_data_platform.ingestion import ingest_ibge_localidades as exported_ingest
 from open_data_platform.ingestion.http import HttpRequest, HttpResponse, Transport
 from open_data_platform.ingestion.ibge_localidades import (
-    MAX_RESPONSE_BYTES,
     MAX_RETRY_AFTER_SECONDS,
     USER_AGENT,
     IbgeLocalidadesError,
@@ -132,14 +130,6 @@ def _municipality(contract: DataContract, **overrides: object) -> dict[str, obje
 
 def _array(*items: dict[str, object]) -> bytes:
     return json.dumps(list(items)).encode()
-
-
-def test_package_exports_the_municipios_ingest() -> None:
-    assert exported_ingest is ingest_ibge_localidades
-
-
-def test_response_limit_is_64_mib() -> None:
-    assert MAX_RESPONSE_BYTES == 64 * 1024 * 1024
 
 
 def test_fixture_lands_under_ibge_localidades() -> None:

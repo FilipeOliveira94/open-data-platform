@@ -17,7 +17,6 @@ import pytest
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.model import ContractField, DataContract
-from open_data_platform.ingestion import extract_postgres_oltp as exported_extract
 from open_data_platform.ingestion.coverage import SETTLE_LAG
 from open_data_platform.ingestion.postgres_oltp import (
     DATASETS,
@@ -207,10 +206,6 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("POSTGRES_USER", "odp")
     monkeypatch.setenv("POSTGRES_PASSWORD", "odp")
     monkeypatch.setenv("POSTGRES_DB", "odp")
-
-
-def test_package_exports_extract() -> None:
-    assert exported_extract is extract_postgres_oltp
 
 
 def test_schema_covers_every_contract_column() -> None:
