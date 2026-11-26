@@ -24,7 +24,7 @@ For each task:
 1. Inspect the existing codebase and current project documentation.
 2. Read `PROJECT_STATUS.md`, `ROADMAP.md` and relevant ADRs when they exist.
 3. Check the relevant roadmap item. Identify dependencies, assumptions, risks and acceptance criteria.
-4. Check the issue's Size and Risk (see "Size and risk" below) and plan it. S + Low: implement directly. Anything else: present the plan in the thread and stop until Filipe approves it.
+4. Check the issue's Size and Risk (see "Size and risk" below) and plan it. Sm + Lo: implement directly. Anything else: present the plan in the thread and stop until Filipe approves it.
 5. Implement the smallest coherent increment. When extracting repeated logic or choosing module boundaries (ingestion sources, Spark jobs, statement builders), use the `code-structure` skill; the principles in §4 take precedence.
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
@@ -35,10 +35,10 @@ For each task:
 
 ### Size and risk (in force since 2026-11-24)
 
-- Every issue carries a Size (S, M, L) and a Risk (Low, Med, High) on the scale in `~/.agents/claude/workflow.md`. Ratings go in the roadmap's "Expected/Seen Risk" and "Expected/Seen Size" columns (format in the same file); until an issue has one, Claude rates it in the plan.
-- **S + Low:** Claude plans and implements straight through to the PR (§13).
+- Every issue carries a Size (Sm, Md, Lg) and a Risk (Lo, Med, Hi) on the scale in `~/.agents/claude/workflow.md`. Ratings go in the roadmap's "Expected/Seen Risk" and "Expected/Seen Size" columns (format in the same file); until an issue has one, Claude rates it in the plan.
+- **Sm + Lo:** Claude plans and implements straight through to the PR (§13).
 - **Anything else:** Claude plans and STOPS: it runs `po-reviewer` on the plan, presents the plan with its verdict in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, sometimes with adjustments.
-- **High risk or L size:** the thread runs at Opus high effort, set when it starts; Claude never switches its model or effort by itself; a switch happens only when Filipe decides it. A High-risk plan names what could go silently wrong and the tests written first; an L plan says whether to split the issue.
+- **Hi risk or Lg size:** the thread runs at Opus high effort, set when it starts; Claude never switches its model or effort by itself; a switch happens only when Filipe decides it. A Hi-risk plan names what could go silently wrong and the tests written first; an Lg plan says whether to split the issue.
 - Claude may raise a rating while planning and says why; it never lowers one without Filipe.
 
 ### Agent workflow
@@ -47,7 +47,7 @@ Language, size and risk, review gates and model policy: `~/.agents/claude/workfl
 
 - **Profile:** reviewed
 - **Language:** English for everything.
-- **High risk here:** a write, merge, delete or backfill that can silently lose or corrupt table data; CDC semantics (duplicates, deletes, ordering); secrets or row values reaching query text, argv or logs (§8); Terraform, cloud resources or cloud cost; anything that changes a published number.
+- **Hi risk here:** a write, merge, delete or backfill that can silently lose or corrupt table data; CDC semantics (duplicates, deletes, ordering); secrets or row values reaching query text, argv or logs (§8); Terraform, cloud resources or cloud cost; anything that changes a published number.
 - **Extra reviewers:** none
 - **Skip review:** none
 - **Model exceptions:** none
@@ -179,7 +179,7 @@ Roles (flow in force since 2026-11-24):
 
 - **Filipe** picks the issue, approves plans, reviews the work, publishes it, and makes final decisions. He confirms any switch to Fable.
 - **Claude in T3 Code** (Claude Opus 5.5) implements each issue: rating, plan, implement, run checks, tests and the review gates, commit. The agent never merges.
-- **Review subagents** (Sonnet 5.5): `po-reviewer` checks the plan and finished branch of every issue rated above S + Low against the acceptance criteria; `code-reviewer` checks the branch for bugs, security issues and regressions. They report; they never edit, merge or push.
+- **Review subagents** (Sonnet 5.5): `po-reviewer` checks the plan and finished branch of every issue rated above Sm + Lo against the acceptance criteria; `code-reviewer` checks the branch for bugs, security issues and regressions. They report; they never edit, merge or push.
 
 No agent pushes `main`.
 

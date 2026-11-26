@@ -1,6 +1,6 @@
 # Agent workflow prompts
 
-Three prompts drive one issue: plan, implement, close. The rules live in [`AGENTS.md`](../AGENTS.md). Replace the placeholders and run the plan prompt first. An issue rated above S + Low waits for Filipe's approval of the plan before any file changes; an S + Low issue goes straight to implementation (see "Size and risk" in `AGENTS.md` §3).
+Three prompts drive one issue: plan, implement, close. The rules live in [`AGENTS.md`](../AGENTS.md). Replace the placeholders and run the plan prompt first. An issue rated above Sm + Lo waits for Filipe's approval of the plan before any file changes; an Sm + Lo issue goes straight to implementation (see "Size and risk" in `AGENTS.md` §3).
 
 ---
 
@@ -24,7 +24,7 @@ Return:
 8. Which items of the AGENTS.md §12 "Issue Close Checklist" this issue will touch, and which §8 "Runtime data exposure" rules it touches.
 9. For a pipeline step, one answer per row of the ROADMAP.md "Pipeline design checklist", each with the test or live check that proves it. "Not applicable" needs a reason.
 
-Rating: <S|M|L> / <Low|Med|High> (the expected half of the roadmap's Risk and Size columns; estimate it in the plan if missing). Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Above S + Low: run po-reviewer on the plan, show its verdict with the plan, and wait for my approval before editing. S + Low: implement after planning. If planning shows more work or risk than the rating, raise it, say why, and follow the new rating.
+Rating: <Sm|Md|Lg> / <Lo|Med|Hi> (the expected half of the roadmap's Risk and Size columns; estimate it in the plan if missing). Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Above Sm + Lo: run po-reviewer on the plan, show its verdict with the plan, and wait for my approval before editing. Sm + Lo: implement after planning. If planning shows more work or risk than the rating, raise it, say why, and follow the new rating.
 ```
 
 ## 2. Implement (after the plan is approved)
@@ -54,7 +54,7 @@ Review the current diff against the agreed plan and acceptance criteria. Do not 
 - Check for unrelated changes, secrets, generated files, weak tests, configuration drift and undocumented behavior.
 - Run the relevant validation commands and report their actual output.
 - Identify acceptance criteria that are not met or not verified.
-- Run the review gates in AGENTS.md §3 "Agent workflow": code-reviewer for any code or config change; for an issue rated above S + Low, then po-reviewer in acceptance mode. Fix blocking findings and put each final verdict in the PR.
+- Run the review gates in AGENTS.md §3 "Agent workflow": code-reviewer for any code or config change; for an issue rated above Sm + Lo, then po-reviewer in acceptance mode. Fix blocking findings and put each final verdict in the PR.
 - Apply the AGENTS.md §12 "Issue Close Checklist".
 - Commit with Conventional Commits on the issue branch, push the branch, and open a PR to main. Never push or merge main (AGENTS.md §13 Git).
 

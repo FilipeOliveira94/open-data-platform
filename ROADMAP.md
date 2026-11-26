@@ -6,7 +6,7 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 
 **Status values:** `not started` · `in progress` · `delivered` · `verified` · `blocked`
 
-**Expected/Seen Risk and Size:** each cell is `expected/seen`. Risk is `Lo`, `Med` or `Hi`; Size is `Sm`, `Md` or `Lg` (scale in `~/.agents/claude/workflow.md`, repo `FilipeOliveira94/agent-config`; High risk here is listed in `AGENTS.md` §3). An open issue has only the expected half (`Med/-`, `Md/-`); the seen half is filled when it closes. Issues closed before 2026-11-24 have only the seen half (`-/Hi`, `-/Lg`), rated afterwards from the hand-written lines of the commits that cite the issue (docs and lockfiles excluded), or from the scope when no commit cites it. A withdrawn issue has `-/-`.
+**Expected/Seen Risk and Size:** each cell is `expected/seen`. Risk is `Lo`, `Med` or `Hi`; Size is `Sm`, `Md` or `Lg` (scale in `~/.agents/claude/workflow.md`, repo `FilipeOliveira94/agent-config`; Hi risk here is listed in `AGENTS.md` §3). An open issue has only the expected half (`Med/-`, `Md/-`); the seen half is filled when it closes. Issues closed before 2026-11-24 have only the seen half (`-/Hi`, `-/Lg`), rated afterwards from the hand-written lines of the commits that cite the issue (docs and lockfiles excluded), or from the scope when no commit cites it. A withdrawn issue has `-/-`.
 
 - Mark an issue **delivered** only when the change exists in the repository.
 - Mark an issue **verified** only when its acceptance checks have been run and the result is recorded in the architecture doc or ADR and in `docs/status-log.md`; `PROJECT_STATUS.md` summarizes it.
