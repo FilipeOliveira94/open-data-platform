@@ -13,6 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from open_data_platform.ingestion.coverage import CADENCES
+from open_data_platform.ingestion.coverage import DAILY as DAILY_CADENCE
+from open_data_platform.ingestion.coverage import WEEKLY as WEEKLY_CADENCE
+
 ROOT = Path(__file__).resolve().parents[3]
 DAG_DIR = ROOT / "airflow" / "dags"
 
@@ -176,6 +180,15 @@ def test_every_dag_is_paused_at_creation(dagbag) -> None:
         assert dag.is_paused_upon_creation is True, dag_id
 
 
+def test_platform_env_runs_the_service_checks_after_imports(dagbag) -> None:
+    dag = dagbag.dags["platform_env"]
+    checks = {"contracts", "minio_raw", "minio_write", "postgres_oltp"}
+    assert {task.task_id for task in dag.tasks} == {"imports", *checks}
+    assert dag.get_task("imports").upstream_task_ids == set()
+    for task_id in checks:
+        assert dag.get_task(task_id).upstream_task_ids == {"imports"}, task_id
+
+
 def test_lakehouse_pool_holds_exactly_the_writes_and_reconciliation(dagbag) -> None:
     pooled = {
         (dag_id, task.task_id)
@@ -210,6 +223,8 @@ def test_daily_dag_runs_at_utc_midnight_with_catchup(dagbag) -> None:
     assert str(timetable._timezone) == "UTC"
     assert dag.catchup is True
     assert dag.start_date == datetime(2026, 11, 19, tzinfo=UTC)
+    # The coverage ledger counts gaps from the same first window.
+    assert dag.start_date == CADENCES[DAILY_CADENCE].first_start
     assert dag.max_active_runs == 1
     assert set(dag.params.keys()) == {"execution_id"}
     assert sorted(dag.task_ids) == ["extract", "settle"]
@@ -368,6 +383,8 @@ def test_weekly_dag_runs_monday_utc_midnight_with_catchup(dagbag) -> None:
     assert str(timetable._timezone) == "UTC"
     assert dag.catchup is True
     assert dag.start_date == datetime(2026, 11, 16, tzinfo=UTC)
+    # The weekly window lags the interval by one day (Sunday to Sunday).
+    assert dag.start_date == CADENCES[WEEKLY_CADENCE].first_start + timedelta(days=1)
     assert dag.max_active_runs == 1
     assert dag.is_paused_upon_creation is True
     assert set(dag.params.keys()) == {"execution_id"}
