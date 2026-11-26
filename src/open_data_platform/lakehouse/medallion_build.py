@@ -61,6 +61,7 @@ STEPS = (
     "dbt-build",
     "dbt-reconcile",
     "dbt-unit",
+    "prune-work",
 )
 
 
@@ -668,8 +669,33 @@ def _run_step(
     if step in {"dbt-parse", "dbt-reconcile", "dbt-unit"}:
         _run_dbt(step, work, env, run_command)
         return True
+    if step == "prune-work":
+        return _prune_work(work, env)
     msg = f"unknown step: {step}"
     raise MedallionBuildError(msg)
+
+
+def _prune_work(work: Path, env: Mapping[str, str]) -> bool:
+    """Delete run scratch folders past ``ODP_WORK_RETENTION_DAYS`` (P3-10)."""
+    from open_data_platform.lakehouse.work_retention import (
+        DEFAULT_RETENTION_DAYS,
+        prune_work,
+    )
+
+    raw = env.get("ODP_WORK_RETENTION_DAYS", "").strip()
+    if not raw:
+        days = DEFAULT_RETENTION_DAYS
+    elif raw.isdigit() and int(raw) >= 1:
+        days = int(raw)
+    else:
+        msg = "ODP_WORK_RETENTION_DAYS must be a positive integer"
+        raise MedallionBuildError(msg)
+    result = prune_work(work.parent, work.name, days)
+    print(
+        f"prune-work: removed {result.removed} run folders older than {days} days "
+        f"({result.bytes_freed} bytes), kept {result.kept} and this run's folder"
+    )
+    return result.removed > 0
 
 
 def _bronze_partition_reader(
