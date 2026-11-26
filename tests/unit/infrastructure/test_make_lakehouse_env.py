@@ -11,8 +11,6 @@ _MODULE = "open_data_platform.lakehouse.medallion_build"
 
 # Marker that must sit in the same recipe shell as `. ./.env`.
 _SOURCED_WORK = {
-    "test-iceberg-poc": "run_poc.sh",
-    "test-catalog-probe": "run_catalog_probe.sh",
     "spark-ivy-warm": "warm_ivy.sh",
     "live-bronze": f"{_MODULE} bronze-checks",
     "live-silver": f"{_MODULE} silver-checks",

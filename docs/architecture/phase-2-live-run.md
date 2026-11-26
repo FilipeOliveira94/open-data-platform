@@ -31,6 +31,8 @@ make live-gold
 make dbt-test-reconciliation
 ```
 
+`make test-catalog-probe` was retired on 2026-11-25. The table below records the 2026-11-11 run.
+
 | Command | Result | Wall time |
 | --- | --- | --- |
 | `make test-catalog-probe` | Spark printed `2`. Trino printed `"2"`. Exit 0 | 17.7 s |

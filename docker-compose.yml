@@ -139,8 +139,7 @@ services:
 
   # Medallion build container on the shared runtime image. The default command
   # sleeps, so profile `up` does not execute SQL. Make runs one medallion_build step
-  # per `compose run` (Makefile `medallion_step`) or a probe script:
-  #   docker compose --profile lakehouse run --rm -T spark /opt/odp/spark/run_poc.sh
+  # per `compose run` (Makefile `medallion_step`).
   spark:
     image: *runtime-image
     build: *runtime-build
