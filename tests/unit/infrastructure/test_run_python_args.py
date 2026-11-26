@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[3]
 DAG_DIR = ROOT / "airflow" / "dags"
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX")
+# ingest_common imports Airflow, the uv `airflow` group (P3-10).
+pytest.importorskip("airflow", reason="uv group 'airflow' is not installed")
 
 CHILD = """
 import os, signal, subprocess, sys, time
