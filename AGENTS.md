@@ -31,7 +31,7 @@ For each task:
 8. Run the review gates in "Agent workflow" below and fix blocking findings.
 9. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
 10. Commit on the issue branch, push it and open a PR to `main` (see §13), then report to Filipe: the PR link, the last commit hash, changed files, commands executed, test results, reviewer verdicts, limitations and the next step.
-11. Filipe reviews the PR and merges it.
+11. Filipe reviews the PR, merges it and deletes the branch.
 
 ### Size and risk (in force since 2026-11-24)
 
@@ -177,18 +177,18 @@ Prompts for planning, implementing and closing an issue are in `docs/agent-workf
 
 Roles (flow in force since 2026-11-24):
 
-- **Filipe** picks the issue, approves plans, reviews the work, publishes it, and makes final decisions. He confirms any switch to Fable.
+- **Filipe** picks the issue, approves plans, reviews the PR, merges it and deletes the branch, and makes final decisions. He confirms any switch to Fable.
 - **Claude in T3 Code** (Claude Opus 5.5) implements each issue: rating, plan, implement, run checks, tests and the review gates, commit. The agent never merges.
 - **Review subagents** (Sonnet 5.5): `po-reviewer` checks the plan and finished branch of every issue rated above Sm + Lo against the acceptance criteria; `code-reviewer` checks the branch for bugs, security issues and regressions. They report; they never edit, merge or push.
 
-No agent pushes `main`.
+No agent merges, deletes a branch or pushes `main`.
 
 Branch and PR flow (in force since 2026-11-20, same as Filipe's other repositories):
 
 - Start each issue on a new branch from an updated `origin/main`, named `<type>/<issue-or-topic>` (for example `feat/p3-11-atomic-replace`).
 - Use Conventional Commits on that branch. Filipe's order to implement authorizes the agent to commit, push the branch, and open the PR.
 - Open one PR to `main` per issue. Its body gives the summary, the checks and their results, and what was not verified.
-- Filipe reviews and merges. The agent never merges, never pushes `main`, and never force-pushes unless Filipe asks.
+- Filipe reviews, merges and deletes the branch. The agent never merges, never deletes a branch, never pushes `main`, and never force-pushes unless Filipe asks.
 - After a merge, update local `main` with `git pull --ff-only` before starting the next branch.
 
 AGENTS.md is the single source; CLAUDE.md imports it.
