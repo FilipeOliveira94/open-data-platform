@@ -58,7 +58,7 @@ export const NODES: SceneNode[] = [
 	{ id: 'ibge', label: 'IBGE', detail: 'Brazilian geography reference data from the IBGE API.', group: 'sources', pos: [-10.1, 0, 0.6], glyph: 'GEO' },
 	{ id: 'bcb', label: 'BCB SGS', detail: 'Daily US dollar and Selic series from the Central Bank of Brazil.', group: 'sources', pos: [-9.9, 0, 2.6], glyph: 'FX' },
 	{ id: 'storefront', label: 'Storefront', detail: 'Clickstream events from a fictional retail website, as JSONL.', group: 'sources', pos: [-9.4, 0, 4.6], glyph: 'EVT' },
-	{ id: 'postgres', label: 'PostgreSQL 16', detail: 'Operational database: windowed batch extracts and logical replication for CDC.', group: 'sources', pos: [-7.4, 0, 6.6], glyph: 'PG' },
+	{ id: 'postgres', label: 'olist-synth-cdc', detail: 'Synthetic Olist-shaped operational database on PostgreSQL 16: windowed batch extracts and logical replication for CDC.', group: 'sources', pos: [-7.4, 0, 6.6], glyph: 'PG' },
 
 	// Ingestion
 	{ id: 'ingest', label: 'Ingestion', detail: 'Python writers with data contracts, a quarantine sidecar and an extract coverage ledger.', group: 'movement', pos: [-5.6, 0, 0.2], glyph: 'ING' },
@@ -133,3 +133,35 @@ export const EDGES: SceneEdge[] = [
 	{ from: 'dbt', to: 'openlineage', kind: 'telemetry' },
 	{ from: 'lakehouse', to: 'finops', kind: 'telemetry' },
 ];
+
+/**
+ * Portrait layout for narrow screens: data flows from the top (back, -z)
+ * to the bottom (front, +z) instead of left to right.
+ */
+export const MOBILE_POS: Record<string, Vec3> = {
+	olist: [-3.6, 0, -10.8],
+	dummyjson: [-1.2, 0, -9.6],
+	ibge: [1.2, 0, -10.8],
+	bcb: [3.6, 0, -9.6],
+	storefront: [-2.4, 0, -7.8],
+	postgres: [2.4, 0, -7.8],
+	ingest: [-2.4, 0, -5.2],
+	debezium: [2.4, 0, -5.2],
+	airflow: [0, 2.2, -2.6],
+	minio: [-3.4, 0, -2.6],
+	kafka: [3.4, 0, -2.6],
+	spark: [-3.4, 0, 0.4],
+	lakehouse: [0, 0, 0.8],
+	catalog: [3.6, 0, 1.4],
+	dbt: [-3.4, 0, 3.6],
+	contracts: [0, 0, 4.0],
+	trino: [3.4, 0, 3.6],
+	jupyter: [-3.2, 0, 6.4],
+	superset: [0, 0, 6.6],
+	site: [3.2, 0, 6.4],
+	actions: [-3.4, 0, 8.6],
+	prometheus: [-1.7, 0, 10.0],
+	grafana: [0, 0, 8.6],
+	openlineage: [1.7, 0, 10.0],
+	finops: [3.4, 0, 8.6],
+};

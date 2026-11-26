@@ -25,7 +25,10 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 			<p class="arch3d__sub">Batch and streaming into one Iceberg lakehouse, orchestrated, tested and observed end to end.</p>
 		</header>
 
-		<p class="arch3d__hint" aria-hidden="true">Drag to orbit · select a component</p>
+		<p class="arch3d__hint" aria-hidden="true">
+			<span class="arch3d__hint-wide">Drag to orbit · select a component</span>
+			<span class="arch3d__hint-narrow">Tap a component · swipe sideways to orbit</span>
+		</p>
 
 		<div class="arch3d__card" data-card hidden>
 			<p class="arch3d__card-group" data-card-group></p>
@@ -129,6 +132,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 		--fi-dot: #ff6fa6;
 
 		margin-block: 0.5rem 2.5rem;
+		container-type: inline-size;
 		font-family: Urbanist, 'Segoe UI', system-ui, sans-serif;
 		color: var(--fi-ink);
 		background: var(--fi-bg);
@@ -142,6 +146,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 
 	.arch3d__stage {
 		position: relative;
+		width: 100%;
 		aspect-ratio: 16 / 8.6;
 		min-height: 440px;
 		max-height: 82vh;
@@ -380,16 +385,49 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 		white-space: nowrap;
 	}
 
-	@media (max-width: 640px) {
+	.arch3d__hint-narrow {
+		display: none;
+	}
+
+	/* Narrow layout: matches the portrait scene the script picks below 640px of width. */
+	@container (width < 640px) {
 		.arch3d__stage {
-			aspect-ratio: 1 / 0.95;
-			min-height: 380px;
-		}
-		.arch3d__hint {
-			display: none;
+			display: flex;
+			flex-direction: column;
+			aspect-ratio: auto;
+			min-height: 0;
+			max-height: none;
 		}
 		.arch3d__head {
-			max-width: 85%;
+			position: static;
+			order: -2;
+			max-width: none;
+			padding: 22px 18px 0;
+		}
+		.arch3d__hint {
+			position: static;
+			order: -1;
+			padding: 0.6rem 18px 0;
+			font-size: 0.66rem;
+			letter-spacing: 0.12em;
+		}
+		.arch3d__hint-wide {
+			display: none;
+		}
+		.arch3d__hint-narrow {
+			display: inline;
+		}
+		canvas {
+			height: auto;
+			aspect-ratio: 9 / 15;
+			max-height: max(92vh, 560px);
+		}
+		.arch3d__groups button {
+			font-size: 0.74rem;
+			padding: 0.28rem 0.6rem;
+		}
+		.arch3d__flows {
+			gap: 0.35rem 0.8rem;
 		}
 	}
 </style>

@@ -3,7 +3,7 @@
  * A perspective camera orbits the scene; edges are quadratic curves in
  * world space with particles travelling along them.
  */
-import { EDGES, GROUPS, NODES, type FlowKind, type GroupId, type SceneEdge, type SceneNode, type Vec3 } from './data';
+import { EDGES, GROUPS, MOBILE_POS, NODES, type FlowKind, type GroupId, type SceneEdge, type SceneNode, type Vec3 } from './data';
 
 // Brand palette, dark tokens (filipeoliveira-hub-assets/brand/tokens.css).
 const C = {
@@ -109,25 +109,33 @@ export function mountScene(root: HTMLElement): void {
 	const roleGlow = new Map(GROUPS.map((g) => [g.id, makeGlow(g.color)]));
 	const colorOf = (id: string) => roleColor.get(byId.get(id)!.group)!;
 
-	const anchor = (n: SceneNode): Vec3 => (n.core ? [n.pos[0], n.pos[1] + 0.95, n.pos[2]] : [n.pos[0], n.pos[1] + 0.12, n.pos[2]]);
-	const edges: EdgeGeom[] = EDGES.map((edge, i) => {
-		const p0 = anchor(byId.get(edge.from)!);
-		const p2 = anchor(byId.get(edge.to)!);
-		const len = Math.hypot(p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]);
-		const lift = FLOW[edge.kind].lift * Math.min(1.6, len / 4);
-		const p1: Vec3 = [(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2 + lift, (p0[2] + p2[2]) / 2];
-		return { edge, p0, p1, p2, phase: (i * 0.37) % 1 };
-	});
+	// Narrow screens use the portrait layout; everything reads positions through posOf.
+	const posOf = (n: SceneNode): Vec3 => (compact ? (MOBILE_POS[n.id] ?? n.pos) : n.pos);
+	const anchor = (n: SceneNode): Vec3 => {
+		const p = posOf(n);
+		return [p[0], p[1] + (n.core ? 0.95 : 0.12), p[2]];
+	};
+	let edges: EdgeGeom[] = [];
+	function buildEdges() {
+		edges = EDGES.map((edge, i) => {
+			const p0 = anchor(byId.get(edge.from)!);
+			const p2 = anchor(byId.get(edge.to)!);
+			const len = Math.hypot(p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]);
+			const lift = FLOW[edge.kind].lift * Math.min(compact ? 1 : 1.6, len / 4);
+			const p1: Vec3 = [(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2 + lift, (p0[2] + p2[2]) / 2];
+			return { edge, p0, p1, p2, phase: (i * 0.37) % 1 };
+		});
+	}
 
 	// Floor grid as short segments so each fades with distance from the core.
 	const floor: [Vec3, Vec3, number][] = [];
 	for (let gx = -13; gx <= 14; gx += 1) {
-		for (let gz = -11; gz < 9; gz += 1) {
+		for (let gz = -11; gz < 11; gz += 1) {
 			const d = Math.hypot(gx - 1, (gz + 0.5 + 1) * 1.2);
 			floor.push([[gx, -0.02, gz], [gx, -0.02, gz + 1], d]);
 		}
 	}
-	for (let gz = -11; gz <= 9; gz += 1) {
+	for (let gz = -11; gz <= 11; gz += 1) {
 		for (let gx = -13; gx < 14; gx += 1) {
 			const d = Math.hypot(gx + 0.5 - 1, (gz + 1) * 1.2);
 			floor.push([[gx, -0.02, gz], [gx + 1, -0.02, gz], d]);
@@ -142,8 +150,8 @@ export function mountScene(root: HTMLElement): void {
 	let W = 0;
 	let H = 0;
 	let focal = 1;
-	const target: Vec3 = [0.3, 1.0, -0.6];
-	const dist = 27;
+	let target: Vec3 = [0.3, 1.0, -0.6];
+	let dist = 27;
 	let yaw = 0;
 	let pitch = 0;
 	let yawUser = 0;
@@ -153,7 +161,7 @@ export function mountScene(root: HTMLElement): void {
 	let sy = 0;
 	let cp = 1;
 	let sp = 0;
-	let compact = false;
+	let compact: boolean | null = null;
 
 	function project(p: Vec3): Proj {
 		const dx = p[0] - target[0];
@@ -165,13 +173,13 @@ export function mountScene(root: HTMLElement): void {
 		const z2 = dy * sp + z1 * cp;
 		const depth = Math.max(1, dist - z2);
 		const s = dist / depth;
-		return { x: W / 2 + (x1 * focal) / depth, y: H * (compact ? 0.6 : 0.6) - (y2 * focal) / depth, depth, s };
+		return { x: W / 2 + (x1 * focal) / depth, y: H * (compact ? 0.4 : 0.6) - (y2 * focal) / depth, depth, s };
 	}
 
 	function setCamera(t: number) {
 		const sway = reduceMotion ? 0 : Math.sin(t * 0.09) * 0.2;
-		yaw = 0.16 + sway + yawUser;
-		pitch = (compact ? 0.82 : 0.5) + (reduceMotion ? 0 : Math.sin(t * 0.06) * 0.04) + pitchUser;
+		yaw = (compact ? 0 : 0.16) + sway * (compact ? 0.35 : 1) + yawUser;
+		pitch = (compact ? 0.95 : 0.5) + (reduceMotion ? 0 : Math.sin(t * 0.06) * 0.04) + pitchUser;
 		cy = Math.cos(yaw);
 		sy = Math.sin(yaw);
 		cp = Math.cos(pitch);
@@ -187,8 +195,16 @@ export function mountScene(root: HTMLElement): void {
 		canvas!.width = Math.round(W * dpr);
 		canvas!.height = Math.round(H * dpr);
 		ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-		compact = W < 640;
-		focal = compact ? Math.min(W * 1.02, H * 2.2) : Math.min(W * 1.0, H * 2.15);
+		const nextCompact = W < 640;
+		if (nextCompact !== compact) {
+			compact = nextCompact;
+			target = compact ? [0, 0.6, -0.4] : [0.3, 1.0, -0.6];
+			dist = compact ? 38 : 27; // Flatter perspective keeps the portrait rows the same size.
+			yawUser = 0;
+			pitchUser = 0;
+			buildEdges();
+		}
+		focal = (compact ? Math.min(W * 2.45, H * 1.32) : Math.min(W * 1.0, H * 2.15)) * (dist / 27);
 		if (!running) draw(lastT);
 	}
 
@@ -260,7 +276,7 @@ export function mountScene(root: HTMLElement): void {
 		});
 
 		// HUD rings around the lakehouse core.
-		const core = byId.get('lakehouse')!.pos;
+		const core = posOf(byId.get('lakehouse')!);
 		const ring = (r: number, from: number, to: number, color: string, alpha: number, width: number, steps = 64) => {
 			const pts: Proj[] = [];
 			for (let i = 0; i <= steps; i++) {
@@ -337,7 +353,7 @@ export function mountScene(root: HTMLElement): void {
 	}
 
 	function drawNode(n: SceneNode, t: number, dim: boolean, hot: boolean) {
-		const [x, y, z] = n.pos;
+		const [x, y, z] = posOf(n);
 		const r = 0.62;
 		const h = 0.26;
 		const a = dim ? 0.22 : 1;
@@ -424,7 +440,7 @@ export function mountScene(root: HTMLElement): void {
 	}
 
 	function drawCore(n: SceneNode, t: number, dim: boolean, hot: boolean) {
-		const [x, , z] = n.pos;
+		const [x, , z] = posOf(n);
 		const a = dim ? 0.3 : 1;
 		const spin = reduceMotion ? 0.6 : t * 0.5;
 
@@ -507,7 +523,7 @@ export function mountScene(root: HTMLElement): void {
 	function drawLabels() {
 		labels.sort((p, q) => q.at.depth - p.at.depth);
 		for (const { n, at, a, hot, core } of labels) {
-			const size = Math.max(10, (core ? 15 : 12.5) * at.s);
+			const size = compact ? Math.max(9, (core ? 13 : 10.5) * at.s) : Math.max(10, (core ? 15 : 12.5) * at.s);
 			ctx!.textAlign = 'center';
 			ctx!.textBaseline = 'bottom';
 			ctx!.font = `700 ${size}px ${FONT}`;
@@ -531,7 +547,7 @@ export function mountScene(root: HTMLElement): void {
 		drawFloor(t);
 		drawEdges(t, focus);
 
-		const depth = new Map(NODES.map((n) => [n.id, project(n.pos).depth]));
+		const depth = new Map(NODES.map((n) => [n.id, project(posOf(n)).depth]));
 		const order = [...NODES].sort((p, q) => depth.get(q.id)! - depth.get(p.id)!);
 		const active = pinnedId ?? hoverId;
 		for (const n of order) {
@@ -540,11 +556,7 @@ export function mountScene(root: HTMLElement): void {
 			if (n.core) drawCore(n, t, dim, hot);
 			else drawNode(n, t, dim, hot);
 		}
-		if (!compact || focus) drawLabels();
-		else {
-			labels = labels.filter((l) => l.core || l.hot);
-			drawLabels();
-		}
+		drawLabels();
 		placeCard();
 	}
 
@@ -569,7 +581,8 @@ export function mountScene(root: HTMLElement): void {
 		if (left + cw > W - 8) left = p.x - p.s * 0.8 - 12 - cw;
 		left = Math.max(8, Math.min(W - cw - 8, left));
 		const top = Math.max(8, Math.min(H - ch - 8, p.y - ch / 2));
-		card!.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+		// The card is positioned in the stage; the canvas may sit below the header (narrow layout).
+		card!.style.transform = `translate(${Math.round(left + canvas!.offsetLeft)}px, ${Math.round(top + canvas!.offsetTop)}px)`;
 	}
 
 	function hit(mx: number, my: number): string | null {
