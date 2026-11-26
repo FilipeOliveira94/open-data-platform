@@ -9,7 +9,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 	<div class="arch3d__stage">
 		<canvas
 			role="img"
-			aria-label="3D architecture map: six sources feed batch ingestion and a CDC stream into an Iceberg lakehouse with Bronze, Silver and Gold layers, queried by Trino for notebooks, dashboards and the report site, orchestrated by Airflow, observed by Prometheus, Grafana and OpenLineage, and mirrored on AWS through Terraform."
+			aria-label="3D architecture map: six sources feed batch ingestion and a CDC stream into an Iceberg lakehouse with Bronze, Silver and Gold layers, queried by Trino for notebooks, dashboards and the report site, orchestrated by Airflow, observed by Prometheus, Grafana and OpenLineage, with GitHub Actions checking every change."
 		></canvas>
 
 		<span class="arch3d__corner arch3d__corner--tl" aria-hidden="true"></span>
@@ -22,7 +22,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 			<h2 id="arch3d-title" class="arch3d__title">
 				Sources to insight<span class="arch3d__dot">.</span>
 			</h2>
-			<p class="arch3d__sub">Batch and streaming into one lakehouse, local on Compose, provisioned on AWS.</p>
+			<p class="arch3d__sub">Batch and streaming into one Iceberg lakehouse, orchestrated, tested and observed end to end.</p>
 		</header>
 
 		<p class="arch3d__hint" aria-hidden="true">Drag to orbit · select a component</p>
@@ -39,7 +39,8 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 			{
 				GROUPS.map((g) => (
 					<li>
-						<button type="button" data-group={g.id} aria-pressed="false">
+						<button type="button" data-group={g.id} aria-pressed="false" style={`--role: ${g.color}`}>
+							<span class="arch3d__role" aria-hidden="true" />
 							{g.label}
 						</button>
 					</li>
@@ -141,7 +142,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 
 	.arch3d__stage {
 		position: relative;
-		aspect-ratio: 16 / 9.5;
+		aspect-ratio: 16 / 8.6;
 		min-height: 440px;
 		max-height: 82vh;
 	}
@@ -299,6 +300,9 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 		list-style: none;
 	}
 	.arch3d__groups button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
 		font: inherit;
 		font-size: 0.78rem;
 		font-weight: 700;
@@ -324,8 +328,20 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 	}
 	.arch3d__groups button[aria-pressed='true'] {
 		color: var(--fi-bg);
-		background: var(--fi-l3);
-		border-color: var(--fi-l3);
+		background: var(--role);
+		border-color: var(--role);
+	}
+	.arch3d__role {
+		width: 9px;
+		height: 9px;
+		border-radius: 3px;
+		background: var(--role);
+		box-shadow: 0 0 8px var(--role);
+		transform: rotate(45deg);
+	}
+	.arch3d__groups button[aria-pressed='true'] .arch3d__role {
+		background: var(--fi-bg);
+		box-shadow: none;
 	}
 	.arch3d__flows {
 		align-items: center;
@@ -342,20 +358,16 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 	.arch3d__swatch {
 		width: 22px;
 		height: 0;
-		border-top: 2px solid var(--fi-l3);
+		border-top: 2px solid var(--fi-l4);
 	}
 	.arch3d__swatch--stream {
-		border-top-color: var(--fi-dot);
+		border-top-width: 4px;
 	}
 	.arch3d__swatch--control {
-		border-top: 2px dashed var(--fi-l2);
+		border-top-style: dashed;
 	}
 	.arch3d__swatch--telemetry {
-		border-top: 2px dotted var(--fi-muted);
-	}
-	.arch3d__swatch--mirror {
-		border-top: 2px dotted var(--fi-l2);
-		opacity: 0.8;
+		border-top-style: dotted;
 	}
 
 	.arch3d__sr {
@@ -370,7 +382,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 
 	@media (max-width: 640px) {
 		.arch3d__stage {
-			aspect-ratio: 1 / 1.05;
+			aspect-ratio: 1 / 0.95;
 			min-height: 380px;
 		}
 		.arch3d__hint {

@@ -4,17 +4,17 @@
  * (right), z runs from the back (negative) to the front, y is height.
  */
 
+/** Function of a component; each one has its own hue in the brand range. */
 export type GroupId =
 	| 'sources'
-	| 'ingestion'
-	| 'streaming'
-	| 'lakehouse'
-	| 'serving'
+	| 'movement'
+	| 'storage'
+	| 'processing'
+	| 'destinations'
 	| 'orchestration'
-	| 'observability'
-	| 'delivery';
+	| 'observability';
 
-export type FlowKind = 'batch' | 'stream' | 'control' | 'telemetry' | 'mirror';
+export type FlowKind = 'batch' | 'stream' | 'control' | 'telemetry';
 
 export type Vec3 = [number, number, number];
 
@@ -34,15 +34,14 @@ export interface SceneEdge {
 	kind: FlowKind;
 }
 
-export const GROUPS: { id: GroupId; label: string }[] = [
-	{ id: 'sources', label: 'Sources' },
-	{ id: 'ingestion', label: 'Ingestion' },
-	{ id: 'streaming', label: 'Streaming CDC' },
-	{ id: 'lakehouse', label: 'Lakehouse' },
-	{ id: 'serving', label: 'Query and BI' },
-	{ id: 'orchestration', label: 'Orchestration and quality' },
-	{ id: 'observability', label: 'Observability and lineage' },
-	{ id: 'delivery', label: 'CI/CD and AWS' },
+export const GROUPS: { id: GroupId; label: string; color: string }[] = [
+	{ id: 'sources', label: 'Sources', color: '#6FB2FF' },
+	{ id: 'movement', label: 'Ingestion and CDC', color: '#8E8BFF' },
+	{ id: 'storage', label: 'Databases and storage', color: '#B98AFF' },
+	{ id: 'processing', label: 'Processing', color: '#E58BEA' },
+	{ id: 'destinations', label: 'Destinations', color: '#FF6FA6' },
+	{ id: 'orchestration', label: 'Orchestration and quality', color: '#E6DAFF' },
+	{ id: 'observability', label: 'Observability and lineage', color: '#9C93B8' },
 ];
 
 export const FLOWS: { kind: FlowKind; label: string }[] = [
@@ -50,7 +49,6 @@ export const FLOWS: { kind: FlowKind; label: string }[] = [
 	{ kind: 'stream', label: 'Change stream' },
 	{ kind: 'control', label: 'Orchestration' },
 	{ kind: 'telemetry', label: 'Metrics and lineage' },
-	{ kind: 'mirror', label: 'AWS counterpart' },
 ];
 
 export const NODES: SceneNode[] = [
@@ -63,42 +61,37 @@ export const NODES: SceneNode[] = [
 	{ id: 'postgres', label: 'PostgreSQL 16', detail: 'Operational database: windowed batch extracts and logical replication for CDC.', group: 'sources', pos: [-7.4, 0, 6.6], glyph: 'PG' },
 
 	// Ingestion
-	{ id: 'ingest', label: 'Ingestion', detail: 'Python writers with data contracts, a quarantine sidecar and an extract coverage ledger.', group: 'ingestion', pos: [-5.6, 0, 0.2], glyph: 'ING' },
-	{ id: 'minio', label: 'MinIO raw zone', detail: 'Auditable raw objects by source, dataset, date and execution id, over the S3 API.', group: 'ingestion', pos: [-2.6, 0, -2.8], glyph: 'S3' },
+	{ id: 'ingest', label: 'Ingestion', detail: 'Python writers with data contracts, a quarantine sidecar and an extract coverage ledger.', group: 'movement', pos: [-5.6, 0, 0.2], glyph: 'ING' },
+	{ id: 'minio', label: 'MinIO raw zone', detail: 'Auditable raw objects by source, dataset, date and execution id, over the S3 API.', group: 'storage', pos: [-2.6, 0, -2.8], glyph: 'RAW' },
 
 	// Streaming CDC
-	{ id: 'debezium', label: 'Debezium', detail: 'Reads the PostgreSQL write-ahead log and emits row-level change events.', group: 'streaming', pos: [-4.6, 0, 5.4], glyph: 'CDC' },
-	{ id: 'kafka', label: 'Kafka', detail: 'Change-event topics that decouple the source from the lakehouse.', group: 'streaming', pos: [-1.4, 0, 5.0], glyph: 'KFK' },
+	{ id: 'debezium', label: 'Debezium', detail: 'Reads the PostgreSQL write-ahead log and emits row-level change events.', group: 'movement', pos: [-4.6, 0, 5.4], glyph: 'CDC' },
+	{ id: 'kafka', label: 'Kafka', detail: 'Change-event topics that decouple the source from the lakehouse.', group: 'movement', pos: [-1.4, 0, 5.0], glyph: 'KFK' },
 
 	// Lakehouse
-	{ id: 'spark', label: 'Spark', detail: 'Batch jobs and Structured Streaming write Bronze and Silver Iceberg tables.', group: 'lakehouse', pos: [-1.2, 0, 1.2], glyph: 'SPK' },
-	{ id: 'lakehouse', label: 'Iceberg lakehouse', detail: 'Bronze keeps raw history, Silver conforms and deduplicates, Gold serves business marts.', group: 'lakehouse', pos: [2.4, 0, 0], glyph: 'ICE', core: true },
-	{ id: 'catalog', label: 'Iceberg catalog', detail: 'JDBC catalog on PostgreSQL shared by Spark and Trino.', group: 'lakehouse', pos: [2.2, 0, -4.4], glyph: 'CAT' },
-	{ id: 'dbt', label: 'dbt', detail: 'Builds and tests the Gold marts through Trino.', group: 'lakehouse', pos: [5.6, 0, 3.8], glyph: 'DBT' },
+	{ id: 'spark', label: 'Spark', detail: 'Batch jobs and Structured Streaming write Bronze and Silver Iceberg tables.', group: 'processing', pos: [-1.2, 0, 1.2], glyph: 'SPK' },
+	{ id: 'lakehouse', label: 'Iceberg lakehouse', detail: 'Bronze keeps raw history, Silver conforms and deduplicates, Gold serves business marts.', group: 'storage', pos: [2.4, 0, 0], glyph: 'ICE', core: true },
+	{ id: 'catalog', label: 'Iceberg catalog', detail: 'JDBC catalog on PostgreSQL shared by Spark and Trino.', group: 'storage', pos: [0.2, 0, -5.0], glyph: 'CAT' },
+	{ id: 'dbt', label: 'dbt', detail: 'Builds and tests the Gold marts through Trino.', group: 'processing', pos: [5.6, 0, 3.8], glyph: 'DBT' },
 
 	// Query and BI
-	{ id: 'trino', label: 'Trino', detail: 'Distributed SQL engine that reads every Iceberg layer.', group: 'serving', pos: [6.4, 0, -0.4], glyph: 'SQL' },
-	{ id: 'jupyter', label: 'JupyterLab', detail: 'Read-only exploration notebooks over Gold.', group: 'serving', pos: [10.0, 0, -3.0], glyph: 'NB' },
-	{ id: 'superset', label: 'Superset', detail: 'Dashboards as code over the Gold marts.', group: 'serving', pos: [10.4, 0, -0.4], glyph: 'BI' },
-	{ id: 'site', label: 'Report site', detail: 'Static multi-page report with the platform figures.', group: 'serving', pos: [10.0, 0, 2.4], glyph: 'WEB' },
+	{ id: 'trino', label: 'Trino', detail: 'Distributed SQL engine that reads every Iceberg layer.', group: 'processing', pos: [6.4, 0, -0.4], glyph: 'SQL' },
+	{ id: 'jupyter', label: 'JupyterLab', detail: 'Read-only exploration notebooks over Gold.', group: 'destinations', pos: [10.0, 0, -3.0], glyph: 'NB' },
+	{ id: 'superset', label: 'Superset', detail: 'Dashboards as code over the Gold marts.', group: 'destinations', pos: [10.4, 0, -0.4], glyph: 'BI' },
+	{ id: 'site', label: 'Report site', detail: 'Static multi-page report with the platform figures.', group: 'destinations', pos: [10.0, 0, 2.4], glyph: 'WEB' },
 
 	// Orchestration and quality
-	{ id: 'airflow', label: 'Airflow', detail: 'Asset-driven daily and weekly schedules, backfills and retries.', group: 'orchestration', pos: [-1.8, 3.6, 3.2], glyph: 'AF' },
+	{ id: 'airflow', label: 'Airflow', detail: 'Asset-driven daily and weekly schedules, backfills and retries.', group: 'orchestration', pos: [0.2, 5.6, 1.6], glyph: 'AF' },
 	{ id: 'contracts', label: 'Data contracts', detail: 'ODCS table contracts checked with the Data Contract CLI, with quarantine for invalid rows.', group: 'orchestration', pos: [5.8, 0, -4.0], glyph: 'DQ' },
 
 	// Observability and lineage
 	{ id: 'prometheus', label: 'Prometheus', detail: 'Pipeline metrics: lag, throughput, failures and refresh duration.', group: 'observability', pos: [-3.0, 0, -7.4], glyph: 'MET' },
 	{ id: 'grafana', label: 'Grafana', detail: 'Operations dashboards, alerts and runbooks.', group: 'observability', pos: [0.6, 0, -7.8], glyph: 'OPS' },
 	{ id: 'openlineage', label: 'OpenLineage', detail: 'Run-level lineage from orchestration, Spark and dbt.', group: 'observability', pos: [4.2, 0, -7.8], glyph: 'LIN' },
-	{ id: 'finops', label: 'FinOps model', detail: 'Cost drivers and Iceberg snapshot retention for the AWS design.', group: 'observability', pos: [7.8, 0, -7.4], glyph: 'FIN' },
+	{ id: 'finops', label: 'FinOps model', detail: 'Cost drivers, unit costs and Iceberg snapshot retention.', group: 'observability', pos: [7.8, 0, -7.4], glyph: 'FIN' },
 
-	// CI/CD and AWS
-	{ id: 'actions', label: 'GitHub Actions', detail: 'Lint, unit tests, security checks and Terraform validation on every change.', group: 'delivery', pos: [-7.2, 0, -5.6], glyph: 'CI' },
-	{ id: 'terraform', label: 'Terraform', detail: 'Provisions the AWS deployment as infrastructure as code.', group: 'delivery', pos: [-6.0, 4.6, -9.0], glyph: 'TF' },
-	{ id: 's3', label: 'Amazon S3', detail: 'Object storage counterpart of MinIO.', group: 'delivery', pos: [-2.6, 4.6, -9.4], glyph: 'S3' },
-	{ id: 'glue', label: 'AWS Glue Catalog', detail: 'Table catalog counterpart of the Iceberg JDBC catalog.', group: 'delivery', pos: [1.2, 4.6, -9.6], glyph: 'GLU' },
-	{ id: 'athena', label: 'Amazon Athena', detail: 'Serverless SQL counterpart of Trino.', group: 'delivery', pos: [5.0, 4.6, -9.4], glyph: 'ATH' },
-	{ id: 'mwaa', label: 'Amazon MWAA', detail: 'Managed Airflow counterpart of the local scheduler.', group: 'delivery', pos: [8.6, 4.6, -9.0], glyph: 'MW' },
+	// CI
+	{ id: 'actions', label: 'GitHub Actions', detail: 'Lint, unit tests and security checks on every change.', group: 'orchestration', pos: [-7.2, 0, -5.6], glyph: 'CI' },
 ];
 
 export const EDGES: SceneEdge[] = [
@@ -131,7 +124,6 @@ export const EDGES: SceneEdge[] = [
 	{ from: 'contracts', to: 'lakehouse', kind: 'control' },
 	{ from: 'catalog', to: 'lakehouse', kind: 'control' },
 	{ from: 'actions', to: 'ingest', kind: 'control' },
-	{ from: 'actions', to: 'terraform', kind: 'control' },
 
 	// Telemetry and lineage
 	{ from: 'airflow', to: 'prometheus', kind: 'telemetry' },
@@ -140,11 +132,4 @@ export const EDGES: SceneEdge[] = [
 	{ from: 'airflow', to: 'openlineage', kind: 'telemetry' },
 	{ from: 'dbt', to: 'openlineage', kind: 'telemetry' },
 	{ from: 'lakehouse', to: 'finops', kind: 'telemetry' },
-
-	// AWS counterparts
-	{ from: 'terraform', to: 's3', kind: 'mirror' },
-	{ from: 'minio', to: 's3', kind: 'mirror' },
-	{ from: 'catalog', to: 'glue', kind: 'mirror' },
-	{ from: 'trino', to: 'athena', kind: 'mirror' },
-	{ from: 'airflow', to: 'mwaa', kind: 'mirror' },
 ];

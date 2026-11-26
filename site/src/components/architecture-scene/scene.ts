@@ -22,7 +22,6 @@ const C = {
 const FONT = "Urbanist, 'Segoe UI', system-ui, sans-serif";
 
 interface FlowStyle {
-	color: string;
 	width: number;
 	dash: number[];
 	speed: number;
@@ -32,11 +31,10 @@ interface FlowStyle {
 }
 
 const FLOW: Record<FlowKind, FlowStyle> = {
-	batch: { color: C.l3, width: 1.4, dash: [], speed: 0.14, count: 2, lift: 1.0, alpha: 0.5 },
-	stream: { color: C.dot, width: 1.6, dash: [], speed: 0.38, count: 5, lift: 0.6, alpha: 0.55 },
-	control: { color: C.l2, width: 1, dash: [5, 6], speed: 0.09, count: 1, lift: 0, alpha: 0.45 },
-	telemetry: { color: C.muted, width: 1, dash: [2, 5], speed: 0.1, count: 1, lift: 0.8, alpha: 0.3 },
-	mirror: { color: C.l2, width: 1, dash: [1, 6], speed: 0.06, count: 1, lift: 0, alpha: 0.4 },
+	batch: { width: 1.5, dash: [], speed: 0.14, count: 2, lift: 1.0, alpha: 0.6 },
+	stream: { width: 2.6, dash: [], speed: 0.38, count: 6, lift: 0.6, alpha: 0.7 },
+	control: { width: 1, dash: [5, 6], speed: 0.09, count: 1, lift: 0, alpha: 0.5 },
+	telemetry: { width: 1, dash: [2, 5], speed: 0.1, count: 1, lift: 0.8, alpha: 0.4 },
 };
 
 const LAYERS = [
@@ -105,7 +103,11 @@ export function mountScene(root: HTMLElement): void {
 	const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const byId = new Map(NODES.map((n) => [n.id, n]));
 	const groupLabel = new Map(GROUPS.map((g) => [g.id, g.label]));
-	const glow = { violet: makeGlow(C.l3), pink: makeGlow(C.dot), ink: makeGlow(C.l4) };
+	const glow = { pink: makeGlow(C.dot), ink: makeGlow(C.l4) };
+	// Each function (group) has its own hue; nodes, flows and particles take it.
+	const roleColor = new Map(GROUPS.map((g) => [g.id, g.color]));
+	const roleGlow = new Map(GROUPS.map((g) => [g.id, makeGlow(g.color)]));
+	const colorOf = (id: string) => roleColor.get(byId.get(id)!.group)!;
 
 	const anchor = (n: SceneNode): Vec3 => (n.core ? [n.pos[0], n.pos[1] + 0.95, n.pos[2]] : [n.pos[0], n.pos[1] + 0.12, n.pos[2]]);
 	const edges: EdgeGeom[] = EDGES.map((edge, i) => {
@@ -140,7 +142,7 @@ export function mountScene(root: HTMLElement): void {
 	let W = 0;
 	let H = 0;
 	let focal = 1;
-	const target: Vec3 = [0.6, 1.2, -1.6];
+	const target: Vec3 = [0.3, 1.0, -0.6];
 	const dist = 27;
 	let yaw = 0;
 	let pitch = 0;
@@ -163,7 +165,7 @@ export function mountScene(root: HTMLElement): void {
 		const z2 = dy * sp + z1 * cp;
 		const depth = Math.max(1, dist - z2);
 		const s = dist / depth;
-		return { x: W / 2 + (x1 * focal) / depth, y: H * (compact ? 0.6 : 0.63) - (y2 * focal) / depth, depth, s };
+		return { x: W / 2 + (x1 * focal) / depth, y: H * (compact ? 0.6 : 0.6) - (y2 * focal) / depth, depth, s };
 	}
 
 	function setCamera(t: number) {
@@ -186,7 +188,7 @@ export function mountScene(root: HTMLElement): void {
 		canvas!.height = Math.round(H * dpr);
 		ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 		compact = W < 640;
-		focal = compact ? Math.min(W * 1.02, H * 2.2) : Math.min(W * 0.95, H * 1.85);
+		focal = compact ? Math.min(W * 1.02, H * 2.2) : Math.min(W * 1.0, H * 2.15);
 		if (!running) draw(lastT);
 	}
 
@@ -296,45 +298,19 @@ export function mountScene(root: HTMLElement): void {
 		}
 	}
 
-	function drawZones() {
-		// AWS plane, raised behind the local stack.
-		const y = 4.58;
-		const corners: Vec3[] = [
-			[-7.6, y, -10.6],
-			[10.2, y, -10.6],
-			[10.2, y, -7.8],
-			[-7.6, y, -7.8],
-		];
-		const pts = corners.map(project);
-		ctx!.fillStyle = rgba(C.b2, 0.22);
-		ctx!.strokeStyle = rgba(C.l2, 0.45);
-		ctx!.lineWidth = 1;
-		drawPath(pts);
-		ctx!.closePath();
-		ctx!.fill();
-		ctx!.stroke();
-		if (!compact) zoneLabel('AWS · TERRAFORM', [3.0, y, -7.95]);
-	}
-
-	function zoneLabel(text: string, p: Vec3) {
-		const q = project(p);
-		ctx!.font = `700 ${Math.max(9, 10.5 * q.s)}px ${FONT}`;
-		ctx!.fillStyle = rgba(C.l3, 0.6);
-		ctx!.textAlign = 'left';
-		ctx!.textBaseline = 'middle';
-		const spaced = text.split('').join(' ');
-		ctx!.fillText(spaced, q.x, q.y);
-	}
-
 	function drawEdges(t: number, focus: ReturnType<typeof focusSets>) {
 		for (const e of edges) {
 			const st = FLOW[e.edge.kind];
 			const on = !focus || focus.edges.has(e.edge);
 			const pts: Proj[] = [];
 			for (let i = 0; i <= 28; i++) pts.push(project(bezier(e, i / 28)));
+			const alpha = on ? Math.min(1, st.alpha * (focus ? 1.5 : 1)) : 0.06;
+			const grad = ctx!.createLinearGradient(pts[0].x, pts[0].y, pts[28].x, pts[28].y);
+			grad.addColorStop(0, rgba(colorOf(e.edge.from), alpha));
+			grad.addColorStop(1, rgba(colorOf(e.edge.to), alpha));
 			ctx!.setLineDash(st.dash);
 			ctx!.lineDashOffset = reduceMotion ? 0 : -t * 14;
-			ctx!.strokeStyle = rgba(st.color, on ? st.alpha * (focus ? 1.6 : 1) : 0.06);
+			ctx!.strokeStyle = grad;
 			ctx!.lineWidth = st.width * (focus && on ? 1.5 : 1);
 			drawPath(pts);
 			ctx!.stroke();
@@ -346,7 +322,7 @@ export function mountScene(root: HTMLElement): void {
 			const st = FLOW[e.edge.kind];
 			const on = !focus || focus.edges.has(e.edge);
 			if (!on) continue;
-			const sprite = e.edge.kind === 'stream' ? glow.pink : e.edge.kind === 'batch' ? glow.ink : glow.violet;
+			const sprite = e.edge.kind === 'stream' ? glow.ink : roleGlow.get(byId.get(e.edge.from)!.group)!;
 			for (let k = 0; k < st.count; k++) {
 				const u = (t * st.speed + e.phase + k / st.count) % 1;
 				const p = project(bezier(e, u));
@@ -365,6 +341,7 @@ export function mountScene(root: HTMLElement): void {
 		const r = 0.62;
 		const h = 0.26;
 		const a = dim ? 0.22 : 1;
+		const col = roleColor.get(n.group)!;
 		const bob = reduceMotion || y === 0 ? 0 : Math.sin(t * 0.8 + x) * 0.08;
 		const yy = y + bob;
 
@@ -373,14 +350,14 @@ export function mountScene(root: HTMLElement): void {
 			const top = project([x, yy, z]);
 			const base = project([x, 0, z]);
 			ctx!.setLineDash([2, 4]);
-			ctx!.strokeStyle = rgba(C.l2, 0.28 * a);
+			ctx!.strokeStyle = rgba(col, 0.35 * a);
 			ctx!.lineWidth = 1;
 			ctx!.beginPath();
 			ctx!.moveTo(top.x, top.y);
 			ctx!.lineTo(base.x, base.y);
 			ctx!.stroke();
 			ctx!.setLineDash([]);
-			ctx!.fillStyle = rgba(C.l3, 0.35 * a);
+			ctx!.fillStyle = rgba(col, 0.4 * a);
 			ctx!.beginPath();
 			ctx!.ellipse(base.x, base.y, 6 * base.s, 2.4 * base.s, 0, 0, Math.PI * 2);
 			ctx!.fill();
@@ -400,7 +377,7 @@ export function mountScene(root: HTMLElement): void {
 		ctx!.globalCompositeOperation = 'lighter';
 		const gs = (hot ? 120 : 84) * center.s;
 		ctx!.globalAlpha = (hot ? 0.75 : 0.4) * a;
-		ctx!.drawImage(glow.violet, center.x - gs / 2, center.y - gs / 2, gs, gs);
+		ctx!.drawImage(roleGlow.get(n.group)!, center.x - gs / 2, center.y - gs / 2, gs, gs);
 		ctx!.globalAlpha = 1;
 		ctx!.globalCompositeOperation = 'source-over';
 
@@ -411,30 +388,35 @@ export function mountScene(root: HTMLElement): void {
 			const vis = nx * (camPos[0] - x) + nz * (camPos[2] - z);
 			if (vis <= 0) continue;
 			const j = (i + 1) % 6;
-			ctx!.fillStyle = rgba(C.b1, 0.92 * a);
-			ctx!.strokeStyle = rgba(C.l2, 0.7 * a);
-			ctx!.lineWidth = 1;
-			drawPath([bottom[i], bottom[j], top[j], top[i]]);
+			const side = [bottom[i], bottom[j], top[j], top[i]];
+			ctx!.fillStyle = rgba(C.b1, 0.94 * a);
+			drawPath(side);
 			ctx!.closePath();
+			ctx!.fill();
+			ctx!.fillStyle = rgba(col, 0.16 * a);
+			ctx!.strokeStyle = rgba(col, 0.6 * a);
+			ctx!.lineWidth = 1;
 			ctx!.fill();
 			ctx!.stroke();
 		}
 
 		const g = ctx!.createLinearGradient(top[3].x, top[3].y, top[0].x, top[0].y);
-		g.addColorStop(0, rgba(C.b2, 0.98 * a));
-		g.addColorStop(1, rgba(C.b1, 0.98 * a));
-		ctx!.fillStyle = g;
-		ctx!.strokeStyle = rgba(hot ? C.l4 : C.l3, (hot ? 1 : 0.85) * a);
-		ctx!.lineWidth = hot ? 1.8 : 1.2;
+		g.addColorStop(0, rgba(col, 0.34 * a));
+		g.addColorStop(1, rgba(col, 0.12 * a));
+		ctx!.fillStyle = rgba(C.c0, 0.98 * a);
 		drawPath(top);
 		ctx!.closePath();
+		ctx!.fill();
+		ctx!.fillStyle = g;
+		ctx!.strokeStyle = rgba(hot ? '#FFFFFF' : col, (hot ? 1 : 0.9) * a);
+		ctx!.lineWidth = hot ? 1.8 : 1.3;
 		ctx!.fill();
 		ctx!.stroke();
 
 		ctx!.textAlign = 'center';
 		ctx!.textBaseline = 'middle';
 		ctx!.font = `700 ${Math.max(7, 10 * center.s)}px ${FONT}`;
-		ctx!.fillStyle = rgba(C.l4, 0.95 * a);
+		ctx!.fillStyle = rgba(col, a);
 		ctx!.fillText(n.glyph, center.x, center.y + 0.5);
 
 		screen.set(n.id, { ...center, s: Math.max(18, 34 * center.s) });
@@ -547,7 +529,6 @@ export function mountScene(root: HTMLElement): void {
 		const focus = focusSets();
 		drawBackground(t);
 		drawFloor(t);
-		drawZones();
 		drawEdges(t, focus);
 
 		const depth = new Map(NODES.map((n) => [n.id, project(n.pos).depth]));
