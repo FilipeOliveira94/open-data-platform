@@ -27,7 +27,7 @@ Return:
 Rating: <Sm|Md|Lg> / <Lo|Med|Hi> (the expected half of the roadmap's Risk and Size columns; estimate it in the plan if missing). Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Above Sm + Lo: run po-reviewer on the plan, show its verdict with the plan, and wait for my approval before editing. Sm + Lo: implement after planning. If planning shows more work or risk than the rating, raise it, say why, and follow the new rating.
 ```
 
-## 2. Implement (after the plan is approved)
+## 2. Implement (straight away for Sm + Lo; after the plan is approved otherwise)
 
 ```text
 Follow AGENTS.md.
