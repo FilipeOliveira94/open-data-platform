@@ -30,6 +30,7 @@ class PruneResult:
     removed: int
     kept: int
     bytes_freed: int
+    failed: tuple[str, ...] = ()
 
 
 def _newest_mtime_and_size(folder: Path) -> tuple[float, int]:
@@ -58,14 +59,22 @@ def prune_work(
         raise ValueError(msg)
     cutoff = (time.time() if now is None else now) - retention_days * _DAY_SECONDS
     removed = kept = freed = 0
+    failed: list[str] = []
     for entry in sorted(work_root.iterdir()):
         if entry.name == current_label or entry.is_symlink() or not entry.is_dir():
             continue
-        newest, size = _newest_mtime_and_size(entry)
-        if newest >= cutoff:
-            kept += 1
+        # One unreadable or vanished folder must not stop the others.
+        try:
+            newest, size = _newest_mtime_and_size(entry)
+            if newest >= cutoff:
+                kept += 1
+                continue
+            shutil.rmtree(entry)
+        except OSError:
+            failed.append(entry.name)
             continue
-        shutil.rmtree(entry)
         removed += 1
         freed += size
-    return PruneResult(removed=removed, kept=kept, bytes_freed=freed)
+    return PruneResult(
+        removed=removed, kept=kept, bytes_freed=freed, failed=tuple(failed)
+    )

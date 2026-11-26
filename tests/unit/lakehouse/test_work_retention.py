@@ -94,18 +94,65 @@ def test_step_reads_the_retention_from_the_environment(
     )
     work = tmp_path / "manual__now"
 
-    assert medallion_build.run_step(
-        "prune-work", work, {"ODP_WORK_RETENTION_DAYS": "10"}
-    ) is False
+    assert (
+        medallion_build.run_step("prune-work", work, {"ODP_WORK_RETENTION_DAYS": "10"})
+        is False
+    )
     assert old.exists()
     assert medallion_build.run_step("prune-work", work, {}) is True
     assert not old.exists()
     assert work.is_dir()
 
 
-@pytest.mark.parametrize("value", ["0", "-1", "7d", "1.5"])
+@pytest.mark.parametrize("value", ["0", "-1", "7d", "1.5", "\u00b2"])
 def test_step_rejects_a_bad_retention(tmp_path: Path, value: str) -> None:
     with pytest.raises(MedallionBuildError, match="ODP_WORK_RETENTION_DAYS"):
         medallion_build.run_step(
             "prune-work", tmp_path / "r1", {"ODP_WORK_RETENTION_DAYS": value}
         )
+
+
+def test_a_folder_that_cannot_be_removed_does_not_stop_the_others(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stuck = _folder(tmp_path, "a_stuck", 30)
+    other = _folder(tmp_path, "b_other", 30)
+    real_rmtree = __import__("shutil").rmtree
+
+    def rmtree(path: Path) -> None:
+        if Path(path) == stuck:
+            raise PermissionError("denied")
+        real_rmtree(path)
+
+    monkeypatch.setattr(
+        "open_data_platform.lakehouse.work_retention.shutil.rmtree", rmtree
+    )
+    result = prune_work(tmp_path, "current", 7, now=NOW)
+
+    assert result.failed == ("a_stuck",)
+    assert result.removed == 1
+    assert stuck.exists()
+    assert not other.exists()
+
+
+def test_step_fails_after_pruning_when_a_folder_is_left(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stuck = _folder(tmp_path, "a_stuck", 30)
+    other = _folder(tmp_path, "b_other", 30)
+    real_rmtree = __import__("shutil").rmtree
+
+    def rmtree(path: Path) -> None:
+        if Path(path) == stuck:
+            raise PermissionError("denied")
+        real_rmtree(path)
+
+    monkeypatch.setattr(
+        "open_data_platform.lakehouse.work_retention.shutil.rmtree", rmtree
+    )
+    monkeypatch.setattr(
+        "open_data_platform.lakehouse.work_retention.time.time", lambda: NOW
+    )
+    with pytest.raises(MedallionBuildError, match="could not remove 1 run folders"):
+        medallion_build.run_step("prune-work", tmp_path / "manual__now", {})
+    assert not other.exists()

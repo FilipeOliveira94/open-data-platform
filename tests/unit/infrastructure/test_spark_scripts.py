@@ -35,7 +35,12 @@ def test_launchers_are_found_by_pattern() -> None:
 
 @pytest.mark.parametrize("path", _launchers(), ids=lambda path: path.name)
 def test_every_spark_launcher_sets_the_session_time_zone(path: Path) -> None:
-    assert _TIME_ZONE in path.read_text(encoding="utf-8")
+    code = [
+        line
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#")
+    ]
+    assert any(_TIME_ZONE in line for line in code)
 
 
 @pytest.mark.parametrize("path", RUNNERS, ids=lambda path: path.name)

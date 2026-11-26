@@ -685,7 +685,7 @@ def _prune_work(work: Path, env: Mapping[str, str]) -> bool:
     raw = env.get("ODP_WORK_RETENTION_DAYS", "").strip()
     if not raw:
         days = DEFAULT_RETENTION_DAYS
-    elif raw.isdigit() and int(raw) >= 1:
+    elif raw.isascii() and raw.isdecimal() and int(raw) >= 1:
         days = int(raw)
     else:
         msg = "ODP_WORK_RETENTION_DAYS must be a positive integer"
@@ -695,6 +695,11 @@ def _prune_work(work: Path, env: Mapping[str, str]) -> bool:
         f"prune-work: removed {result.removed} run folders older than {days} days "
         f"({result.bytes_freed} bytes), kept {result.kept} and this run's folder"
     )
+    if result.failed:
+        msg = f"prune-work could not remove {len(result.failed)} run folders: " + (
+            ", ".join(result.failed)
+        )
+        raise MedallionBuildError(msg)
     return result.removed > 0
 
 
