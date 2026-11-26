@@ -21,4 +21,5 @@ exec /opt/spark/bin/spark-sql \
   --conf "spark.ui.enabled=false" \
   --conf "spark.eventLog.enabled=false" \
   --conf "spark.jars.ivy=/tmp/.ivy2" \
+  --conf "spark.sql.session.timeZone=UTC" \
   -e "SELECT 1 AS ivy_warm;"
