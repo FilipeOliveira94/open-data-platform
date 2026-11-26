@@ -25,7 +25,7 @@ For each task:
 2. Read `PROJECT_STATUS.md`, `ROADMAP.md` and relevant ADRs when they exist.
 3. Check the relevant roadmap item. Identify dependencies, assumptions, risks and acceptance criteria.
 4. Check the issue's Size and Risk (see "Size and risk" below) and plan it. Sm + Lo: implement directly. Anything else: present the plan in the thread and stop until Filipe approves it.
-5. Implement the smallest coherent increment. When extracting repeated logic or choosing module boundaries (ingestion sources, Spark jobs, statement builders), use the `code-structure` skill; the principles in §4 take precedence.
+5. Implement the smallest coherent increment. When extracting repeated logic or choosing module boundaries (ingestion sources, Spark jobs, statement builders), use the `module-boundaries` skill; the principles in §4 take precedence.
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
 8. Run the review gates in "Agent workflow" below and fix blocking findings.
