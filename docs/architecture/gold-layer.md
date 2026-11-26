@@ -109,7 +109,7 @@ Against Silver from `odp-raw` / `execution_id=run-001` (same snapshot as the mod
 
 ## Limitations
 
-- dbt reaches Trino inside the Compose network. Trino stays on the `lakehouse` profile and still publishes `TRINO_PORT` for host clients.
+- dbt reaches Trino inside the Compose network. Trino stays on the `lakehouse` profile and still publishes `ODP_TRINO_HOST_PORT` (default 8080; `TRINO_PORT` before P3-10) for host clients.
 - Quarantine staging replaces `gold_staging.quarantine_findings` through Spark with one `CREATE OR REPLACE TABLE … AS SELECT` (P3-11), so `make stage-quarantine` needs the JDBC catalog database and the runtime image Spark, same as Bronze. Trino reads the table afterwards. The staging JSONL is the finding payload at rest in the warehouse bucket. A malformed staging line can still surface in a Spark `FAILFAST` exception.
 - Accidental schemas from early misconfigured runs should be dropped if present; `generate_schema_name` now uses the model schema as the Iceberg namespace with no `target.schema` prefix.
 - dbt SSL warning from dbt-trino on HTTP local Trino is expected.
