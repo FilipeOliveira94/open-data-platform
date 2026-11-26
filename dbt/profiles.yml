@@ -1,12 +1,13 @@
-# Local developer profile (gitignored via dbt/profiles.yml pattern — keep example in profiles.yml.example).
-# This checked-in copy uses only .env.example placeholders for Compose Trino.
+# Versioned dbt profile. The runtime image reads it from the mounted repository.
+# No secrets: Compose Trino runs without authentication. Values come from the
+# container environment set in docker-compose.yml (ODP_TRINO_*).
 open_data_platform:
   target: local
   outputs:
     local:
       type: trino
       method: none
-      user: odp
+      user: "{{ env_var('ODP_TRINO_USER', 'odp') }}"
       # dbt runs in the runtime image on the Compose network (P3-03).
       host: "{{ env_var('ODP_TRINO_HOST', 'trino') }}"
       port: "{{ env_var('ODP_TRINO_PORT', '8080') | int }}"

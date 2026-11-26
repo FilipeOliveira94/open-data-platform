@@ -43,6 +43,13 @@ those writes. The read-only check steps stay outside the pool.
 
 The Trino service (Compose profile ``lakehouse``) must be up for the check
 steps and dbt.
+
+``prune_work`` (P3-10) deletes the scratch folders of earlier runs under
+``/opt/odp/work`` once they are older than ``ODP_WORK_RETENTION_DAYS``
+(default 7). It never deletes this run's folder, and it touches no Airflow
+run, task log, table, or raw object. It has no upstream or downstream task:
+it runs beside the refresh, so its result never blocks a layer, and a failed
+refresh still fails the DAG run (a leaf task with ``all_done`` would hide it).
 """
 
 from __future__ import annotations
@@ -91,6 +98,11 @@ with DAG(
     default_args=DEFAULT_ARGS,
     doc_md=__doc__,
 ):
+    python_task(
+        "prune_work",
+        ["-m", MEDALLION_BUILD, "prune-work", *RUN_LABEL, *SKIP],
+        skip_exit_code=SKIP_EXIT_CODE,
+    )
     chain(
         *(
             python_task(

@@ -13,9 +13,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from open_data_platform.ingestion.coverage import CADENCES
-from open_data_platform.ingestion.coverage import DAILY as DAILY_CADENCE
-from open_data_platform.ingestion.coverage import WEEKLY as WEEKLY_CADENCE
+# Airflow is the uv `airflow` group, not a default group (P3-10). Without it the
+# whole module skips; `make test` and CI sync the group.
+pytest.importorskip("airflow", reason="uv group 'airflow' is not installed")
+
+from open_data_platform.ingestion.coverage import CADENCES  # noqa: E402
+from open_data_platform.ingestion.coverage import DAILY as DAILY_CADENCE  # noqa: E402
+from open_data_platform.ingestion.coverage import WEEKLY as WEEKLY_CADENCE  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 DAG_DIR = ROOT / "airflow" / "dags"
@@ -47,6 +51,7 @@ POOLED_TASKS = {
 MEDALLION_BUILD = "open_data_platform.lakehouse.medallion_build"
 RUN_LABEL = ["--run-label", "{{ run_id }}"]
 CHECK_TASKS = {"bronze_checks", "silver_checks"}
+PRUNE = "prune_work"
 
 TRANSFORM_ORDER = (
     ("bronze", "bronze"),
@@ -126,9 +131,9 @@ def test_transform_runs_bronze_silver_gold_in_order(dagbag) -> None:
     dag = dagbag.dags["transform_lakehouse"]
     assert type(dag.timetable).__name__ == "AssetTriggeredTimetable"
     assert dag.max_active_runs == 1
-    assert [task.task_id for task in dag.topological_sort()] == [
-        task_id for task_id, _step in TRANSFORM_ORDER
-    ]
+    refresh = [t.task_id for t in dag.topological_sort() if t.task_id != PRUNE]
+    assert refresh == [task_id for task_id, _step in TRANSFORM_ORDER]
+    assert set(dag.task_ids) == {PRUNE, *refresh}
     previous = None
     for task_id, step in TRANSFORM_ORDER:
         task = dag.get_task(task_id)
@@ -150,6 +155,25 @@ def test_transform_runs_bronze_silver_gold_in_order(dagbag) -> None:
         previous = task_id
     assert "dbt_reconcile" not in dag.task_ids
     assert all("reconcile" not in " ".join(_vector(t)) for t in dag.tasks)
+
+
+def test_prune_work_runs_beside_the_refresh(dagbag) -> None:
+    """P3-10: no edge, so it never blocks a layer or hides a failed refresh."""
+    task = dagbag.dags["transform_lakehouse"].get_task(PRUNE)
+    assert _vector(task) == [
+        "-m",
+        MEDALLION_BUILD,
+        "prune-work",
+        "--run-label",
+        "{{ run_id }}",
+        "--skip-exit-code",
+        "99",
+    ]
+    assert task.op_kwargs == {"skip_exit_code": 99}
+    assert task.upstream_task_ids == set()
+    assert task.downstream_task_ids == set()
+    assert task.trigger_rule == "all_success"
+    assert task.pool == "default_pool"
 
 
 def test_reconcile_gold_is_weekly_and_separate(dagbag) -> None:

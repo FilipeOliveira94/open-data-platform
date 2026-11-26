@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-24 (P3-09 verified) |
+| Last updated | 2026-11-26 (P3-10 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,18 +22,18 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-10** — Orchestration runtime hardening. Not started.
+**P3-14** — Live run, result, and consistency check. Not started.
 
-P3-09 is verified. `scripts/p3_09_orchestration_check.sh` ran eight scenarios on the local Airflow on 2026-11-24, and every check passed. The scenarios: a missed day caught up after a pause, including a failed run, a gap report and a clear; the happy path for daily, weekly, `transform_lakehouse`, and `reconcile_gold`; retries of the extract, `dbt_build`, and `dbt_reconcile`; a failed `reconcile_gold` run that was cleared; a Silver write killed mid-run that left the previous tables readable; a refresh with no new raw object that wrote nothing; two extracts during one refresh that gave one follow-up run; and a failed Bronze check that a refresh with no new raw object did not get past. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09) and [`docs/status-log.md`](docs/status-log.md).
+P3-10 is verified. Spark in the runtime image is capped by `ODP_SPARK_CORES` and `ODP_SPARK_DRIVER_MEMORY` (defaults 2 and `2g`) and every Spark script sets the UTC session time zone. Airflow is the uv `airflow` group. The `prune_work` task deletes run scratch folders in `odp_lakehouse_work` older than seven days. On 2026-11-26, `make live-rebuild` with the caps exited 0 in 603.7 s with unchanged Silver and Gold row counts, and a `transform_lakehouse` run removed the six folders older than seven days. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#spark-resource-caps-p3-10), the [ADR-0005](docs/decisions/0005-compute-and-transform.md) addendum, and [`docs/status-log.md`](docs/status-log.md).
 
-The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-10, P3-15, and later phases.
+The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-15 and later phases.
 
 Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](docs/status-log.md).
 
 ## Next work
 
-1. **P3-10** — Orchestration runtime hardening. Acceptance: `ROADMAP.md` → P3-10.
-2. **P3-14** — Live run, result, and consistency check (after P3-10).
+1. **P3-14** — Live run, result, and consistency check. Acceptance: `ROADMAP.md` → P3-14.
+2. **P3-15** — Phase 3 documentation and status (after P3-14).
 
 ---
 
@@ -50,7 +50,7 @@ Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](doc
 | P3-07 | Quality checks and quarantine | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#silver-handling-of-quarantined-records-p3-07) |
 | P3-08 | Execution metadata and failure logging | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#execution-metadata-p3-08) |
 | P3-09 | Orchestration success/failure tests | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09) |
-| P3-10 | Orchestration runtime hardening | Not started | — |
+| P3-10 | Orchestration runtime hardening | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#spark-resource-caps-p3-10) |
 | P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
 | P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
 | P3-13 | Incremental lakehouse refresh | Verified | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
@@ -85,10 +85,10 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | Validation | Detail |
 | --- | --- |
-| Date | 2026-11-24 |
+| Date | 2026-11-26 |
 | Environment | Local Compose: PostgreSQL, MinIO, Trino, and Airflow 3.4.0 (LocalExecutor) on `odp-runtime:airflow3.4.0-spark3.5.8` |
-| Checks | `scripts/p3_09_orchestration_check.sh` scenarios `catchup`, `happy`, `retry`, `reconcile`, `write-failure`, `no-new-raw`, `coalesce`, `gate`; `make lint`; `uv run pytest tests/unit` |
-| Result | PASS. Every scenario check passed (detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09)). Unit tests 582 passed. The script was corrected during the run for the Airflow 3.4 and runtime image behavior recorded there |
+| Checks | `make lint`; `make test`; unit tests in a venv without the `airflow` group; `make live-rebuild`; Silver and Gold row counts before and after; `transform_lakehouse` run `manual__2026-11-26T05:27:14.456317+00:00`; `make live-prune-work` |
+| Result | PASS. 614 unit tests passed; without the `airflow` group the two Airflow modules skip and the rest pass. Rebuild exit 0 in 603.7 s, dbt `PASS=294`, row counts unchanged. The DAG run succeeded; the work volume went from 113 folders (474_478_934 bytes) to 108 (444_862_796). A second prune removed 0 |
 
 ---
 

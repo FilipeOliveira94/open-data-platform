@@ -25,7 +25,8 @@ jobs:
           python-version: "3.12"
 
       - name: Sync dependencies
-        run: uv sync --frozen
+        # The airflow group is not a default group (P3-10); the DagBag tests need it.
+        run: uv sync --frozen --group airflow
 
       - name: Ruff
         run: uv run ruff check src tests airflow docker/airflow
@@ -34,4 +35,4 @@ jobs:
         run: python scripts/check_markdown_tables.py
 
       - name: Pytest (unit)
-        run: uv run pytest tests/unit
+        run: uv run --frozen --group airflow pytest tests/unit

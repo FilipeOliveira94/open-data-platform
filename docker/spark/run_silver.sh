@@ -27,6 +27,31 @@ case "${ICEBERG_CATALOG_DB}" in
     ;;
 esac
 
+# P3-10: Spark local mode runs inside the scheduler (or spark) container and
+# shares its CPU and memory with Airflow. These two values cap it.
+: "${ODP_SPARK_CORES:=2}"
+: "${ODP_SPARK_DRIVER_MEMORY:=2g}"
+case "${ODP_SPARK_CORES}" in
+  "" | 0* | *[!0-9]*)
+    echo "ODP_SPARK_CORES must be a positive integer" >&2
+    exit 1
+    ;;
+esac
+case "${ODP_SPARK_DRIVER_MEMORY}" in
+  [1-9]*[mg])
+    case "${ODP_SPARK_DRIVER_MEMORY%?}" in
+      *[!0-9]*)
+        echo "ODP_SPARK_DRIVER_MEMORY must look like 2g or 1536m" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  *)
+    echo "ODP_SPARK_DRIVER_MEMORY must look like 2g or 1536m" >&2
+    exit 1
+    ;;
+esac
+
 # shellcheck source=credentials.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/credentials.sh"
 SECRET_PROPS="$(odp_write_secret_properties jdbc)"
@@ -67,7 +92,8 @@ if [[ -n "${ODP_SPARK_METRICS_FILE:-}" || -n "${ODP_SPARK_EVENT_DIR:-}" ]]; then
 fi
 
 exec /opt/spark/bin/spark-sql \
-  --master "local[*]" \
+  --master "local[${ODP_SPARK_CORES}]" \
+  --driver-memory "${ODP_SPARK_DRIVER_MEMORY}" \
   --packages "${packages}" \
   --properties-file "${SECRET_PROPS}" \
   "${metrics_opts[@]}" \
@@ -85,6 +111,7 @@ exec /opt/spark/bin/spark-sql \
   --conf "spark.sql.catalog.local.warehouse=s3a://${ODP_WAREHOUSE_BUCKET}/catalog" \
   --conf "spark.sql.catalog.local.cache-enabled=false" \
   --conf "spark.sql.caseSensitive=true" \
+  --conf "spark.sql.session.timeZone=UTC" \
   --conf "spark.hadoop.fs.s3a.endpoint=http://minio:9000" \
   --conf "spark.hadoop.fs.s3a.path.style.access=true" \
   --conf "spark.hadoop.fs.s3a.connection.ssl.enabled=false" \

@@ -4,6 +4,26 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-26 — P3-10 orchestration runtime hardening
+
+Spark local mode in the runtime image is capped. `run_bronze.sh` and `run_silver.sh` take `local[${ODP_SPARK_CORES}]` and `--driver-memory ${ODP_SPARK_DRIVER_MEMORY}` (Compose defaults 2 and `2g`; before: `local[*]` and Spark's 1g default) and exit 1 on a malformed value. Every script under `docker/spark` that starts Spark sets `spark.sql.session.timeZone=UTC` (review R16). The runtime container's JVM default was already UTC (`date +%Z`, `TZ` unset). The Airflow pins moved from the uv `dev` group to a non-default `airflow` group; `test_dagbag.py` and `test_run_python_args.py` skip without it, and `make test` and CI sync it. `medallion_build prune-work` deletes run folders under `/opt/odp/work` whose newest file is older than `ODP_WORK_RETENTION_DAYS` (default 7). It never deletes the current run's folder and touches no Airflow run, task log, table, or raw object. `transform_lakehouse` runs it as `prune_work`, a task with no edges; `make live-prune-work` runs it from Make. `.env.example` replaces `TRINO_HOST`, `TRINO_PORT`, and `TRINO_USER` with `ODP_TRINO_HOST_PORT` (the published host port) and `ODP_TRINO_USER`; `dbt/profiles.yml` stays versioned and reads the user from `ODP_TRINO_USER`; `dbt/profiles.yml.example` was removed.
+
+| Check | Result |
+| --- | --- |
+| `make lint` | All checks passed; markdown tables 63 files, 0 empty headers |
+| `make test` | 614 passed |
+| Unit tests in a venv synced without the `airflow` group | All passed; `test_dagbag.py` and `test_run_python_args.py` skipped |
+| `test_spark_scripts.py` with the time zone conf removed from `warm_ivy.sh` | Failed as expected; passes with it |
+| `make live-rebuild` with the defaults | Exit 0 in 603.7 s. Bronze 259.3 s, Bronze checks 2.5 s, Silver 279.1 s, Silver checks 9.9 s, stage-quarantine 13.6 s, dbt-build 29.0 s (`PASS=294`). The 2026-11-23 rebuild with `local[*]` took 632 s |
+| Spark process during the rebuild | Driver JVM `-Xmx2g`, `--driver-memory`, `spark.sql.session.timeZone=UTC`; Spark logged `Spark master: local[2]` |
+| Row counts | 18 Silver tables, `gold_shared.dim_date`, and `gold_staging.quarantine_findings`: identical before and after. 56 Gold and staging base tables: identical to their previous Iceberg snapshot. `silver_audit.quality_counts` 866 to 870, its per-run audit rows |
+| `transform_lakehouse` run `manual__2026-11-26T05:27:14.456317+00:00` | Success. Refresh tasks skipped (no new raw objects); `prune_work` success. Work volume 113 folders (474_478_934 bytes), 6 older than seven days, to 108 folders (444_862_796 bytes) including the new run's folder |
+| `make live-prune-work` right after | `removed 0 run folders older than 7 days (0 bytes), kept 108 and this run's folder`; step skipped |
+
+Not run: a full refresh through the DAG with new raw objects under the caps (the Make rebuild exercised the same scripts). The `prune_work` summary line of the DAG run is in the remote task log bucket and was not read; the folder counts above are the evidence.
+
+---
+
 ### 2026-11-25 — Test suite pruning and P2 probe retirement
 
 Removed unit tests that only matched source text or compared a name with itself: the three P2 Spark probe contract files, `tests/unit/test_package.py`, the re-export and `MAX_RESPONSE_BYTES` asserts, the grep-based DAG checks that `test_dagbag.py` already reads from the loaded DAG objects, and the image-tag, `.env.example` and Makefile-phrase checks in `test_airflow_compose_contract.py`.

@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio spark-ivy-warm live-bronze live-silver live-refresh live-rebuild coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation dbt-unit live-gold runtime-build up airflow-up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio spark-ivy-warm live-bronze live-silver live-refresh live-rebuild live-prune-work coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation dbt-unit live-gold runtime-build up airflow-up down ps logs clean
 
 # One run label per make invocation (ADR-0024). The work directory and the
 # staging keys carry it, so a make run and an Airflow run never share staging.
@@ -49,8 +49,8 @@ format: ## Format with Ruff
 	$(RUFF) format src tests airflow docker/airflow
 	$(RUFF) check --fix src tests airflow docker/airflow
 
-test: ## Run unit tests (no Compose services required)
-	$(PYTEST) tests/unit
+test: ## Run unit tests (no Compose services required), DagBag checks included
+	$(UV) run --group airflow pytest tests/unit
 
 test-unit: test ## Alias for test
 
@@ -162,6 +162,14 @@ live-refresh: ## Incremental refresh, the same steps as transform_lakehouse (ADR
 
 live-rebuild: ## Rebuild every table from all complete raw objects (contract change or recovery; never scheduled)
 	$(MAKE) live-refresh REFRESH_FLAGS=--full-rebuild
+
+live-prune-work: ## Delete run scratch folders in odp_lakehouse_work older than ODP_WORK_RETENTION_DAYS (P3-10)
+	@set -e; \
+	set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) --profile lakehouse run --rm -T --no-deps spark python -m open_data_platform.lakehouse.medallion_build prune-work --run-label $(RUN_LABEL)
 
 # daily or weekly. Exit status 1 when the report finds a gap or an overlap.
 FREQUENCY ?= daily

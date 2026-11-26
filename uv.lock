@@ -1361,13 +1361,15 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+airflow = [
+    { name = "apache-airflow" },
+    { name = "apache-airflow-providers-standard" },
+]
 dbt = [
     { name = "dbt-core" },
     { name = "dbt-trino" },
 ]
 dev = [
-    { name = "apache-airflow" },
-    { name = "apache-airflow-providers-standard" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -1380,13 +1382,15 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+airflow = [
+    { name = "apache-airflow", specifier = "==3.4.0" },
+    { name = "apache-airflow-providers-standard", specifier = "==1.21.0" },
+]
 dbt = [
     { name = "dbt-core", specifier = "==1.12.6" },
     { name = "dbt-trino", specifier = "==1.11.0" },
 ]
 dev = [
-    { name = "apache-airflow", specifier = "==3.4.0" },
-    { name = "apache-airflow-providers-standard", specifier = "==1.21.0" },
     { name = "pytest", specifier = ">=8.3.0,<9" },
     { name = "ruff", specifier = ">=0.9.0,<1" },
 ]

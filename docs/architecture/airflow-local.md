@@ -173,7 +173,7 @@ The PostgreSQL extract window was `2026-10-17T00:00:00Z` inclusive to `2026-10-1
 | Spark `3.5.8` and Temurin JRE `17.0.20` | Copied from `spark:3.5.8-java17@sha256:5363cd7d…` (`/opt/spark`, `/opt/java/openjdk`). That image is a build stage only. No service runs it |
 | dbt Core `1.12.6`, dbt-trino `1.11.0` | Venv `/opt/dbt-venv`, installed with `--require-hashes` from `docker/runtime/dbt-requirements.txt` |
 
-`dbt-requirements.txt` is `uv export --only-group dbt` from `uv.lock`. The `dbt` group is not in `default-groups`, so `uv sync` does not install dbt on the host. Before P3-03, Make ran Spark in `spark:3.5.8-java17` and dbt on the host through `uv run dbt`. The decision record is the addendum in [ADR-0005](../decisions/0005-compute-and-transform.md).
+`dbt-requirements.txt` is `uv export --only-group dbt` from `uv.lock`. The `dbt` group is not in `default-groups`, so `uv sync` does not install dbt on the host. Since P3-10 the Airflow pins are the `airflow` group, also outside `default-groups`: a plain `uv sync` installs neither, and the DagBag tests (`test_dagbag.py`, `test_run_python_args.py`) skip with `pytest.importorskip`. `make test` and CI run `uv run --group airflow pytest tests/unit`, so they still load every DAG. Before P3-03, Make ran Spark in `spark:3.5.8-java17` and dbt on the host through `uv run dbt`. The decision record is the addendum in [ADR-0005](../decisions/0005-compute-and-transform.md).
 
 `make runtime-build` builds the image. `make airflow-up` builds it when it is missing or stale. `docker compose run` builds it when it is missing.
 
@@ -192,6 +192,7 @@ Since P3-13 the write steps are incremental. A step with nothing to do writes no
 | `stage-quarantine` | While Gold is pending and no check is open: `lakehouse.quarantine_stage`, then `run_bronze.sh` on that SQL |
 | `dbt-build` | While Gold is pending and no check is open: `dbt build --exclude tag:reconciliation`, then clears the Gold flag |
 | `dbt-parse` / `dbt-reconcile` | `dbt parse`, `dbt test --select tag:reconciliation` |
+| `prune-work` | Deletes the scratch folders of earlier runs past `ODP_WORK_RETENTION_DAYS` ([retention](#work-directory-retention-p3-10)). Skips when none is old enough |
 
 `medallion_build` runs each process with an argument vector and no shell. Credentials stay in the container environment. Trino checks use the HTTP protocol at `ODP_TRINO_HOST:ODP_TRINO_PORT` (`trino:8080`). A mismatch prints the statement, the expected value, and the result, then fails the step.
 
@@ -199,11 +200,25 @@ Since P3-13 the write steps are incremental. A step with nothing to do writes no
 
 `tests/unit/lakehouse/test_medallion_build.py` covers the steps without Compose.
 
+### Spark resource caps (P3-10)
+
+Spark runs in local mode inside the scheduler container (DAGs) or the `spark` service (Make), so it shares that container's CPU and memory with Airflow. `run_bronze.sh` and `run_silver.sh` start `spark-sql` with `--master local[${ODP_SPARK_CORES}]` and `--driver-memory ${ODP_SPARK_DRIVER_MEMORY}`. Compose sets both from `.env` (defaults `2` and `2g`). The scripts exit 1 before Spark starts when a value is not a positive integer or a size such as `2g` or `1536m`. Every script under `docker/spark` that starts Spark also sets `spark.sql.session.timeZone=UTC`, so timestamp parsing never depends on the JVM default (review R16); `tests/unit/infrastructure/test_spark_scripts.py` fails when a launcher lacks it. The limit is recorded in the [ADR-0005](../decisions/0005-compute-and-transform.md) addendum.
+
+### Work directory retention (P3-10)
+
+What is in `odp_lakehouse_work` (`/opt/odp/work`): one folder per run label, holding that step's scratch only. That is the rendered Spark SQL, Bronze count files, local staging copies, Spark metrics files while a step runs, and dbt `target/` and `dbt-logs`. No step reads another label's folder; `medallion_build` resolves only its own (`run_dir`).
+
+What `prune-work` deletes: folders under `/opt/odp/work` whose newest file is older than `ODP_WORK_RETENTION_DAYS` (default 7). It never deletes the current run's folder, files at the volume root, or anything a symlink points to.
+
+What it does not touch: Airflow DAG runs, task instances, and the metadata database; Airflow task logs (`/opt/airflow/logs` and the `ODP_AIRFLOW_LOG_BUCKET` bucket); Iceberg tables and the catalog; raw objects; the promotion registry and run log; and the run-label staging keys in the warehouse bucket. None of them live under the work root.
+
+`transform_lakehouse` runs it as `prune_work`, a task with no upstream or downstream edge. It runs beside the refresh, so it never blocks a layer, and a failed refresh still fails the DAG run. `make live-prune-work` runs the same step for Make-only use. Age is the newest file mtime, so a run that wrote nothing for longer than the retention period would lose its folder; no step comes close to that today.
+
 ### DAGs
 
 | DAG | Schedule | Tasks |
 | --- | --- | --- |
-| `transform_lakehouse` | None (also triggered by `ingest_postgres_oltp_daily`, P3-04) | `bronze` → `bronze_checks` → `silver` → `silver_checks` → `stage_quarantine` → `dbt_build` |
+| `transform_lakehouse` | None (also triggered by `ingest_postgres_oltp_daily`, P3-04) | `bronze` → `bronze_checks` → `silver` → `silver_checks` → `stage_quarantine` → `dbt_build`, and `prune_work` beside them (P3-10) |
 | `reconcile_gold` | `@weekly` | `dbt_reconcile` |
 
 The tasks use the P3-02 `DEFAULT_ARGS` from `ingest_common.py`: 2 retries, a 2-minute delay, and a 30-minute execution timeout. Since P3-16 the two check tasks have `retries=0`: a failed check is a data result, and it stays open for the next refresh. Both DAGs set `max_active_runs=1` and `catchup=False`. `transform_lakehouse` is linear. All Spark steps share one Ivy cache and one container, so two Spark steps do not run at the same time. Quarantine staging does not read Bronze or Silver. It runs after `silver_checks` only for that reason.

@@ -42,6 +42,11 @@ x-lakehouse-env: &lakehouse-env
   ODP_WORK_ROOT: /opt/odp/work
   ODP_TRINO_HOST: trino
   ODP_TRINO_PORT: "8080"
+  ODP_TRINO_USER: ${ODP_TRINO_USER:-odp}
+  # Spark local-mode caps and scratch retention (P3-10).
+  ODP_SPARK_CORES: ${ODP_SPARK_CORES:-2}
+  ODP_SPARK_DRIVER_MEMORY: ${ODP_SPARK_DRIVER_MEMORY:-2g}
+  ODP_WORK_RETENTION_DAYS: ${ODP_WORK_RETENTION_DAYS:-7}
   # Total seconds for one Trino check query, nextUri polling included (P3-08).
   ODP_TRINO_QUERY_TIMEOUT: ${ODP_TRINO_QUERY_TIMEOUT:-600}
 
@@ -186,9 +191,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-odp}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odp}
       ICEBERG_CATALOG_DB: ${ICEBERG_CATALOG_DB:-iceberg}
-    # Host port for dbt-trino (P2-06). Inside Compose the service remains trino:8080.
+    # Host port (P2-06). Inside Compose the service remains trino:8080.
     ports:
-      - "${TRINO_PORT:-8080}:8080"
+      - "${ODP_TRINO_HOST_PORT:-8080}:8080"
     volumes:
       - ./docker/trino/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
     healthcheck:
