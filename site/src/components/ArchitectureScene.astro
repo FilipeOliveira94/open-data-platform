@@ -1,0 +1,383 @@
+---
+import { EDGES, FLOWS, GROUPS, NODES } from './architecture-scene/data';
+
+const label = new Map(NODES.map((n) => [n.id, n.label]));
+const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
+---
+
+<section class="arch3d not-content" data-arch3d aria-labelledby="arch3d-title">
+	<div class="arch3d__stage">
+		<canvas
+			role="img"
+			aria-label="3D architecture map: six sources feed batch ingestion and a CDC stream into an Iceberg lakehouse with Bronze, Silver and Gold layers, queried by Trino for notebooks, dashboards and the report site, orchestrated by Airflow, observed by Prometheus, Grafana and OpenLineage, and mirrored on AWS through Terraform."
+		></canvas>
+
+		<span class="arch3d__corner arch3d__corner--tl" aria-hidden="true"></span>
+		<span class="arch3d__corner arch3d__corner--tr" aria-hidden="true"></span>
+		<span class="arch3d__corner arch3d__corner--bl" aria-hidden="true"></span>
+		<span class="arch3d__corner arch3d__corner--br" aria-hidden="true"></span>
+
+		<header class="arch3d__head">
+			<p class="arch3d__eyebrow">Platform architecture</p>
+			<h2 id="arch3d-title" class="arch3d__title">
+				Sources to insight<span class="arch3d__dot">.</span>
+			</h2>
+			<p class="arch3d__sub">Batch and streaming into one lakehouse, local on Compose, provisioned on AWS.</p>
+		</header>
+
+		<p class="arch3d__hint" aria-hidden="true">Drag to orbit · select a component</p>
+
+		<div class="arch3d__card" data-card hidden>
+			<p class="arch3d__card-group" data-card-group></p>
+			<p class="arch3d__card-title" data-card-title></p>
+			<p class="arch3d__card-detail" data-card-detail></p>
+		</div>
+	</div>
+
+	<div class="arch3d__bar">
+		<ul class="arch3d__groups" aria-label="Highlight a group">
+			{
+				GROUPS.map((g) => (
+					<li>
+						<button type="button" data-group={g.id} aria-pressed="false">
+							{g.label}
+						</button>
+					</li>
+				))
+			}
+		</ul>
+		<ul class="arch3d__flows" aria-label="Flow legend">
+			{
+				FLOWS.map((f) => (
+					<li>
+						<span class={`arch3d__swatch arch3d__swatch--${f.kind}`} aria-hidden="true" />
+						{f.label}
+					</li>
+				))
+			}
+		</ul>
+	</div>
+
+	<div class="arch3d__sr">
+		<h3>Components</h3>
+		{
+			GROUPS.map((g) => (
+				<>
+					<h4>{g.label}</h4>
+					<ul>
+						{NODES.filter((n) => n.group === g.id).map((n) => (
+							<li>
+								{n.label}: {n.detail}
+							</li>
+						))}
+					</ul>
+				</>
+			))
+		}
+		<h3>Flows</h3>
+		<ul>
+			{
+				EDGES.map((e) => (
+					<li>
+						{label.get(e.from)} to {label.get(e.to)} ({flowLabel.get(e.kind)})
+					</li>
+				))
+			}
+		</ul>
+	</div>
+</section>
+
+<script>
+	import { mountScene } from './architecture-scene/scene';
+
+	for (const el of document.querySelectorAll<HTMLElement>('[data-arch3d]')) mountScene(el);
+</script>
+
+<style>
+	@font-face {
+		font-family: 'Urbanist';
+		font-style: normal;
+		font-weight: 500;
+		font-display: swap;
+		src: url('../assets/fonts/urbanist-latin-500-normal.woff2') format('woff2');
+	}
+	@font-face {
+		font-family: 'Urbanist';
+		font-style: normal;
+		font-weight: 700;
+		font-display: swap;
+		src: url('../assets/fonts/urbanist-latin-700-normal.woff2') format('woff2');
+	}
+
+	/* The map widens the home content column; other pages are unaffected. */
+	:global(main:has(.arch3d)) {
+		--sl-content-width: 76rem;
+	}
+
+	.arch3d {
+		/* Brand tokens, dark set: the map is a dark stage in both site themes. */
+		--fi-bg: #120b20;
+		--fi-ink: #f1ecfa;
+		--fi-muted: #b3a8c9;
+		--fi-c0: #1a1229;
+		--fi-b1: #2b1e4a;
+		--fi-b2: #42306f;
+		--fi-l2: #8a62e8;
+		--fi-l3: #b08cff;
+		--fi-l4: #decdff;
+		--fi-dot: #ff6fa6;
+
+		margin-block: 0.5rem 2.5rem;
+		font-family: Urbanist, 'Segoe UI', system-ui, sans-serif;
+		color: var(--fi-ink);
+		background: var(--fi-bg);
+		border: 1px solid var(--fi-b2);
+		border-radius: 18px;
+		overflow: hidden;
+		box-shadow:
+			0 0 0 1px rgb(138 98 232 / 0.12),
+			0 24px 60px -24px rgb(60 16 137 / 0.55);
+	}
+
+	.arch3d__stage {
+		position: relative;
+		aspect-ratio: 16 / 9.5;
+		min-height: 440px;
+		max-height: 82vh;
+	}
+
+	canvas {
+		display: block;
+		width: 100%;
+		height: 100%;
+		touch-action: pan-y pinch-zoom;
+		cursor: grab;
+	}
+	canvas:global(.is-dragging) {
+		cursor: grabbing;
+	}
+
+	.arch3d__head {
+		position: absolute;
+		top: clamp(14px, 3vw, 28px);
+		left: clamp(16px, 3vw, 32px);
+		max-width: min(28rem, 60%);
+		pointer-events: none;
+	}
+	.arch3d__eyebrow {
+		margin: 0;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+		color: var(--fi-l3);
+	}
+	.arch3d__title {
+		margin: 0.3rem 0 0;
+		font-size: clamp(1.4rem, 3.2vw, 2.4rem);
+		font-weight: 700;
+		line-height: 1.05;
+		color: var(--fi-ink);
+	}
+	.arch3d__dot {
+		color: var(--fi-dot);
+	}
+	.arch3d__sub {
+		margin: 0.5rem 0 0;
+		font-size: clamp(0.82rem, 1.4vw, 0.98rem);
+		font-weight: 500;
+		line-height: 1.4;
+		color: var(--fi-muted);
+	}
+
+	.arch3d__hint {
+		position: absolute;
+		top: clamp(14px, 3vw, 28px);
+		right: clamp(16px, 3vw, 32px);
+		margin: 0;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--fi-l3);
+		opacity: 0.75;
+		pointer-events: none;
+	}
+
+	.arch3d__corner {
+		position: absolute;
+		width: 22px;
+		height: 22px;
+		border-color: var(--fi-l2);
+		border-style: solid;
+		border-width: 0;
+		opacity: 0.7;
+		pointer-events: none;
+	}
+	.arch3d__corner--tl {
+		top: 10px;
+		left: 10px;
+		border-top-width: 2px;
+		border-left-width: 2px;
+	}
+	.arch3d__corner--tr {
+		top: 10px;
+		right: 10px;
+		border-top-width: 2px;
+		border-right-width: 2px;
+	}
+	.arch3d__corner--bl {
+		bottom: 10px;
+		left: 10px;
+		border-bottom-width: 2px;
+		border-left-width: 2px;
+	}
+	.arch3d__corner--br {
+		bottom: 10px;
+		right: 10px;
+		border-bottom-width: 2px;
+		border-right-width: 2px;
+	}
+
+	.arch3d__card {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: min(17rem, 70%);
+		padding: 0.75rem 0.9rem 0.85rem;
+		background: rgb(26 18 41 / 0.92);
+		border: 1px solid var(--fi-l2);
+		border-left: 3px solid var(--fi-dot);
+		border-radius: 10px;
+		backdrop-filter: blur(6px);
+		box-shadow: 0 12px 30px -12px rgb(0 0 0 / 0.7);
+		pointer-events: none;
+	}
+	.arch3d__card[hidden] {
+		display: none;
+	}
+	.arch3d__card p {
+		margin: 0;
+	}
+	.arch3d__card-group {
+		font-size: 0.66rem;
+		font-weight: 700;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--fi-l3);
+	}
+	.arch3d__card-title {
+		margin-top: 0.15rem !important;
+		font-size: 1.05rem;
+		font-weight: 700;
+		color: var(--fi-ink);
+	}
+	.arch3d__card-detail {
+		margin-top: 0.3rem !important;
+		font-size: 0.85rem;
+		font-weight: 500;
+		line-height: 1.4;
+		color: var(--fi-muted);
+	}
+
+	.arch3d__bar {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 0.75rem 1.5rem;
+		padding: 0.9rem clamp(16px, 3vw, 28px) 1rem;
+		border-top: 1px solid var(--fi-b1);
+		background: linear-gradient(180deg, rgb(26 18 41 / 0.6), var(--fi-bg));
+	}
+	.arch3d__groups,
+	.arch3d__flows {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem 0.5rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.arch3d__groups button {
+		font: inherit;
+		font-size: 0.78rem;
+		font-weight: 700;
+		padding: 0.3rem 0.7rem;
+		color: var(--fi-l4);
+		background: var(--fi-c0);
+		border: 1px solid var(--fi-b2);
+		border-radius: 999px;
+		cursor: pointer;
+		transition:
+			background 0.2s,
+			border-color 0.2s,
+			color 0.2s;
+	}
+	.arch3d__groups button:hover,
+	.arch3d__groups button:focus-visible {
+		border-color: var(--fi-l3);
+		background: var(--fi-b1);
+	}
+	.arch3d__groups button:focus-visible {
+		outline: 2px solid var(--fi-dot);
+		outline-offset: 2px;
+	}
+	.arch3d__groups button[aria-pressed='true'] {
+		color: var(--fi-bg);
+		background: var(--fi-l3);
+		border-color: var(--fi-l3);
+	}
+	.arch3d__flows {
+		align-items: center;
+		gap: 0.4rem 1rem;
+		font-size: 0.76rem;
+		font-weight: 500;
+		color: var(--fi-muted);
+	}
+	.arch3d__flows li {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.arch3d__swatch {
+		width: 22px;
+		height: 0;
+		border-top: 2px solid var(--fi-l3);
+	}
+	.arch3d__swatch--stream {
+		border-top-color: var(--fi-dot);
+	}
+	.arch3d__swatch--control {
+		border-top: 2px dashed var(--fi-l2);
+	}
+	.arch3d__swatch--telemetry {
+		border-top: 2px dotted var(--fi-muted);
+	}
+	.arch3d__swatch--mirror {
+		border-top: 2px dotted var(--fi-l2);
+		opacity: 0.8;
+	}
+
+	.arch3d__sr {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	@media (max-width: 640px) {
+		.arch3d__stage {
+			aspect-ratio: 1 / 1.05;
+			min-height: 380px;
+		}
+		.arch3d__hint {
+			display: none;
+		}
+		.arch3d__head {
+			max-width: 85%;
+		}
+	}
+</style>
