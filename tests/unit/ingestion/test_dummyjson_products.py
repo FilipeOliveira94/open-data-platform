@@ -15,7 +15,6 @@ import pytest
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.contracts.model import ContractField, DataContract
-from open_data_platform.ingestion import ingest_dummyjson_products as exported_ingest
 from open_data_platform.ingestion.dummyjson_products import (
     MAX_RETRY_AFTER_SECONDS,
     USER_AGENT,
@@ -160,10 +159,6 @@ def _page(
         "limit": limit,
     }
     return json.dumps(payload).encode()
-
-
-def test_package_exports_the_products_ingest() -> None:
-    assert exported_ingest is ingest_dummyjson_products
 
 
 def test_two_pages_land_under_dummyjson_products() -> None:

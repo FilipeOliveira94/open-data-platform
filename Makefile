@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio test-iceberg-poc test-catalog-probe spark-ivy-warm live-bronze live-silver live-refresh live-rebuild coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation dbt-unit live-gold runtime-build up airflow-up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio spark-ivy-warm live-bronze live-silver live-refresh live-rebuild coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation dbt-unit live-gold runtime-build up airflow-up down ps logs clean
 
 # One run label per make invocation (ADR-0024). The work directory and the
 # staging keys carry it, so a make run and an Airflow run never share staging.
@@ -61,35 +61,6 @@ test-minio: ## MinIO write/read smoke (Compose MinIO must be healthy)
 	set +a; \
 	$(PYTEST) tests/integration/infrastructure/test_minio_smoke.py
 
-test-iceberg-poc: ## Create the warehouse bucket and run the Iceberg probe
-	@set -a; \
-	[ -f .env.example ] && . ./.env.example; \
-	[ -f .env ] && . ./.env; \
-	set +a; \
-	$(ensure_spark_ivy); \
-	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
-	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/spark/run_poc.sh
-
-test-catalog-probe: ## Spark JDBC catalog write and Trino read (profile lakehouse)
-	@set -a; \
-	[ -f .env.example ] && . ./.env.example; \
-	[ -f .env ] && . ./.env; \
-	set +a; \
-	$(ensure_spark_ivy); \
-	db="$${ICEBERG_CATALOG_DB:-iceberg}"; \
-	case "$$db" in \
-		*[!a-z0-9_]*|"") echo "ICEBERG_CATALOG_DB must be a simple identifier" >&2; exit 1;; \
-	esac; \
-	$(UV) run python -c 'import os; from open_data_platform.object_storage import client_from_env, ensure_bucket; ensure_bucket(client_from_env(os.environ), os.environ["ODP_WAREHOUSE_BUCKET"])'; \
-	$(COMPOSE) up -d --wait postgres minio; \
-	exists=$$($(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'"); \
-	if [ "$$exists" != "1" ]; then \
-		$(COMPOSE) exec -T postgres psql -U "$$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$db"; \
-	fi; \
-	$(COMPOSE) --profile lakehouse run --rm -T spark /opt/odp/spark/run_catalog_probe.sh; \
-	$(COMPOSE) --profile lakehouse up -d --wait trino; \
-	$(COMPOSE) --profile lakehouse exec -T trino trino --execute "SELECT COUNT(*) AS row_count FROM iceberg.catalog_probe.probe"
-
 spark-ivy-warm: ## Download pinned Spark lakehouse jars into .local/spark-ivy (P2-08)
 	@set -a; \
 	[ -f .env.example ] && . ./.env.example; \
@@ -107,6 +78,7 @@ live-bronze: ## Promote new raw objects into Bronze, then Trino count checks (ru
 	set +a; \
 	$(ensure_spark_ivy); \
 	$(COMPOSE) up -d --wait postgres minio; \
+	$(call medallion_step,ensure-catalog); \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(call medallion_step,bronze); \
 	$(call medallion_step,bronze-checks)
@@ -179,6 +151,7 @@ live-refresh: ## Incremental refresh, the same steps as transform_lakehouse (ADR
 	set +a; \
 	$(ensure_spark_ivy); \
 	$(COMPOSE) up -d --wait postgres minio; \
+	$(call medallion_step,ensure-catalog); \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(call medallion_step,bronze); \
 	$(call medallion_step,bronze-checks); \

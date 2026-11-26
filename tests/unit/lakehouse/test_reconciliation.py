@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from open_data_platform.contracts.load import load_contracts
 from open_data_platform.lakehouse.bronze import bronze_columns, render_bronze_sql
@@ -234,29 +235,21 @@ def test_reconciliation_sql_covers_every_gold_model() -> None:
     assert models == tests
 
 
-def test_reconciliation_is_outside_the_gold_build() -> None:
-    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-    project = (ROOT / "dbt" / "dbt_project.yml").read_text(encoding="utf-8")
-    runner = (
-        ROOT / "src" / "open_data_platform" / "lakehouse" / "medallion_build.py"
-    ).read_text(encoding="utf-8")
-    assert '"tag:reconciliation",\n            "test_type:unit",' in runner
-    assert '"--select", "tag:reconciliation"' in runner
-    assert "dbt-test-reconciliation:" in makefile
-    assert "$(call medallion_step,dbt-build)" in makefile
-    assert "$(call medallion_step,dbt-reconcile)" in makefile
-    assert "live-gold: stage-quarantine dbt-build" in makefile
-    for domain in (
-        "gold_shared",
-        "brazil_geography",
-        "marketplace_operations",
-        "customer_crm",
-        "seller_acquisition",
-        "catalog_commerce",
-        "storefront_behavior",
-        "oltp_operations",
-    ):
-        assert f'+tags: ["reconciliation", "{domain}"]' in project
+def test_every_reconciliation_directory_carries_the_tag() -> None:
+    # dbt build excludes tag:reconciliation (test_medallion_build.py). A
+    # directory without the tag would gate live Gold on its reconciliation.
+    project = yaml.safe_load(
+        (ROOT / "dbt" / "dbt_project.yml").read_text(encoding="utf-8")
+    )
+    configured = project["tests"]["open_data_platform"]["reconciliation"]
+    root = ROOT / "dbt" / "tests" / "reconciliation"
+    directories = {path.name for path in root.iterdir() if path.is_dir()}
+    assert directories
+    # A file at the root would carry no domain tag and run inside dbt build.
+    assert [path.name for path in root.iterdir() if path.is_file()] == []
+    assert set(configured) == directories
+    for domain, config in configured.items():
+        assert "reconciliation" in config["+tags"], domain
 
 
 def test_quality_schema_names_every_table_model() -> None:

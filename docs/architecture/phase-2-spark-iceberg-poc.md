@@ -1,5 +1,7 @@
 # P2-01 — Spark + Iceberg probe
 
+> **Retired 2026-11-25.** `make test-iceberg-poc`, `docker/spark/run_poc.sh` and `docker/spark/poc_probe.sql` were removed once Bronze (P2-03) wrote the same stack on real data. This page keeps the P2-01 evidence. The pins live on in `docker/spark/run_bronze.sh`.
+
 One synthetic Iceberg table, created, overwritten, and queried with Spark SQL. The warehouse is the existing MinIO bucket. This probe uses the Hadoop catalog. The table format is D-003. The durable catalog and the SQL engine are D-004.
 
 ## Pins

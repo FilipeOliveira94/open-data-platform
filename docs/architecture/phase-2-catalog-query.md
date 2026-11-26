@@ -1,5 +1,7 @@
 # P2-02 — Local catalog and query engine
 
+> **Retired 2026-11-25.** `make test-catalog-probe`, `docker/spark/run_catalog_probe.sh` and `docker/spark/catalog_probe.sql` were removed. `make live-bronze` now creates the catalog database and the warehouse bucket and writes through the same JDBC catalog. This page keeps the P2-02 evidence.
+
 Spark writes one synthetic Iceberg table through the Iceberg JDBC catalog. Trino reads that same table. The warehouse is the existing MinIO bucket, under a prefix separate from the P2-01 Hadoop-catalog probe. D-003 and D-004 record the format and this catalog.
 
 The JDBC catalog stores table pointers in PostgreSQL. On AWS, the catalog role is Glue and the SQL role is Athena. The protocols are not the same. Phase 7 documents that mapping. This probe does not create cloud resources.

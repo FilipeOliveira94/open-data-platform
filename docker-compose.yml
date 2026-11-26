@@ -139,8 +139,7 @@ services:
 
   # Medallion build container on the shared runtime image. The default command
   # sleeps, so profile `up` does not execute SQL. Make runs one medallion_build step
-  # per `compose run` (Makefile `medallion_step`) or a probe script:
-  #   docker compose --profile lakehouse run --rm -T spark /opt/odp/spark/run_poc.sh
+  # per `compose run` (Makefile `medallion_step`).
   spark:
     image: *runtime-image
     build: *runtime-build
@@ -167,8 +166,9 @@ services:
     entrypoint: ["/usr/bin/env"]
     command: ["sleep", "infinity"]
 
-  # Read-only query side of the P2-02 probe. Start after a Spark script
-  # has created the JDBC tables. The image sizes the JVM from the memory
+  # Read-only query side of the JDBC catalog. Start after the catalog
+  # database exists (`make live-bronze` and `make live-refresh` run
+  # `ensure-catalog` first). The image sizes the JVM from the memory
   # Docker gives the container.
   trino:
     image: trinodb/trino:484

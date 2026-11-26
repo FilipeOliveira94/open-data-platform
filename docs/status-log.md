@@ -4,6 +4,22 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-25 — Test suite pruning and P2 probe retirement
+
+Removed unit tests that only matched source text or compared a name with itself: the three P2 Spark probe contract files, `tests/unit/test_package.py`, the re-export and `MAX_RESPONSE_BYTES` asserts, the grep-based DAG checks that `test_dagbag.py` already reads from the loaded DAG objects, and the image-tag, `.env.example` and Makefile-phrase checks in `test_airflow_compose_contract.py`.
+
+The invariants those files held that nothing else covered became behavior checks:
+- `test_dagbag.py`: the daily `start_date` equals `CADENCES["daily"].first_start`, the weekly one is `CADENCES["weekly"].first_start` plus one day, and `platform_env` runs its four service checks after `imports`.
+- `test_reconciliation.py`: every directory under `dbt/tests/reconciliation` has a `dbt_project.yml` entry tagged `reconciliation`, which `dbt build` excludes.
+- `test_airflow_compose_contract.py`: every Airflow service is on the `orchestration` profile with `LocalExecutor`, there is no Celery, Redis or Flower, and the code mounts are read-only with no repo-root mount.
+- `test_dagbag.py`: the manual extract renders `--frequency manual`, its window params and run id.
+- `test_package_exports.py`: every name in `open_data_platform.ingestion.__all__` resolves.
+- `test_ingestion_dags.py`: the DAG directory listing, no `shell=True`, and no SQL `SELECT` in DAG sources.
+
+`make test-iceberg-poc`, `make test-catalog-probe` and their four `docker/spark` files were retired. The Bronze step creates the catalog database (`ensure_catalog_database`) and the warehouse bucket, so the README run list starts at `make live-bronze`. `make live-bronze` and `make live-refresh` now run the `ensure-catalog` step before Trino starts, which the probe used to do. `uv run pytest tests/unit`: 570 passed. `ruff check`, `ruff format --check` and `make lint` passed. `make live-bronze` on a fresh volume: a separate Compose project (`-p odp-scratch`, own container names, ports and volumes) started with no `iceberg` database and no warehouse bucket. The 541 `raw/` objects were copied from the local raw bucket with their S3 metadata. `ensure-catalog` created the database in 0.7 s, Trino came up healthy before any Iceberg table existed, the `bronze` step created the warehouse bucket and 18 tables, and `bronze-checks` passed 18/18. Exit 0 in 273 s. A first attempt copied the objects without their metadata, and Bronze refused them with `object metadata does not match the key`. `make live-refresh` on a fresh volume was not run.
+
+---
+
 ### 2026-11-24 — P3-09 orchestration success and failure scenarios
 
 `scripts/p3_09_orchestration_check.sh` drives the shipped DAGs on the local Airflow 3.4.0 (LocalExecutor). It reads task states and try numbers from the Airflow metadata database, step results from `lakehouse_state.step_runs`, and table versions from `iceberg_tables.metadata_location`. Faults come from outside the code: `ALTER DATABASE odp ALLOW_CONNECTIONS false`, `docker compose stop trino`, a SIGTERM to the Silver step's process group, and a `BEFORE UPDATE` trigger that adds 1 to the Bronze `orders` expected count. An `EXIT` trap undoes them. No DAG or package code changed.

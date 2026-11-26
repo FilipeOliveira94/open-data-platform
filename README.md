@@ -146,7 +146,6 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 - Unit tests do not need those files
 
 ```bash
-make test-catalog-probe
 make live-bronze
 make live-silver
 make live-gold

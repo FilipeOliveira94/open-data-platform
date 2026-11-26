@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Resolve and cache the pinned lakehouse jars into spark.jars.ivy (/tmp/.ivy2).
-# Pins match run_bronze.sh / run_silver.sh / run_catalog_probe.sh. No SQL work.
+# Pins match run_bronze.sh / run_silver.sh. No SQL work.
 set -euo pipefail
 
 mkdir -p /tmp/.ivy2/cache /tmp/.ivy2/jars /tmp/.ivy2/local
