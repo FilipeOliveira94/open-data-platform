@@ -166,8 +166,9 @@ services:
     entrypoint: ["/usr/bin/env"]
     command: ["sleep", "infinity"]
 
-  # Read-only query side of the P2-02 probe. Start after a Spark script
-  # has created the JDBC tables. The image sizes the JVM from the memory
+  # Read-only query side of the JDBC catalog. Start after the catalog
+  # database exists (`make live-bronze` and `make live-refresh` run
+  # `ensure-catalog` first). The image sizes the JVM from the memory
   # Docker gives the container.
   trino:
     image: trinodb/trino:484

@@ -78,6 +78,7 @@ live-bronze: ## Promote new raw objects into Bronze, then Trino count checks (ru
 	set +a; \
 	$(ensure_spark_ivy); \
 	$(COMPOSE) up -d --wait postgres minio; \
+	$(call medallion_step,ensure-catalog); \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(call medallion_step,bronze); \
 	$(call medallion_step,bronze-checks)
@@ -150,6 +151,7 @@ live-refresh: ## Incremental refresh, the same steps as transform_lakehouse (ADR
 	set +a; \
 	$(ensure_spark_ivy); \
 	$(COMPOSE) up -d --wait postgres minio; \
+	$(call medallion_step,ensure-catalog); \
 	$(COMPOSE) --profile lakehouse up -d --wait trino; \
 	$(call medallion_step,bronze); \
 	$(call medallion_step,bronze-checks); \

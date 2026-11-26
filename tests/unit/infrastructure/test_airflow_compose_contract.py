@@ -61,12 +61,21 @@ def test_airflow_profile_runs_local_executor_without_celery() -> None:
 
 
 def test_airflow_mounts_code_read_only_and_not_the_repo_root() -> None:
-    volumes = _services()["airflow-scheduler"]["volumes"]
-    mounts = [str(item) for item in volumes]
-    for source in ("./src", "./config", "./dbt", "./docker/spark", "./data/raw"):
-        matching = [item for item in mounts if item.startswith(f"{source}:")]
-        assert matching and all(item.endswith(":ro") for item in matching), source
-    assert not any(item.startswith("./:") for item in mounts)
+    services = _services()
+    mounted = {
+        name: [str(item) for item in spec.get("volumes", [])]
+        for name, spec in services.items()
+        if name.startswith("airflow-") and spec.get("volumes")
+    }
+    assert "airflow-scheduler" in mounted
+    for name, mounts in mounted.items():
+        for source in ("./src", "./config", "./dbt", "./docker/spark", "./data/raw"):
+            matching = [item for item in mounts if item.startswith(f"{source}:")]
+            assert all(item.endswith(":ro") for item in matching), (name, source)
+        assert not any(item.startswith("./:") for item in mounts), name
+    scheduler = mounted["airflow-scheduler"]
+    for source in ("./src", "./dbt", "./docker/spark"):
+        assert any(item.startswith(f"{source}:") for item in scheduler), source
 
 
 def test_airflow_init_creates_the_one_slot_lakehouse_pool() -> None:

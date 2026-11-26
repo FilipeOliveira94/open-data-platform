@@ -12,9 +12,11 @@ The invariants those files held that nothing else covered became behavior checks
 - `test_dagbag.py`: the daily `start_date` equals `CADENCES["daily"].first_start`, the weekly one is `CADENCES["weekly"].first_start` plus one day, and `platform_env` runs its four service checks after `imports`.
 - `test_reconciliation.py`: every directory under `dbt/tests/reconciliation` has a `dbt_project.yml` entry tagged `reconciliation`, which `dbt build` excludes.
 - `test_airflow_compose_contract.py`: every Airflow service is on the `orchestration` profile with `LocalExecutor`, there is no Celery, Redis or Flower, and the code mounts are read-only with no repo-root mount.
+- `test_dagbag.py`: the manual extract renders `--frequency manual`, its window params and run id.
+- `test_package_exports.py`: every name in `open_data_platform.ingestion.__all__` resolves.
 - `test_ingestion_dags.py`: the DAG directory listing, no `shell=True`, and no SQL `SELECT` in DAG sources.
 
-`make test-iceberg-poc`, `make test-catalog-probe` and their four `docker/spark` files were retired. The Bronze step creates the catalog database (`ensure_catalog_database`) and the warehouse bucket, so the README run list starts at `make live-bronze`. `uv run pytest tests/unit`: 557 passed. `ruff check`, `ruff format --check` and `make lint` passed. `make live-bronze` on a fresh volume was not run.
+`make test-iceberg-poc`, `make test-catalog-probe` and their four `docker/spark` files were retired. The Bronze step creates the catalog database (`ensure_catalog_database`) and the warehouse bucket, so the README run list starts at `make live-bronze`. `make live-bronze` and `make live-refresh` now run the `ensure-catalog` step before Trino starts, which the probe used to do. `uv run pytest tests/unit`: 570 passed. `ruff check`, `ruff format --check` and `make lint` passed. `make live-bronze` on a fresh volume was not run.
 
 ---
 

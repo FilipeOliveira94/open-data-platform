@@ -106,7 +106,7 @@ The loop measures what a reader sees between statements. It does not prove isola
 
 ## Live result
 
-[P2-09 live run](phase-2-live-run.md) (2026-11-11). This page does not add a run.
+[P2-09 live run](phase-2-live-run.md) (2026-11-11). This page does not add a run. `make test-catalog-probe` was retired on 2026-11-25.
 
 | Command | Result |
 | --- | --- |

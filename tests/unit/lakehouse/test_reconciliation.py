@@ -242,12 +242,11 @@ def test_every_reconciliation_directory_carries_the_tag() -> None:
         (ROOT / "dbt" / "dbt_project.yml").read_text(encoding="utf-8")
     )
     configured = project["tests"]["open_data_platform"]["reconciliation"]
-    directories = {
-        path.name
-        for path in (ROOT / "dbt" / "tests" / "reconciliation").iterdir()
-        if path.is_dir()
-    }
+    root = ROOT / "dbt" / "tests" / "reconciliation"
+    directories = {path.name for path in root.iterdir() if path.is_dir()}
     assert directories
+    # A file at the root would carry no domain tag and run inside dbt build.
+    assert [path.name for path in root.iterdir() if path.is_file()] == []
     assert set(configured) == directories
     for domain, config in configured.items():
         assert "reconciliation" in config["+tags"], domain

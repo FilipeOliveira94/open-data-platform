@@ -305,6 +305,29 @@ def _render_extract(dag, context: dict[str, object]) -> list[str]:
     return [str(task.render_template(arg, context)) for arg in task.op_args]
 
 
+def test_manual_extract_renders_its_own_frequency(dagbag) -> None:
+    # A manual backfill must not land in the daily or weekly coverage ledger.
+    dag = dagbag.dags["ingest_postgres_oltp"]
+    run_id = "manual__2026-10-18T00:00:00+00:00"
+    vector = _render_extract(
+        dag,
+        {
+            "params": {
+                "execution_id": "",
+                "window_start": "2026-10-17T00:00:00+00:00",
+                "window_end": "2026-10-18T00:00:00+00:00",
+            },
+            "run_id": run_id,
+        },
+    )
+    flags = dict(zip(vector[3::2], vector[4::2], strict=True))
+    assert flags["--window-start"] == "2026-10-17T00:00:00+00:00"
+    assert flags["--window-end"] == "2026-10-18T00:00:00+00:00"
+    assert flags["--frequency"] == "manual"
+    assert flags["--dag-id"] == "ingest_postgres_oltp"
+    assert flags["--airflow-run-id"] == run_id
+
+
 def test_daily_window_renders_into_a_valid_extract_window(dagbag) -> None:
     import pendulum
 
