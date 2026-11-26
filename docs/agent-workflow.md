@@ -1,6 +1,6 @@
 # Agent workflow prompts
 
-Three prompts drive one issue: plan, implement, close. They are tool-neutral; the rules live in [`AGENTS.md`](../AGENTS.md). Replace the placeholders and run the plan prompt first. A large task waits for Filipe's approval of the plan before any file changes; a small task goes straight to implementation (see "Task size" in `AGENTS.md` §3).
+Three prompts drive one issue: plan, implement, close. The rules live in [`AGENTS.md`](../AGENTS.md). Replace the placeholders and run the plan prompt first. An issue rated above Sm + Lo waits for Filipe's approval of the plan before any file changes; an Sm + Lo issue goes straight to implementation (see "Size and risk" in `AGENTS.md` §3).
 
 ---
 
@@ -24,7 +24,7 @@ Return:
 8. Which items of the AGENTS.md §12 "Issue Close Checklist" this issue will touch, and which §8 "Runtime data exposure" rules it touches.
 9. For a pipeline step, one answer per row of the ROADMAP.md "Pipeline design checklist", each with the test or live check that proves it. "Not applicable" needs a reason.
 
-Mode: <small|large>. Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Large: wait for my approval before editing. Small: implement after planning. If planning shows the task is larger than stated, reclassify it as large and stop.
+Rating: <Sm|Md|Lg> / <Lo|Med|Hi> (the expected half of the roadmap's Risk and Size columns; estimate it in the plan if missing). Keep the scope limited to this issue. Do not implement future phases or silently change architecture. Above Sm + Lo: run po-reviewer on the plan, show its verdict with the plan, and wait for my approval before editing. Sm + Lo: implement after planning. If planning shows more work or risk than the rating, raise it, say why, and follow the new rating.
 ```
 
 ## 2. Implement (after the plan is approved)
@@ -54,14 +54,9 @@ Review the current diff against the agreed plan and acceptance criteria. Do not 
 - Check for unrelated changes, secrets, generated files, weak tests, configuration drift and undocumented behavior.
 - Run the relevant validation commands and report their actual output.
 - Identify acceptance criteria that are not met or not verified.
+- Run the review gates in AGENTS.md §3 "Agent workflow": code-reviewer for any code or config change; for an issue rated above Sm + Lo, then po-reviewer in acceptance mode. Fix blocking findings and put each final verdict in the PR.
 - Apply the AGENTS.md §12 "Issue Close Checklist".
 - Commit with Conventional Commits on the issue branch, push the branch, and open a PR to main. Never push or merge main (AGENTS.md §13 Git).
 
 Return a concise completion report, the PR link, the last commit SHA, and the next smallest useful task.
 ```
-
----
-
-## Fallback model
-
-The default implementer is Claude Opus 5.5 in T3 Code. When the Claude Pro limit runs out, use Grok 4.7 through the Cursor provider in T3. Paste the same three prompts. Point it at `AGENTS.md`; do not keep that tool's own rule files in the repository, so the rules have one source. The git policy is in AGENTS.md §13, so the other tool gets it too.

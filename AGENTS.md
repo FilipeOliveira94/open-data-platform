@@ -14,8 +14,7 @@ The platform demonstrates:
 
 ## 2. Working Language
 
-- Use English for code, identifiers, comments, commit messages and technical documentation.
-- Communicate with the user in Brazilian Portuguese.
+- Use English for everything: replies to Filipe (he may write in Portuguese), code, identifiers, comments, commit messages, PRs and documentation.
 - Explain architectural decisions and trade-offs clearly.
 
 ## 3. Mandatory Workflow
@@ -25,19 +24,33 @@ For each task:
 1. Inspect the existing codebase and current project documentation.
 2. Read `PROJECT_STATUS.md`, `ROADMAP.md` and relevant ADRs when they exist.
 3. Check the relevant roadmap item. Identify dependencies, assumptions, risks and acceptance criteria.
-4. Classify the task as small or large (see Task size below) and plan it. Small: implement directly. Large: present the plan in the thread and stop until Filipe approves it.
+4. Check the issue's Size and Risk (see "Size and risk" below) and plan it. Sm + Lo: implement directly. Anything else: present the plan in the thread and stop until Filipe approves it.
 5. Implement the smallest coherent increment. When extracting repeated logic or choosing module boundaries (ingestion sources, Spark jobs, statement builders), use the `code-structure` skill; the principles in §4 take precedence.
 6. Run relevant tests, linting and validation commands.
 7. Inspect the results and fix regressions caused by the changes.
-8. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
-9. Commit on the issue branch, push it and open a PR to `main` (see §13), then report to Filipe: the PR link, the last commit hash, changed files, commands executed, test results, limitations and the next step.
-10. Filipe reviews the PR and merges it. When he asks, the Reviewer de Projetos bot opens a T3 thread where Claude reviews the PR and summarizes the verdict; Filipe decides.
+8. Run the review gates in "Agent workflow" below and fix blocking findings.
+9. Update documentation and `PROJECT_STATUS.md` (current-phase ledger only; append older narrative to `docs/status-log.md` when trimming).
+10. Commit on the issue branch, push it and open a PR to `main` (see §13), then report to Filipe: the PR link, the last commit hash, changed files, commands executed, test results, reviewer verdicts, limitations and the next step.
+11. Filipe reviews the PR and merges it.
 
-### Task size (rule in force since 2026-11-20)
+### Size and risk (in force since 2026-11-24)
 
-- **Small**: docs, text, a config tweak, a patch dependency bump, or a contained bugfix of up to ~50 lines in up to 3 files that touches none of: architecture, data model or schema, auth or security, infrastructure or deploy, public API, or pipeline logic. Claude plans and implements straight through to the PR (§13).
-- **Large**: everything else, or when in doubt. Claude plans and STOPS: it presents the plan in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, from Filipe directly or relayed by the PO de Projetos as "Plano aprovado pelo Filipe: implemente.", sometimes with adjustments.
-- The issue prompt states which mode to follow. Claude may reclassify a task as large if planning shows it is bigger; it never reclassifies large as small.
+- Every issue carries a Size (Sm, Md, Lg) and a Risk (Lo, Med, Hi) on the scale in `~/.agents/claude/workflow.md`. Ratings go in the roadmap's "Expected/Seen Risk" and "Expected/Seen Size" columns (format in the same file); until an issue has one, Claude rates it in the plan.
+- **Sm + Lo:** Claude plans and implements straight through to the PR (§13).
+- **Anything else:** Claude plans and STOPS: it runs `po-reviewer` on the plan, presents the plan with its verdict in the thread and waits for Filipe's approval before touching code. Approval arrives in the same thread, sometimes with adjustments.
+- **Hi risk or Lg size:** the thread runs at Opus high effort, set when it starts; Claude never switches its model or effort by itself; a switch happens only when Filipe decides it. A Hi-risk plan names what could go silently wrong and the tests written first; an Lg plan says whether to split the issue.
+- Claude may raise a rating while planning and says why; it never lowers one without Filipe.
+
+### Agent workflow
+
+Language, size and risk, review gates and model policy: `~/.agents/claude/workflow.md` (repo `FilipeOliveira94/agent-config`).
+
+- **Profile:** reviewed
+- **Language:** English for everything.
+- **Hi risk here:** a write, merge, delete or backfill that can silently lose or corrupt table data; CDC semantics (duplicates, deletes, ordering); secrets or row values reaching query text, argv or logs (§8); Terraform, cloud resources or cloud cost; anything that changes a published number.
+- **Extra reviewers:** none
+- **Skip review:** none
+- **Model exceptions:** none
 
 Do not mark a task complete unless its acceptance criteria have been verified.
 
@@ -152,7 +165,7 @@ The user makes final architectural decisions and approves significant changes.
 
 Before the closing commit of an issue, check each item and update only what the verified evidence supports:
 
-- `ROADMAP.md`: the issue status, one line in the Changelog section (what changed, no evidence; the evidence goes in `docs/status-log.md`), and Last updated.
+- `ROADMAP.md`: the issue status, the seen half of its Risk and Size, one line in the Changelog section (what changed, no evidence; the evidence goes in `docs/status-log.md`), and Last updated.
 - `PROJECT_STATUS.md`: the phase table, Current objective (the next issue and the latest result, not a history), Next work consistent with the current acceptance criteria, and Last updated. Do not copy log entries into it.
 - `docs/status-log.md`: a new entry.
 - An ADR or `DECISIONS.md` entry changes to `approved` only with evidence from a verified issue.
@@ -162,14 +175,13 @@ Prompts for planning, implementing and closing an issue are in `docs/agent-workf
 
 ## 13. Git
 
-Roles (simplified flow, in force since 2026-11-20):
+Roles (flow in force since 2026-11-24):
 
-- **Filipe** asks for status, picks the issue, reviews the work, publishes it, and makes final decisions.
-- **Claude in T3 Code** (Claude Opus 5.5) implements each issue: plan, implement, run checks and tests, commit. Fallback: Grok 4.7 through the Cursor provider in T3, only when the Claude Pro limit runs out. The agent never merges.
-- **PO de Projetos** (bot), only when Filipe asks: status, sending an issue to T3, summarizing what was done after it lands, product view.
-- **Reviewer de Projetos** (bot), only when Filipe asks, for a harder change: opens a T3 thread where Claude reviews it, and summarizes the verdict. It never merges, pushes or deletes branches.
+- **Filipe** picks the issue, approves plans, reviews the work, publishes it, and makes final decisions. He confirms any switch to Fable.
+- **Claude in T3 Code** (Claude Opus 5.5) implements each issue: rating, plan, implement, run checks, tests and the review gates, commit. The agent never merges.
+- **Review subagents** (Sonnet 5.5): `po-reviewer` checks the plan and finished branch of every issue rated above Sm + Lo against the acceptance criteria; `code-reviewer` checks the branch for bugs, security issues and regressions. They report; they never edit, merge or push.
 
-There is no double PO and Reviewer approval, no per-project dev, and no bot that pushes `main`.
+No agent pushes `main`.
 
 Branch and PR flow (in force since 2026-11-20, same as Filipe's other repositories):
 
