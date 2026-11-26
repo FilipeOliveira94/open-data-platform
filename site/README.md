@@ -49,6 +49,14 @@ Static output is written to `dist/`.
 | `src/content/docs/operations.md` | Operations |
 | `src/content/docs/reference.md` | Reference |
 
+## Architecture map
+
+The home page opens with a 3D architecture map: `src/components/ArchitectureScene.astro` (markup, styles, accessible text list) and `src/components/architecture-scene/` (`data.ts` holds the components and flows, `scene.ts` is a dependency-free canvas renderer). To add a component or a flow, edit `data.ts` only.
+
+- Brand palette (dark tokens from `filipeoliveira-hub-assets/brand/tokens.css`) and the Urbanist font, self-hosted under `src/assets/fonts/` (SIL OFL 1.1, `OFL.txt`).
+- Drag orbits the camera; hover or tap shows a component card; the layer chips highlight a group.
+- The animation pauses off-screen and in a hidden tab, and renders one still frame under `prefers-reduced-motion`.
+
 Theme options live in `astro.config.mjs`: mocha/latte with mauve accent (same as the [Catppuccin kitchen sink](https://starlight-themes.netlify.app/catppuccin/kitchen-sink/)).
 
 ## Content rules
