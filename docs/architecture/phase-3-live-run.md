@@ -77,4 +77,4 @@ scripts/p3_14_live_run.sh pause         # any time before 00:00Z
 scripts/p3_14_live_run.sh catchup report  # after 00:15Z the next day
 ```
 
-Do not run `make live-*` targets while the script runs. They share the Iceberg tables and the Ivy cache with the DAGs (P3-15 documents this).
+Do not run `make live-*` targets while the script runs. They share the Iceberg tables and the Ivy cache with the DAGs ([one writer at a time](phase-3-orchestration.md#one-writer-at-a-time)).

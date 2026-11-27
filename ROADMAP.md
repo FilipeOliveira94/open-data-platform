@@ -61,7 +61,7 @@ Every issue that adds or changes a pipeline step (ingestion, Bronze, Silver, Gol
 | 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Sprint 1 (week 1) | — | Verified |
 | 1 | Multi-source ingestion (historical, API, PostgreSQL incremental extract, demo storefront clickstream) | Sprint 2 (weeks 1–2) | Phase 0 verified | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Verified |
-| 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | In progress (P3-01–P3-08, P3-11–P3-13, P3-16–P3-18 verified; P3-16–P3-18 added by the 2026-11-21 review) |
+| 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Verified |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified; P11-01 to P11-04 (shared Kafka broker, Spark–Kafka proof) | Not started |
 | 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
@@ -228,20 +228,20 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Phase acceptance (all required):**
 
-- [ ] DAGs have clear dependencies and verifiable failure behavior.
-- [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
+- [x] DAGs have clear dependencies and verifiable failure behavior (P3-03, P3-09).
+- [x] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed) (P3-04, P3-13, P3-14).
 - [x] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily) (P3-05).
-- [ ] Backfills do not corrupt data or create undue duplication.
+- [x] Backfills do not corrupt data or create undue duplication (P3-06, P3-14).
 - [x] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06). Reopened 2026-11-21 for trailing gaps; since P3-16 the report runs to the last window due at report time, so a stopped DAG shows its gaps.
 - [x] A failed Bronze or Silver check blocks the next layer until it passes, including on a later refresh with no new raw objects (P3-16).
 - [x] Gold metrics keep their documented grain: no fan-out, rate denominators count only eligible rows, and money is exact decimal (P3-17, P3-18).
-- [ ] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
+- [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11; failed write P3-09; reads during refreshes P3-14). Tables are still visible before their checks run (review R6, P6-09).
 - [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
 - [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing, Silver rebuilds of `incremental_window`/`append_only` datasets (ADR-0024), still do. The Bronze `MERGE` scans only the `dt` partitions it writes since P3-08 (2026-11-21 review R5).
 - [x] Invalid records are identified and handled per documented rules (P3-07).
-- [ ] Success and failure scenarios have tests or reproducible evidence.
+- [x] Success and failure scenarios have tests or reproducible evidence (P3-09).
 - [x] A live run result is recorded and compared to the source windows (P3-14).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-15).
+- [x] Documentation and `PROJECT_STATUS.md` cite that result (P3-15). Index: [`docs/architecture/phase-3-orchestration.md`](docs/architecture/phase-3-orchestration.md).
 
 ### Issues
 
@@ -264,7 +264,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P3-17 | Gold metric grain corrections | P2-06, P2-07 | -/Hi | -/Md | Verified | From the [2026-11-21 review](docs/reviews/2026-11-21-verified-issues-review.md) (R2, R3, R19, T7). `mart_review_drivers` counts each `(review_id, order_id)` once: the category is resolved per order by a rule written in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md), and its `review_count` reconciles to `fct_reviews`. `on_time_handoff_rate` in `mart_delivery_performance`, `mart_seller_performance`, and the two OLTP marts divides by the orders eligible for a handoff (a carrier date and a shipping limit), and each mart exposes that eligible count. The `fct_oltp_orders` docs and column descriptions say the customer location is the current one (Type 1) until P4-08. dbt unit tests (dbt-core 1.12) build each corrected model from a small fixture: an order with two items and one review, and a cancelled order with no carrier date. A unit-test rule in [`docs/architecture/gold-layer.md`](docs/architecture/gold-layer.md#unit-test-rule) says which Gold models need a unit test (fan-out join, tie-break, rate on a subset, bucket or threshold, null-key row). `dbt/unit_test_policy.yml` lists every Gold model as covered, exempt with a reason, or pending with an issue, and a pytest fails on an unlisted model or a covered model with no test. Every mart and dimension the rule applies to has a unit test that fails when its rule is broken; the quality-findings models may stay pending, named in the policy file. The live run records each changed metric before and after, and the Gold docs cite the new values |
 | P3-18 | Exact decimal type for money fields | P1-03, P2-04, P3-12 | -/Hi | -/Md | Verified | From the [2026-11-21 review](docs/reviews/2026-11-21-verified-issues-review.md) (R4). The contract vocabulary gains `decimal` with precision and scale. Money fields (Olist item price and freight, payment value, OLTP item price and freight, DummyJSON price, and the marketing-funnel `declared_monthly_revenue`, added by Filipe on 2026-11-22) move to it in a new contract version. Each money field names its currency in its description, and the data-contracts doc states the currency rules. The PostgreSQL extract writes `numeric` values without a float conversion; record validation accepts them; Silver casts to `DECIMAL(p, s)`; Gold sums stay decimal. Reconciliation of money totals uses exact equality, and the `scalars_near` checks on money are removed. The contract version change follows the documented rebuild path (P3-11, `make live-rebuild`). The plan answers the pipeline design checklist. Unit tests: a planted amount survives extract, Bronze, and Silver unchanged, and a sum of planted cents is exact. Evidence: [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#money-p3-18), [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md#p3-18-exact-money-2026-11-22) |
 | P3-14 | Live run, result, and consistency check | P3-08, P3-09, P3-10, P3-11, P3-12, P3-13, P3-16, P3-17, P3-18 | Med/Med | Md/Md | Verified | On local Airflow, trigger one daily-shaped run and one weekly-shaped run, then rerun one of those windows. Record watermarks, task states, landing counts, and quarantine counts. Compare the counts to the source window and to the previous landing for that window. Pause the daily DAG before a 00:00Z boundary and unpause it after: one caught-up run per missed day, and an empty gap report. Commit one late row and show the weekly run lands it. Run one refresh with no new raw objects and show it writes nothing. Query a Silver table during a refresh and show it never errors. Record, per refresh, raw objects and rows read against total raw history. Record mismatches. Unit tests alone do not close this issue. Evidence: [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) |
-| P3-15 | Phase 3 documentation and status | P3-14 | Lo/- | Sm/- | Not started | Document schedules, catchup, backfill, quarantine, the review findings closed in Phase 3, that `make` targets and Airflow DAGs must not run concurrently against the same Iceberg tables and Ivy cache, and the P3-14 result. `PROJECT_STATUS.md` cites that evidence |
+| P3-15 | Phase 3 documentation and status | P3-14 | Lo/Lo | Sm/Sm | Verified | Document schedules, catchup, backfill, quarantine, the review findings closed in Phase 3, that `make` targets and Airflow DAGs must not run concurrently against the same Iceberg tables and Ivy cache, and the P3-14 result. `PROJECT_STATUS.md` cites that evidence. Evidence: [`docs/architecture/phase-3-orchestration.md`](docs/architecture/phase-3-orchestration.md) |
 
 **Suggested order:** P3-01 → P3-02 ∥ P3-03 → P3-04 → P3-11 → P3-12 → P3-13 → P3-05 → P3-06 → P3-16 → P3-17 → P3-18 → P3-07 → P3-08 → P3-09 → P3-10 → P3-14 → P3-15. P3-11 to P3-13 come before the weekly schedule so that P3-05 and P3-06 build on the incremental refresh, not on the full rebuild. P3-16 to P3-18 come from the [2026-11-21 review](docs/reviews/2026-11-21-verified-issues-review.md) and are numbered after P3-15 but run before the close pair: P3-16 first, because P3-07 builds on the check gate, and P3-17 and P3-18 before P3-14, so the live run records corrected metrics.
 
@@ -646,7 +646,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-27 (P3-14; P11-01 to P11-03) |
+| Last updated | 2026-11-27 (P3-15; Phase 3 verified) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -655,6 +655,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-27: P3-15 verified. Phase 3 verified. Phase index `docs/architecture/phase-3-orchestration.md` (schedules, catchup, backfill, quarantine, one writer at a time, review findings closed, P3-14 result).
 - 2026-11-27: P3-14 verified. The live-run Phase 3 acceptance item is checked.
 - 2026-11-27: P11-03 verified. Kafka 4.3.2 (KRaft, one node) on the `streaming` profile with four topics, and the `bioguardia-telemetry` producer with checkpoint, replay, and gateway records; `telemetry model` and `telemetry verify`. Seen size Lg: the restart, replay, and verify paths grew past the estimate.
 - 2026-11-27: P11-02 verified. The `open_data_platform.simulators.bioguardia` package and the `bioguardia-ops-export` service publish the daily ops and finance drops to `odp-landing`; the drops from 2026-11-26 to 2026-12-31 are generated.
