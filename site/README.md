@@ -1,8 +1,6 @@
-# Platform report (Starlight + Catppuccin)
+# Platform report (Starlight, brand theme)
 
-Astro [Starlight](https://starlight.astro.build/) site themed with
-[Catppuccin for Starlight](https://starlight-themes.netlify.app/catppuccin/)
-(`@catppuccin/starlight`).
+Astro [Starlight](https://starlight.astro.build/) site themed with the author's brand: the violet and pink palette and the Urbanist font from `filipeoliveira-hub-assets/brand/`.
 
 **Purpose:** multi-page platform report (Home, Architecture, Pipeline, Operations, Reference). Content uses only facts verified in `PROJECT_STATUS.md`. Site v1 (Phase 9, P9-05) hosts it on GitHub Pages; from Phase 4 on, each phase's site update issue adds that phase's verified results (`ROADMAP.md` → growth scheme).
 
@@ -57,7 +55,11 @@ The home page opens with a 3D architecture map: `src/components/ArchitectureScen
 - Drag orbits the camera; hover or tap shows a component card; the layer chips highlight a group.
 - The animation pauses off-screen and in a hidden tab, and renders one still frame under `prefers-reduced-motion`.
 
-Theme options live in `astro.config.mjs`: mocha/latte with mauve accent (same as the [Catppuccin kitchen sink](https://starlight-themes.netlify.app/catppuccin/kitchen-sink/)).
+## Theme
+
+- `src/styles/brand.css` maps the `--fi-*` tokens of `filipeoliveira-hub-assets/brand/tokens.css` onto Starlight's `--sl-color-*` variables, light and dark, and loads Urbanist for the whole site. Body, muted and accent text pass WCAG AA; body and accent text on the page background measure at least 7:1. Pink appears only in the Fi mark.
+- `src/assets/brand/fi-mark-{light,dark}.svg` is the header logo and `public/favicon.svg` the favicon, both copied from the brand repo. Copy them again when the brand changes.
+- `src/components/SocialIcons.astro` overrides Starlight's header links to add a visible Portfolio link (`https://filipeoliveira-hub.com.br`) before the GitHub icon.
 
 ## Content rules
 

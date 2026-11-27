@@ -98,20 +98,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 </script>
 
 <style>
-	@font-face {
-		font-family: 'Urbanist';
-		font-style: normal;
-		font-weight: 500;
-		font-display: swap;
-		src: url('../assets/fonts/urbanist-latin-500-normal.woff2') format('woff2');
-	}
-	@font-face {
-		font-family: 'Urbanist';
-		font-style: normal;
-		font-weight: 700;
-		font-display: swap;
-		src: url('../assets/fonts/urbanist-latin-700-normal.woff2') format('woff2');
-	}
+	/* Urbanist is loaded site-wide by src/styles/brand.css. */
 
 	/* The map widens the home content column; other pages are unaffected. */
 	:global(main:has(.arch3d)) {

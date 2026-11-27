@@ -491,7 +491,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 
 | ID | Title | Depends on | Expected/Seen Risk | Expected/Seen Size | Status | Acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| P9-01 | Site scaffold and page map | Phase 3 | Lo/- | Sm/- | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev` |
+| P9-01 | Site scaffold and page map | Phase 3 | Lo/Lo | Sm/Sm | Verified | `site/` as Astro Starlight with the brand theme (palette and Urbanist from `filipeoliveira-hub-assets/brand`) and a header link to the portfolio; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev` |
 | P9-02 | Home and Architecture pages | P9-01 | Hi/- | Md/- | Not started | Home states the platform purpose and the verified status of Phases 0–3; its status table matches the phase overview (the scaffold still shows Phase 2 in progress). Architecture covers the stack, medallion, contracts, Airflow orchestration, and batch vs stream, with streaming CDC labeled planned. Diagrams come from `docs/`. No figure: figures 1 and 10 arrive with P8-08 |
 | P9-03 | Pipeline and Operations pages | P9-01 | Hi/- | Md/- | Not started | Pipeline covers ingestion through Gold and the Airflow daily and weekly schedules, backfills, quality gate, and quarantine from the Phase 1–3 docs; CDC is labeled planned. Operations covers CI (Phase 0) and the Phase 3 quality gate; observability, lineage, and the resource footprint are labeled planned. The stale status lines on both pages are fixed. No figure: figures 2–9 arrive with P8-08 and figure 11 with P5-10 |
 | P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/- | Sm/- | Not started | Reference links to GitHub, ADRs, roadmap, and setup; README Platform report block points to the GitHub Pages URL. The figure manifest link arrives with P8-08 |
@@ -651,7 +651,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-27 (R1-03; source renamed to olist-synth-cdc) |
+| Last updated | 2026-11-27 (P9-01; site scaffold verified) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -660,6 +660,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-27: P9-01 verified. The `site/` Starlight scaffold now uses the brand theme instead of Catppuccin (owner decision; acceptance reworded) and links to the portfolio from the header. It serves the five routes from `npm run dev` and `npm run build`; its dependencies are pinned to the locked versions.
 - 2026-11-27: R1-03 verified. `postgres_oltp` is now `olist_synth_cdc` (PostgreSQL schema `olist_synth`, Gold schema `olist_synth_operations`, `_olist_synth_` models) in code, DAGs, dbt, contracts, storage, tests, and living docs; the old tables, prefixes, registry rows, and DAG history are deleted. Dated records keep the old names.
 - 2026-11-27: R1-02 verified. Phase 9 becomes Site v1 on GitHub Pages from verified Phase 0–3 material and depends on Phase 3 only. Site update issues before each close pair: P4-11, P5-10, P6-10, P8-08, P10-13, P11-19; the live runs compare the site and the documentation issues fix it. P8-08 exports the figures and P8-06 checks them; the figure table gains a Published by column and figure 11 (Grafana, P5-10). Seen risk Med (phase acceptance changed).
 - 2026-11-27: R1-01 verified. Refactor R1 table added (R1-01 to R1-03). Phase 7 and P6-03 withdrawn; Phase 5 FinOps becomes the local resource footprint and cost to run (P5-05 rescoped, expected size Md); Phase 9 depends on Phases 3 and 8; ADR-0029 approved (open source only).
