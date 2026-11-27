@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-27 (P3-14 verified) |
+| Last updated | 2026-11-27 (P3-14 verified; Phase 11 added, P11-01 to P11-03) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -164,7 +164,8 @@ Three PostgreSQL refresh patterns remain in scope (`ROADMAP.md`). CDC does **not
 
 Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase overview.
 
---- | --- | --- |
+| Phase | Scope | Status |
+| --- | --- | --- |
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
@@ -176,6 +177,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–7) |
 | 9 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
 | 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3) |
+| 11 | BioGuardia Atlantic sources at scale: daily export, telemetry stream, PII, skew, SCD2, reconciliation | In progress (waiver): P11-01 verified; the generators come next (P11-02, P11-03). Processing (P11-04 on) waits for Phase 3 |
 
 ---
 

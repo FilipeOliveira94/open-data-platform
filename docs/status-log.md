@@ -23,6 +23,20 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 The first daily attempt on 2026-10-24 logged one FAIL: the script expected Silver sellers to grow by exactly the planted seller. That day held one more source seller that no earlier window had extracted, and landing, source, and Silver all agreed on 2. The check now compares the window's Silver rows to the source. Observations: an empty window still rebuilds Silver and Gold, and Silver scans the `postgres_oltp` Bronze tables twice. Detail: [`docs/architecture/phase-3-live-run.md`](architecture/phase-3-live-run.md).
 
+---
+
+### 2026-11-26 — P11-01 BioGuardia Atlantic domain model and Phase 11
+
+Filipe approved the Phase 11 plan on 2026-11-26 with two changes: the daily batch export grows to at least 20M rows a day with a 2 GB cap per drop, and the telemetry stream is 1M events an hour instead of 5M. Added [`docs/architecture/bioguardia-domain.md`](architecture/bioguardia-domain.md) (organization, use cases, sources, 23-dataset catalog, telemetry topics, world model, the PII, skew, SCD2 and reconciliation cases, synthetic-data safety, planted defects, storage budget), [ADR-0027](decisions/0027-bioguardia-synthetic-sources.md) and [ADR-0028](decisions/0028-telemetry-message-broker.md) (`proposed`, D-027 and D-028), an addendum to ADR-0008, and Phase 11 in `ROADMAP.md` (P11-01 to P11-18). The waiver that lets P11-01 to P11-03 run before Phase 3 closes is in the `DECISIONS.md` changelog. P4-02 now runs Debezium on the P11-03 broker, P4-04 depends on the P11-04 proof, P4-08 is the only CDC-based SCD issue, and P5-07's maintenance command is shared with P11-08 and P11-15.
+
+| Check | Result |
+| --- | --- |
+| Phone area codes | ANATEL open data `PGCN.csv` (downloaded 2026-11-26): 67 assigned codes; unassigned 20, 23, 25, 26, 29, 30, 36, 39, 40, 50, 52, 56 to 60, 70, 72, 76, 78, 80, 90 |
+| IBGE codes | 54 curated municipalities in BA, ES, MG, RJ, SP, PR, SC, RS matched by name and UF in the IBGE Localidades API (5,571 municipalities, 2026-11-26) |
+| Versions | `apache/kafka:4.3.2` (Docker Hub, 2026-10-20), `python:3.12.15-slim-bookworm` (2026-10-21), `confluent-kafka` 2.16.1 (PyPI, 2026-10-28) |
+
+---
+
 ### 2026-11-26 — P3-10 orchestration runtime hardening
 
 Spark local mode in the runtime image is capped. `run_bronze.sh` and `run_silver.sh` take `local[${ODP_SPARK_CORES}]` and `--driver-memory ${ODP_SPARK_DRIVER_MEMORY}` (Compose defaults 2 and `2g`; before: `local[*]` and Spark's 1g default) and exit 1 on a malformed value. Every script under `docker/spark` that starts Spark sets `spark.sql.session.timeZone=UTC` (review R16). The runtime container's JVM default was already UTC (`date +%Z`, `TZ` unset). The Airflow pins moved from the uv `dev` group to a non-default `airflow` group; `test_dagbag.py` and `test_run_python_args.py` skip without it, and `make test` and CI sync it. `medallion_build prune-work` deletes run folders under `/opt/odp/work` whose newest file is older than `ODP_WORK_RETENTION_DAYS` (default 7). It never deletes the current run's folder and touches no Airflow run, task log, table, or raw object. `transform_lakehouse` runs it as `prune_work`, a task with no edges; `make live-prune-work` runs it from Make. `.env.example` replaces `TRINO_HOST`, `TRINO_PORT`, and `TRINO_USER` with `ODP_TRINO_HOST_PORT` (the published host port) and `ODP_TRINO_USER`; `dbt/profiles.yml` stays versioned and reads the user from `ODP_TRINO_USER`; `dbt/profiles.yml.example` was removed.
