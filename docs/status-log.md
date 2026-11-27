@@ -4,6 +4,19 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-27 — P9-01 Site scaffold and page map
+
+The `site/` scaffold from 2026-10-16 meets the P9-01 acceptance: Astro Starlight with `@catppuccin/starlight` (mocha/latte, mauve accent), a sidebar with the five pages, and a local preview through `npm run dev`. `site/package.json` now pins the locked versions instead of caret ranges: `astro` 7.3.8, `@astrojs/starlight` 0.42.6, `@catppuccin/starlight` 2.1.0, `sharp` 0.35.5. Page content is unchanged; P9-02 and P9-03 replace the stale status lines.
+
+| Check | Result |
+| --- | --- |
+| `npm ci` (Node 22.23.4) | Installed from the lockfile |
+| `npm run build` | Complete; `dist/` holds `index.html`, `architecture/`, `pipeline/`, `operations/`, `reference/`, and `404.html`. Warnings: no `i18n` collection, and the sitemap skipped because `site` is unset (P9-05 sets it) |
+| `npm run dev`, then `curl` each route | `/`, `/architecture/`, `/pipeline/`, `/operations/`, `/reference/` return 200 with their page titles |
+| `npm audit` | 2 moderate: `astro` (fixed in 7.4.13; dynamic tag names and the `@astrojs/node` image endpoint, neither used by this static site) and `postcss-selector-parser` (CPU on crafted selectors, build-time only). Not upgraded here |
+
+---
+
 ### 2026-11-27 — R1-03 Rename the PostgreSQL source to olist-synth-cdc
 
 Owner request: the name says the source is synthetic. `postgres_oltp` is now `olist_synth_cdc`, the PostgreSQL schema `oltp` is now `olist_synth`, and the Gold schema `oltp_operations` is now `olist_synth_operations`, with `_olist_synth_` model names. The rename covers code, DAG ids, the raw Asset, contracts, fixtures, dbt, storage paths, tests, scripts, and living docs. Dated records (this log, reviews, ADRs, `DECISIONS.md`, phase live-run docs, the ROADMAP changelog, and Phase 0–3 sections) keep the old names. `tests/unit/infrastructure/test_r1_03_rename.py` fails on any other tracked use.
