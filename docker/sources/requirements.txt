@@ -10,6 +10,14 @@ botocore==1.43.114 \
     # via
     #   boto3
     #   s3transfer
+confluent-kafka==2.16.1 \
+    --hash=sha256:11677c2318afe589135f87c3f0eda7d1960b5f9deafd341a17c157322fcc77f8 \
+    --hash=sha256:3365eb68d0c645209cdc6af0b4db9100a11e6032c07a3606f8f703eaa24529ee \
+    --hash=sha256:5d61d8214453d31cceb438b9dfc03bdd078ceeeac742d970990dd2dfc398e4aa \
+    --hash=sha256:9deb0aa8920d567d09dd6258db6428f16ab9d229ee93aaf35a014aec771c2500 \
+    --hash=sha256:ec1474347615b9dd1bd0e269d37e31fa442782e67c4942661751e81b09d9f0c8 \
+    --hash=sha256:ef8b8ea6b237aec595f5254b59a37e1cf5f0b7851b6739afa93ed0bb1c0be77f \
+    --hash=sha256:fdb2c4d53e84e10f4e567f4e74bba45d0ce90276b81259c3fc58df6960caabf5
 jmespath==1.1.0 \
     --hash=sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d \
     --hash=sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64

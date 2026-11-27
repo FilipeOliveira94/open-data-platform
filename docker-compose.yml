@@ -376,6 +376,92 @@ services:
       retries: 3
       start_period: 120s
 
+  # One Kafka broker for the telemetry stream (P11-03, ADR-0028); Phase 4 adds
+  # Debezium on it. KRaft combined mode, PLAINTEXT on the Compose network only.
+  kafka:
+    image: apache/kafka:4.3.2
+    container_name: odp-kafka
+    profiles: [streaming]
+    restart: unless-stopped
+    environment:
+      CLUSTER_ID: Pp_cL0rvR1yS8Yc3SsnAIQ
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:${ODP_KAFKA_HOST_PORT:-9094}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_LOG_RETENTION_HOURS: ${ODP_KAFKA_RETENTION_HOURS:-72}
+      KAFKA_HEAP_OPTS: -Xmx1g -Xms1g
+    ports:
+      - "${ODP_KAFKA_HOST_PORT:-9094}:9094"
+    volumes:
+      - odp_kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Creates the telemetry topics (idempotent) and applies their retention.
+  kafka-init:
+    image: apache/kafka:4.3.2
+    profiles: [streaming]
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      RETENTION_HOURS: ${ODP_KAFKA_RETENTION_HOURS:-72}
+    volumes:
+      - ./docker/kafka/create-topics.sh:/opt/odp/create-topics.sh:ro
+    entrypoint: ["/bin/bash", "/opt/odp/create-topics.sh"]
+
+  # The telemetry gateway: publishes the fleet's events to Kafka on the wall
+  # clock, 24/7, with no Airflow dependency. It replays its backlog after a stop.
+  bioguardia-telemetry:
+    <<: *sources-common
+    profiles: [streaming]
+    restart: unless-stopped
+    command: ["telemetry", "run"]
+    environment:
+      <<: *sources-env
+      ODP_KAFKA_BOOTSTRAP: kafka:9092
+      ODP_TELEMETRY_STATE_DIR: /var/lib/bioguardia
+    volumes:
+      - ./src:/opt/odp/repo/src:ro
+      - odp_telemetry_state:/var/lib/bioguardia
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys,time; sys.exit(time.time() - int(open('/tmp/bioguardia-telemetry.heartbeat').read()) > 120)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+
 volumes:
   odp_postgres_data:
   odp_minio_data:
@@ -384,3 +470,6 @@ volumes:
   odp_lakehouse_work:
   # Scratch files of the BioGuardia export service while it writes a drop.
   odp_bioguardia_work:
+  # Kafka log segments (72-hour retention) and the producer's checkpoint.
+  odp_kafka_data:
+  odp_telemetry_state:

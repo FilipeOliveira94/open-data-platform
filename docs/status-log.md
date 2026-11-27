@@ -25,6 +25,25 @@ The first daily attempt on 2026-10-24 logged one FAIL: the script expected Silve
 
 ---
 
+### 2026-11-26 — P11-03 Kafka broker and BioGuardia telemetry producer
+
+Kafka `apache/kafka:4.3.2` (KRaft, one node, [ADR-0028](decisions/0028-telemetry-message-broker.md)) runs on the Compose profile `streaming` with `kafka-init` (`docker/kafka/create-topics.sh`) creating the four topics: readings 6 partitions, health 3, alerts 3, gateway 1; `retention.ms` 259200000 (72 h), `retention.bytes` caps, automatic creation off. The `bioguardia-telemetry` service (`telemetry run`, image `odp-sources`, `confluent-kafka` 2.16.1 in the uv group `sources`) publishes the world model's events with `acks=all`, idempotence and zstd, keyed by `device_id`, checkpoints every 5 s on the volume `odp_telemetry_state`, and has no Airflow dependency. New commands: `telemetry model` and `telemetry verify`, `make stream-up`, `stream-stop`, `stream-check`. Source note: [`bioguardia-telemetry.md`](sources/bioguardia-telemetry.md).
+
+| Check | Result |
+| --- | --- |
+| Unit tests (`tests/unit/simulators/bioguardia/test_telemetry.py`) | Passed: modeled rate at least 1.0M per hour at scale 1, delivered events per device and UTC day equal `generated - dropped` of `device_daily_counters`, unique `event_id`, contiguous sequences, restart skip counts equal to the gateway records, an outage ending at 00:00 UTC is uploaded, overlapping outages merge, payload fields listed in the source note, a restarted producer replays and logs counts only |
+| Topics | `kafka-topics.sh --describe`: partitions, replication factor 1, retention and caps as documented |
+| Rate, 60 minutes | 2026-11-26 11:13:18Z to 12:13:30Z with Airflow stopped: 1,019,332 messages (1,015,945 per hour), 99.97% of the model's 1,019,639 for the window; producer 2.4% CPU and 162 MiB, broker 23.9% CPU and 1.03 GiB |
+| Rate, 60 minutes across 00:00 UTC | 2026-11-26 23:21:37Z to 2026-11-27 00:21:40Z, with Airflow running (scheduler, API server, DAG processor): 1,022,299 messages (1,021,447 per hour), 100.01% of the model's 1,022,162 for the window; producer 2.2% CPU and 173 MiB, broker 14.3% CPU and 1,002 MiB; segment growth 56.7 MB |
+| Verify across 00:00 UTC | `telemetry verify` for 2026-11-26 23:30Z to 2026-11-27 00:15Z: 763,408 expected, all found, gateway-skipped 0, missing 0, 793 duplicate copies |
+| Storage | About 51 bytes per message in the segment files: 52 MB per hour, 1.24 GB per day, 3.7 GB for 72 hours |
+| Unplanned stop | 2 h 50 min down (host sleep and reboot); the restart replayed 2,888,706 events and skipped 103 older than the buffer, with a gateway record; `telemetry verify` 08:00Z to 08:40Z: 676,950 expected, all found, 47,185 duplicate copies |
+| Planned 10-minute stop | Stopped 12:14:49Z, started 12:24:53Z: the restart was 619 s behind, replayed 175,697 events, skipped 0, and wrote a gateway record. `telemetry verify` for 12:10Z to 12:30Z: 338,006 expected, all found, 0 missing, 1,169 duplicate copies (0.1% retransmissions and at most 5 seconds re-sent after the checkpoint) |
+| `code-reviewer` | Round 1 BLOCK (shared with P11-02: outage at 00:00 UTC, overlapping outages), fixed; round 2 PASS; warnings fixed (heartbeat during a long restart walk, stops over 7 days recorded as `gap_too_long`, buffer capped at 24 h) |
+
+
+---
+
 ### 2026-11-26 — P11-02 BioGuardia daily export generator
 
 `open_data_platform.simulators.bioguardia` generates the BioGuardia Operations Hub and Finance daily exports from one deterministic world model ([ADR-0027](decisions/0027-bioguardia-synthetic-sources.md), [domain model](architecture/bioguardia-domain.md), source notes [`bioguardia-ops-export.md`](sources/bioguardia-ops-export.md) and [`bioguardia-finance-export.md`](sources/bioguardia-finance-export.md)). Each drop is a set of gzip CSV and JSON Lines files, a `_manifest.json` (rows, bytes, uncompressed bytes, SHA-256, columns, exact decimal control totals, time range), and `_SUCCESS` written last, in MinIO `odp-landing`; the planted-defect lists go only to `odp-evaluation`. New: image `odp-sources` (`docker/sources/Dockerfile`, `python:3.12.15-slim-bookworm` by digest, dependencies exported from `uv.lock` with hashes), Compose service `bioguardia-ops-export` on profile `sources` (the release loop: ops at 02:00 BRT, finance at 06:00 BRT, version 2 three days after version 1, catch-up in date order), Make targets `sources-build`, `sources-up`, `sources-requirements`, `bioguardia-export`, and the `.env.example` names. The drops from 2026-11-26 to 2026-12-31 were published in advance at Filipe's request (`--allow-future`), so they are visible before their release time; P11-05 must ignore a drop whose `released_at` is in the future.

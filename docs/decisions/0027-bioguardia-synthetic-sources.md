@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` |
 | Date opened | 2026-11-26 |
-| Date decided | — |
+| Date decided | 2026-11-27 |
 | Owner | Platform architect |
 | Index ID | D-027 |
 | Related issues | P11-01, P11-02, P11-03; processing P11-04 to P11-18 |
@@ -48,7 +48,7 @@ P11-01 to P11-03 start before Phase 3 closes (waiver recorded in `DECISIONS.md`,
 
 ## Evidence / validation
 
-None yet. P11-02 records the measured rows, bytes and generation time per drop; P11-03 records the measured stream rate. Both go in the source notes and [`docs/status-log.md`](../status-log.md).
+P11-02 (2026-11-26): 37 ops drops (2026-11-26 to 2026-12-31 plus a version 2 of 2026-12-15) and 36 finance drops generated at scale 1: 880,848,289 rows and 13.19 GB of gzip in all, about 23.8M rows and 356 MB of gzip per day, every drop under the 2 GB cap. Regenerating a date gives byte-identical files (same SHA-256), and a killed run leaves no partial drop. P11-03 (2026-11-26 and 27): the stream delivered 1,022,299 messages in 60 minutes across 00:00 UTC (100.01% of the model), and `telemetry verify` found every modeled event after a planned 10-minute stop and an unplanned 2 h 50 min stop. Detail: the source notes ([ops](../sources/bioguardia-ops-export.md#measured-volume), [telemetry](../sources/bioguardia-telemetry.md#measured-volume)) and [`docs/status-log.md`](../status-log.md).
 
 ## Revisit when
 

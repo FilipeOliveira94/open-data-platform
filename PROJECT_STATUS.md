@@ -177,7 +177,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–7) |
 | 9 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
 | 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3) |
-| 11 | BioGuardia Atlantic sources at scale: daily export, telemetry stream, PII, skew, SCD2, reconciliation | In progress (waiver): P11-01 and P11-02 verified; drops 2026-11-26 to 2026-12-31 in MinIO; the stream comes next (P11-03). Processing (P11-04 on) waits for Phase 3 |
+| 11 | BioGuardia Atlantic sources at scale: daily export, telemetry stream, PII, skew, SCD2, reconciliation | In progress (waiver): P11-01 to P11-03 verified; drops 2026-11-26 to 2026-12-31 in MinIO; stream running. Processing (P11-04 on) waits for Phase 3 |
 
 ---
 
