@@ -10,7 +10,7 @@ Owner decision: the platform core is open source only ([ADR-0029](decisions/0029
 
 | Check | Result |
 | --- | --- |
-| `make lint` | Clean; markdown tables: 71 files, 0 with an empty header row |
+| `make lint` | Clean; markdown tables: 72 files, 0 with an empty header row |
 | `uv run pytest tests/unit -q` | Passed |
 | `cd site && npm run build` | 6 pages built |
 | Leftover `git grep` for AWS, Terraform, Athena, Glue, OIDC, QuickSight, MWAA, EMR, MSK, CloudWatch, DynamoDB, FinOps, cost model and Phase 7, outside the status log, genesis doc, reviews, ADR-0001, ADR-0011, ADR-0029 and lockfiles, with S3 client names filtered | Remaining hits: withdrawn rows, the R1 table, D-001's superseded note, changelog lines, verified Phase 0–1 issue text, rejected-alternative rows citing ADR-0029, the Hadoop AWS jar pin, and links to the ADR-0001 file name |
