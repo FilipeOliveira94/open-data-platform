@@ -42,14 +42,18 @@ Static output is written to `dist/`.
 | Path | Page |
 | --- | --- |
 | `src/content/docs/index.mdx` | Home |
-| `src/content/docs/architecture.md` | Architecture |
+| `src/content/docs/architecture.mdx` | Architecture |
 | `src/content/docs/pipeline.md` | Pipeline |
 | `src/content/docs/operations.md` | Operations |
 | `src/content/docs/reference.md` | Reference |
 
+## Diagrams
+
+Architecture shows two diagrams through `src/components/DiagramFigure.astro`, which imports the light and dark PNGs from `docs/assets/diagrams/` so docs and site share one copy. To change a diagram, edit the facts in `docs/architecture/` first, then `docs/assets/diagrams/build_diagrams.py`, run it, and export the PNGs with the diagram-design skill's `export_png.py` (scale 2). `tests/unit/site/` fails when the HTML is stale or a page stops importing from `docs/`.
+
 ## Architecture map
 
-The home page opens with a 3D architecture map: `src/components/ArchitectureScene.astro` (markup, styles, accessible text list) and `src/components/architecture-scene/` (`data.ts` holds the components and flows, `scene.ts` is a dependency-free canvas renderer). To add a component or a flow, edit `data.ts` only.
+The home page opens with a 3D map of the target architecture (not a status view; the Home status table says what is verified): `src/components/ArchitectureScene.astro` (markup, styles, accessible text list) and `src/components/architecture-scene/` (`data.ts` holds the components and flows, `scene.ts` is a dependency-free canvas renderer). To add a component or a flow, edit `data.ts` only.
 
 - Brand palette (dark tokens from `filipeoliveira-hub-assets/brand/tokens.css`) and the Urbanist font, self-hosted under `src/assets/fonts/` (SIL OFL 1.1, `OFL.txt`).
 - Drag orbits the camera; hover or tap shows a component card; the layer chips highlight a group.
