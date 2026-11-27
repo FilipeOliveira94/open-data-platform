@@ -52,7 +52,7 @@ Until P3-13 every lakehouse refresh rebuilt every Bronze table from every raw ob
 - **Upgrade.** Existing Bronze tables have no `_raw_etag` column. The first refresh after this change bootstraps each dataset with a full rebuild, because the registry is empty. A `MERGE` against a table that the registry knows but whose schema lacks the column fails loudly; `make live-rebuild` is the fix.
 - **Raw executions without a marker** (landed before P3-12) no longer enter Bronze. For a `snapshot` source, Silver already ignored them. For `postgres_oltp` (`incremental_window`) the local windows were re-extracted with new execution ids so that they carry markers (Evidence).
 - **AWS mapping.** The registry needs a PostgreSQL-compatible database (RDS or Aurora Serverless) next to Glue. The Airflow metadata database on AWS is a candidate. Phase 7 records the choice.
-- **Concurrency.** Staging no longer collides. Two writers of the same Iceberg table still must not run at the same time; `make` targets and the DAG share the tables, the registry, and the Ivy cache (documented in P3-15). The `lakehouse_gold` pool serializes the DAG's writes.
+- **Concurrency.** Staging no longer collides. Two writers of the same Iceberg table still must not run at the same time; `make` targets and the DAG share the tables, the registry, and the Ivy cache ([one writer at a time](../architecture/phase-3-orchestration.md#one-writer-at-a-time)). The `lakehouse_gold` pool serializes the DAG's writes.
 - **Checks.** `bronze-checks` compares each written Bronze table's `COUNT(*)` with the registry row total of that dataset. `silver-checks` covers only the Silver tables rebuilt in the run.
 
 ## Evidence / validation

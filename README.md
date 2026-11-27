@@ -22,9 +22,9 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 
 | Field | Now |
 | --- | --- |
-| Current phase | Phase 3 — Orchestration and data quality. In progress |
-| Objective | Airflow for the daily and weekly PostgreSQL windows, plus backfills and quarantine |
-| In place | Phases 0–2. Lakehouse run on [2026-11-11](docs/architecture/phase-2-live-run.md) |
+| Current phase | Phase 4 — Streaming CDC. Not started; P11-04 (Spark on Kafka) comes first |
+| Objective | Change capture from PostgreSQL through Debezium and Kafka, next to the daily and weekly batch |
+| In place | Phases 0–3. Orchestration run on [2026-11-27](docs/architecture/phase-3-live-run.md) |
 | Ledger | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) · scope in [`ROADMAP.md`](ROADMAP.md) |
 
 ---
@@ -36,7 +36,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 | Ingestion | Implemented | 1 | MinIO |
 | Contracts | Implemented | 1 | YAML |
 | Processing | Implemented | 2 | Spark · Iceberg · Trino · dbt |
-| Orchestration | Proposed | 3 | Airflow |
+| Orchestration | Implemented | 3 | Airflow |
 | CDC | Proposed | 4 | Debezium · Kafka · Spark |
 | Report site | Scaffold | 9 | Astro |
 | Dataviz | Proposed | 8 | Jupyter · Superset |
@@ -78,7 +78,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
   - Storefront
   - Orders window
 - **Reconciliation:** Compares the layers, and the published number with the source.
-- **Commit:** Bronze and Silver replace the current table.
+- **Commit:** Bronze merges new raw objects; Silver and Gold replace each table in one commit.
 - **Docs:** [Lakehouse](docs/architecture/phase-2-lakehouse.md) · [Gold model](docs/architecture/gold-model-design.md) · [2026-11-11 run](docs/architecture/phase-2-live-run.md)
 
 ### 📋 Orchestration
@@ -87,9 +87,9 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 - **Daily batch:** One PostgreSQL window per day.
 - **Weekly batch:** A distinct seven-day window.
 - **Boundary:** Business logic stays in the package, not in the DAGs.
-- **Backfill:** A window can be rerun without corrupting that window.
-- **Extract:** The windowed PostgreSQL extract already exists. The schedules do not.
-- **Docs:** [ADR-0006](docs/decisions/0006-orchestration.md) · [ADR-0007](docs/decisions/0007-daily-weekly-batch.md)
+- **Backfill:** A window can be rerun without corrupting that window; a gap report lists missed windows.
+- **Quality:** A failed Bronze or Silver check blocks the next layer; invalid records are quarantined and counted.
+- **Docs:** [Phase 3 index](docs/architecture/phase-3-orchestration.md) · [Local Airflow](docs/architecture/airflow-local.md) · [2026-11-27 run](docs/architecture/phase-3-live-run.md) · [ADR-0006](docs/decisions/0006-orchestration.md) · [ADR-0007](docs/decisions/0007-daily-weekly-batch.md)
 
 ### 📋 CDC
 

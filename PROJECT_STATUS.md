@@ -6,9 +6,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-27 (P3-14 verified; Phase 11 added, P11-01 to P11-03) |
-| Current phase | Phase 3 — Orchestration and data quality |
-| Phase status | In progress |
+| Last updated | 2026-11-27 (P3-15 verified; Phase 3 verified) |
+| Current phase | Phase 4 — Streaming CDC |
+| Phase status | Not started |
 
 **Status values:** not started · in progress · delivered · verified · blocked · withdrawn
 
@@ -22,61 +22,31 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-15** — Phase 3 documentation and status. Not started.
-
-P3-14 is verified. A scripted live run (`scripts/p3_14_live_run.sh`) on 2026-11-26 and 2026-11-27 drove the shipped daily and weekly DAGs. Every landing matched the PostgreSQL rows of its window and the previous landing of that window. A rerun of the same run and of the same window left Silver unchanged. The weekly run landed one late seller once. A refresh with no new raw objects wrote no table, and 152 Silver reads during refreshes all succeeded. After one missed midnight the daily DAG made one catch-up run and the gap report was clean. Each refresh read 4 new raw objects out of 245 to 273. No mismatch was found. Detail and observations: [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) and [`docs/status-log.md`](docs/status-log.md).
-
-The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-15 and later phases.
-
-Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](docs/status-log.md).
+Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)).
 
 ## Next work
 
-1. **P3-15** — Phase 3 documentation and status. Acceptance: `ROADMAP.md` → P3-15.
+1. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
+2. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
 
 ---
 
-## Phase 3 progress
+## Phase 4 progress
 
 | ID | Title | Status | Evidence |
 | --- | --- | --- | --- |
-| P3-01 | Airflow in local Compose | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-02 | Ingestion DAGs (thin wrappers) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-03 | Transform / dbt DAGs | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-04 | Daily batch schedule (PostgreSQL) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md) |
-| P3-05 | Weekly batch schedule (PostgreSQL) | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#weekly-postgresql-re-extract-p3-05) |
-| P3-06 | Window coverage, gap report, and backfill | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#window-coverage-gap-report-and-backfill-p3-06) |
-| P3-07 | Quality checks and quarantine | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#silver-handling-of-quarantined-records-p3-07) |
-| P3-08 | Execution metadata and failure logging | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#execution-metadata-p3-08) |
-| P3-09 | Orchestration success/failure tests | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09) |
-| P3-10 | Orchestration runtime hardening | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#spark-resource-caps-p3-10) |
-| P3-11 | Atomic table replace for readers | Verified | [`docs/architecture/phase-2-lakehouse.md`](docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11) |
-| P3-12 | Update-pattern semantics and source refresh policy | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#update-patterns-p3-12) |
-| P3-13 | Incremental lakehouse refresh | Verified | [`docs/architecture/bronze-layer.md`](docs/architecture/bronze-layer.md#result-2026-11-20-incremental-refresh-p3-13) |
-| P3-16 | Quality gate state and extract-window corrections | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#quality-gate-p3-16) |
-| P3-17 | Gold metric grain corrections | Verified | [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md#p3-17-metric-corrections-2026-11-22) |
-| P3-18 | Exact decimal type for money fields | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#money-p3-18) |
-| P3-14 | Live run, result, and consistency check | Verified | [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) |
-| P3-15 | Phase 3 documentation and status | Not started | — |
+| P4-01 | PostgreSQL logical replication prerequisites | Not started | — |
+| P4-02 | Debezium on the shared Kafka broker | Not started | — |
+| P4-03 | CDC path for insert / update / delete | Not started | — |
+| P4-04 | Spark Structured Streaming consumer | Not started | — |
+| P4-05 | Semantics documentation (batch vs stream) | Not started | — |
+| P4-06 | Streaming resilience scenarios | Not started | — |
+| P4-07 | Batch path regression check | Not started | — |
+| P4-08 | SCD Type 2 history | Not started | — |
+| P4-09 | Live run, result, and consistency check | Not started | — |
+| P4-10 | Phase 4 documentation and status | Not started | — |
 
-Acceptance detail: `ROADMAP.md` → Phase 3.
-
-### Phase 3 acceptance
-
-- [x] DAGs have clear dependencies and verifiable failure behavior (P3-09).
-- [ ] A **daily** scheduled batch path exists for PostgreSQL incremental extract (and downstream transforms as designed).
-- [x] A **weekly** scheduled batch path exists (distinct schedule and documented purpose/grain vs daily) (P3-05).
-- [ ] Backfills do not corrupt data or create undue duplication.
-- [x] A missed window is caught up or reported as a gap; covered windows are queryable (P3-04, P3-06; trailing gaps since P3-16).
-- [x] A failed Bronze or Silver check blocks the next layer until it passes, including on a later refresh with no new raw objects (P3-16).
-- [x] Gold metrics keep their documented grain: no fan-out, rate denominators count only eligible rows, and money is exact decimal (P3-17, P3-18).
-- [x] Readers never see a missing, empty, or half-written table, including after a failed write (P3-11).
-- [x] Each contract `update_pattern` has defined and enforced Bronze and Silver behavior, and every source has a documented refresh policy (P3-12).
-- [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing, Silver rebuilds of `incremental_window`/`append_only` datasets (ADR-0024), still do. The Bronze `MERGE` scans only the `dt` partitions it writes since P3-08.
-- [x] Invalid records are identified and handled per documented rules (P3-07).
-- [x] Success and failure scenarios have tests or reproducible evidence (P3-09).
-- [x] A live run result is recorded and compared to the source windows (P3-14).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-15).
+Acceptance detail: `ROADMAP.md` → Phase 4.
 
 ---
 
@@ -84,16 +54,20 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | Validation | Detail |
 | --- | --- |
-| Date | 2026-11-26 to 2026-11-27 |
-| Environment | Local Compose: PostgreSQL, MinIO, Trino, and Airflow 3.4.0 (LocalExecutor) on `odp-runtime:airflow3.4.0-spark3.5.8` |
-| Checks | `make lint`; `make test`; `scripts/p3_14_live_run.sh all-day`, `pause`, `catchup report`; `scripts/p3_09_orchestration_check.sh no-new-raw happy` on the moved helpers |
-| Result | PASS. 617 unit tests passed. Every P3-14 step passed after one script check was corrected (see the live-run doc). The P3-09 scenarios passed, 10 of 10 |
+| Date | 2026-11-27 |
+| Environment | WSL2, repository checks only (P3-15 is documentation) |
+| Checks | `make lint` |
+| Result | PASS. The phase result it cites is the P3-14 live run: [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) |
 
---- | --- |
-| Date | 2026-11-26 |
-| Environment | Local Compose: PostgreSQL, MinIO, Trino, and Airflow 3.4.0 (LocalExecutor) on `odp-runtime:airflow3.4.0-spark3.5.8` |
-| Checks | `make lint`; `make test`; unit tests in a venv without the `airflow` group; `make live-rebuild`; Silver and Gold row counts before and after; `transform_lakehouse` run `manual__2026-11-26T05:27:14.456317+00:00`; `make live-prune-work` |
-| Result | PASS. 614 unit tests passed; without the `airflow` group the two Airflow modules skip and the rest pass. Rebuild exit 0 in 603.7 s, dbt `PASS=294`, row counts unchanged. The DAG run succeeded; the work volume went from 113 folders (474_478_934 bytes) to 108 (444_862_796). A second prune removed 0 |
+---
+
+## Phase 3 baseline
+
+Phase 3 is **verified**. Index: [`docs/architecture/phase-3-orchestration.md`](docs/architecture/phase-3-orchestration.md). Live result: [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) (2026-11-26 to 2026-11-27).
+
+Airflow 3.4.0 (LocalExecutor) runs the daily PostgreSQL extract at 00:00 UTC (`[D-1, D)`, 15 min settle lag, catchup) and the weekly re-extract on Monday (`[W-8, W-1)`). Each successful extract records its window in the coverage ledger, and a gap report lists missed windows. Every ingestion DAG emits a raw Asset that schedules `transform_lakehouse`, which promotes only new raw objects. Failed Bronze or Silver checks block the next layer. Invalid records are quarantined or flagged per contract and counted. Each table replace is one Iceberg commit. Money is exact decimal. In the P3-14 run every landing matched its source window, reruns left Silver unchanged, 152 reads during refreshes all succeeded, and one missed midnight gave one catch-up run. `make live-*` targets and the DAGs must not run at the same time.
+
+Closed Phase 3 narrative: [`ROADMAP.md`](ROADMAP.md) (Phase 3), [`docs/status-log.md`](docs/status-log.md).
 
 ---
 
@@ -142,7 +116,9 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | --- | --- | --- |
 | D-006 | Airflow 3.4 LocalExecutor on `odp-runtime:airflow3.4.0-spark3.5.8`; task logs in MinIO; Celery and Flower are not a follow-up | `approved` |
 | D-007 | Daily and weekly windows. The extract (P1-06), the daily schedule (P3-04), and the weekly re-extract (P3-05) exist | `approved` |
+| D-008 | Streaming CDC: logical replication, Debezium, Kafka, Spark Structured Streaming | `proposed` |
 | D-014 | CDC does not replace daily or weekly batch | `proposed` |
+| D-028 | Kafka 4.3.2 broker shared by telemetry and the Phase 4 CDC path | `approved` |
 | D-005 | DAGs call Spark Bronze/Silver and dbt-trino Gold. They do not reimplement them. Addendum: one runtime image runs Airflow, Spark, and dbt | Approved (addendum 2026-11-13) |
 | D-013 | Invalid rows stay visible. Reprocessing quarantined source rows is P3-07 | Approved |
 
@@ -169,7 +145,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 0 | Repository, toolchain, PostgreSQL 16, MinIO, CI | Verified |
 | 1 | Multi-source ingestion | Verified (P1-09 withdrawn) |
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
-| 3 | Airflow daily/weekly, backfills, quality | In progress (P3-01–P3-06, P3-11–P3-13, P3-16–P3-18 verified) |
+| 3 | Airflow daily/weekly, backfills, quality | Verified |
 | 4 | Streaming CDC | Not started |
 | 5 | Observability, lineage, FinOps model | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |

@@ -4,6 +4,20 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-27 — P3-15 Phase 3 documentation and status; Phase 3 verified
+
+New phase index [`docs/architecture/phase-3-orchestration.md`](architecture/phase-3-orchestration.md): the DAG schedules, catchup, gap report and backfill, the quality gate and quarantine, the rule that `make live-*` targets and the DAGs never run at the same time (they share the Iceberg tables, the promotion registry, the coverage ledger, and the Ivy cache), the 2026-11-21 review findings closed in Phase 3 and the ones left to later phases, and the P3-14 live result. ADR-0024 and the P3-14 live-run doc now link to that rule.
+
+The open Phase 3 acceptance items are checked on recorded evidence: DAG dependencies and failure behavior (P3-03, P3-09), the daily path (P3-04, P3-13, P3-14), backfills without duplication (P3-06, and the P3-14 reruns with no duplicate key), readers never see a missing or half-written table (P3-11, the P3-09 killed Silver write, the 152 P3-14 reads), success and failure evidence (P3-09), and this documentation. Tables are still visible before their checks run (review R6, P6-09).
+
+| Check | Result |
+| --- | --- |
+| `make lint` | Clean |
+
+`PROJECT_STATUS.md` moves to Phase 4. `README.md` marks orchestration as implemented.
+
+---
+
 ### 2026-11-27 — P3-14 live run, result, and consistency check
 
 `scripts/p3_14_live_run.sh` drove the shipped daily and weekly PostgreSQL DAGs on local Airflow 3.4.0 from 2026-11-26 05:52Z to 2026-11-27 00:26Z, with no fault injected. The Airflow, catalog, and Trino helpers of the P3-09 script moved to `scripts/lib/live_check.sh`, which both scripts source. P3-09 `no-new-raw` and `happy` passed on the moved helpers. Each landing (`extract_coverage.row_count`) was compared to the PostgreSQL rows with `updated_at` in its window, counted right after the extract.
