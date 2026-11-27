@@ -37,7 +37,7 @@ Implement only the plan we just agreed on.
 - Add or update tests for the behavior changed.
 - Do not implement tasks from future phases.
 - Do not add dependencies or services outside the approved plan.
-- Do not run destructive commands, deploy cloud resources, or incur cloud costs without my explicit approval.
+- Do not run destructive commands without my explicit approval.
 - Run the relevant checks and report the actual output.
 - Update documentation and PROJECT_STATUS.md only for work that has actually been verified.
 - Work on the issue branch from AGENTS.md §13. Do not commit; the close step commits and opens the PR.

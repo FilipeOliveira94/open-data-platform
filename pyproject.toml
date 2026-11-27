@@ -1,7 +1,7 @@
 [project]
 name = "open-data-platform"
 version = "0.1.0"
-description = "Reproducible open-source data platform with a local Compose baseline and an AWS Terraform IaC path."
+description = "Reproducible open-source data platform on a local Docker Compose stack."
 readme = "README.md"
 authors = [
     { name = "Filipe Oliveira", email = "filipeoliveira94@hotmail.com" },

@@ -2,15 +2,15 @@
 
 ## 1. Project Goal
 
-Build a reproducible open-source data platform that supports local development on Windows 11 through WSL2 and Docker Compose, with an AWS deployment path expressed as Terraform Infrastructure as Code.
+Build a reproducible open-source data platform that supports local development on Windows 11 through WSL2 and Docker Compose. The core is open source only and has no cloud deployment path ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)).
 
 The platform demonstrates:
 - Multiple source ingestion: historical datasets, APIs, PostgreSQL, and a fictional storefront clickstream.
 - Batch processing and CDC/streaming.
 - A lakehouse with Bronze, Silver and Gold layers.
 - Apache Airflow orchestration and dbt analytics.
-- Data quality, lineage, observability and FinOps cost modeling.
-- Automated testing, CI/CD and reproducible cloud infrastructure as code.
+- Data quality, lineage, observability, and a measured local resource footprint with the machine cost to run it.
+- Automated testing and CI/CD.
 
 ## 2. Working Language
 
@@ -47,7 +47,7 @@ Language, size and risk, review gates and model policy: `~/.agents/claude/workfl
 
 - **Profile:** reviewed
 - **Language:** English for everything.
-- **Hi risk here:** a write, merge, delete or backfill that can silently lose or corrupt table data; CDC semantics (duplicates, deletes, ordering); secrets or row values reaching query text, argv or logs (§8); Terraform, cloud resources or cloud cost; anything that changes a published number.
+- **Hi risk here:** a write, merge, delete or backfill that can silently lose or corrupt table data; CDC semantics (duplicates, deletes, ordering); secrets or row values reaching query text, argv or logs (§8); anything that changes a published number.
 - **Extra reviewers:** none
 - **Skip review:** none
 - **Model exceptions:** none
@@ -103,8 +103,7 @@ Do **not** treat `PROJECT_STATUS.md` as durable evidence storage. Architecture d
 - Prefer Linux paths inside WSL2.
 - Do not assume PowerShell syntax in Linux scripts or Bash syntax in PowerShell commands.
 - Use Docker Compose for local services and end-to-end verification.
-- Keep local development independent of AWS credentials whenever possible.
-- Use Terraform for the AWS deployment path (local→AWS service mapping: MinIO→S3, catalog→Glue, Trino→Athena) and document the required permissions.
+- Use open-source components that run on the local stack. Do not add a managed cloud service or a cloud deployment path (ADR-0029).
 - Do not install or upgrade system-wide dependencies without explaining the impact.
 
 ## 8. Security and Cost
@@ -113,11 +112,10 @@ Do **not** treat `PROJECT_STATUS.md` as durable evidence storage. Architecture d
 - Not committing a value is not enough. Do not place row values or secrets in query text, process arguments, exception messages, or `print` output. Counts, names, paths, and field names are fine. Write rows to a data file and reference the path. Spark secrets go through `docker/spark/credentials.sh`, not `--conf`. Detail: Runtime data exposure below.
 - Use `.env.example` for variable names and safe placeholders.
 - Treat public API responses and downloaded files as untrusted input.
-- Prefer short-lived AWS credentials and OIDC for CI/CD.
-- Validate Terraform with `fmt`/`validate` in CI; do not run `terraform apply`, `terraform destroy`, delete cloud resources or destructive Docker volume operations without explicit user approval.
-- Ask before any operation that can incur meaningful cloud costs.
+- CI needs no cloud credentials.
+- Do not run destructive Docker volume operations without explicit user approval.
 - Do not invent performance metrics, cost figures, lineage or benchmark results.
-- Present the AWS path as Infrastructure as Code that shows how the platform provisions on AWS; do not frame documentation around unpaid cloud usage.
+- Footprint and cost-to-run figures come from measurements on a stated machine and state their assumptions; label estimates as estimates.
 
 ### Runtime data exposure
 

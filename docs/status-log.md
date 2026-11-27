@@ -4,6 +4,21 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-27 — R1-01 Remove the AWS deployment path
+
+Owner decision: the platform core is open source only ([ADR-0029](decisions/0029-open-source-only-platform.md), D-029 approved). Phase 7 (P7-01 to P7-09) and P6-03 are withdrawn; phase numbers are kept. P5-05 becomes the local resource footprint and cost to run (measured CPU, memory, disk and storage per service, run time per layer, a machine cost from stated assumptions, and a performance analysis). ADR-0011 is superseded, ADR-0001 keeps its Compose half, and the other ADRs, `DECISIONS.md`, `AGENTS.md`, the README, architecture docs, cover images, and site no longer name AWS counterparts. A Refactor R1 table in `ROADMAP.md` lists R1-01 to R1-03.
+
+| Check | Result |
+| --- | --- |
+| `make lint` | Clean; markdown tables: 71 files, 0 with an empty header row |
+| `uv run pytest tests/unit -q` | Passed |
+| `cd site && npm run build` | 6 pages built |
+| Leftover `git grep` for AWS, Terraform, Athena, Glue, OIDC, QuickSight, MWAA, EMR, MSK, CloudWatch, DynamoDB, FinOps, cost model and Phase 7, outside the status log, genesis doc, reviews, ADR-0001, ADR-0011, ADR-0029 and lockfiles, with S3 client names filtered | Remaining hits: withdrawn rows, the R1 table, D-001's superseded note, changelog lines, verified Phase 0–1 issue text, rejected-alternative rows citing ADR-0029, the Hadoop AWS jar pin, and links to the ADR-0001 file name |
+
+The S3 client libraries MinIO needs (`hadoop-aws`, `aws-java-sdk-bundle`, `fs.s3a.*`, Trino `s3.aws-*`, boto3 `aws_*`, the Airflow `aws` connection type) stay.
+
+---
+
 ### 2026-11-27 — P3-15 Phase 3 documentation and status; Phase 3 verified
 
 New phase index [`docs/architecture/phase-3-orchestration.md`](architecture/phase-3-orchestration.md): the DAG schedules, catchup, gap report and backfill, the quality gate and quarantine, the rule that `make live-*` targets and the DAGs never run at the same time (they share the Iceberg tables, the promotion registry, the coverage ledger, and the Ivy cache), the 2026-11-21 review findings closed in Phase 3 and the ones left to later phases, and the P3-14 live result. ADR-0024 and the P3-14 live-run doc now link to that rule.

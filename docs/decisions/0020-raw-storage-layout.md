@@ -19,7 +19,7 @@ Local Kaggle fetches already use gitignored `data/raw/` (ADR-0018). That path is
 
 ## Decision
 
-1. **Auditable raw** lives in the object store (MinIO locally, S3 on AWS) under a dedicated bucket (env `ODP_RAW_BUCKET`) and key prefix `raw/`.
+1. **Auditable raw** lives in the object store (MinIO, S3 API) under a dedicated bucket (env `ODP_RAW_BUCKET`) and key prefix `raw/`.
 2. **`data/raw/`** remains local fetch/staging only (gitignored); it is not the source of truth for lakehouse raw.
 3. **Object key layout:**
    `raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_name}`
@@ -34,7 +34,7 @@ Package helpers under `src/open_data_platform/ingestion/` own path building, met
 | Option | Pros | Cons | Why not (if rejected) |
 | --- | --- | --- | --- |
 | Object-store `raw/` + metadata helpers (chosen) | Auditable; MinIO→S3 portable; testable | Needs discipline vs local `data/raw/` | — |
-| Local filesystem only as lakehouse raw | Simple on laptop | Diverges from AWS path; weak object semantics | Rejected (conflicts with D-002) |
+| Local filesystem only as lakehouse raw | Simple on laptop | Weak object semantics | Rejected (conflicts with D-002) |
 | Skip raw; land only as Bronze tables | Fewer layers | Loses opaque replay of source bytes | Rejected for Phase 1 audit story |
 | Partition only by `execution_id` (no `dt=`) | Shorter keys | Harder date-scoped listing and ops | Rejected; keep Hive-style `dt=` |
 

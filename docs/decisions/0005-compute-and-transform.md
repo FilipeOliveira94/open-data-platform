@@ -27,7 +27,7 @@ Use **Apache Spark** for heavy engineering transforms (batch and later Structure
 | Spark as sole transform layer (no dbt) | One engine | Weaker analytics engineering / model-test story | Rejected as sole approach |
 | dbt-only transforms | Simple SQL models | Weak for large/raw engineering and CDC processing | Insufficient alone |
 | Apache Flink | Strong streaming | Extra ops surface for this scope | Deferred |
-| SQL-engine transforms (Trino/Athena CTAS) | Fewer moving parts | Limited for heavy Spark-style jobs and CDC sinks | Possible for some Gold steps only |
+| SQL-engine transforms (Trino CTAS) | Fewer moving parts | Limited for heavy Spark-style jobs and CDC sinks | Possible for some Gold steps only |
 | Python-only (pandas/polars) for all scales | Simple locally | Does not scale or map cleanly to lakehouse engines | Rejected as primary |
 
 ## Consequences and trade-offs

@@ -39,7 +39,7 @@ Until P3-13 every lakehouse refresh rebuilt every Bronze table from every raw ob
 
 | Option | Pros | Cons | Why not (if rejected) |
 | --- | --- | --- | --- |
-| Registry as an Iceberg table | Maps to S3/Glue on AWS with no database | Every read from Python needs a Spark JVM or Trino. The registry write cannot share a transaction with the pending flags | Rejected for now. The registry write is guarded by the idempotent `MERGE`, so the store can move later |
+| Registry as an Iceberg table | No extra database | Every read from Python needs a Spark JVM or Trino. The registry write cannot share a transaction with the pending flags | Rejected for now. The registry write is guarded by the idempotent `MERGE`, so the store can move later |
 | Registry as JSON manifests in the warehouse bucket | No database | Reading it lists every manifest, so it grows with history. No transaction across manifests | Rejected |
 | Plain `INSERT INTO` for Bronze | Cheapest write | A crash between commit and registry write duplicates rows on retry | Rejected. `MERGE` makes the retry a no-op |
 | Promote incomplete executions with a null completion time (P3-12 behavior) | Bronze holds every raw object | A partial page set enters Bronze. The incremental path would have to re-stamp rows when the marker lands | Rejected. Incomplete executions wait for the marker |
@@ -51,7 +51,6 @@ Until P3-13 every lakehouse refresh rebuilt every Bronze table from every raw ob
 - **What a scheduled run reads.** Raw: one listing of each dataset prefix (metadata only, 1 000 keys per page; it grows with the number of keys), plus the bodies and markers of new objects. Registry: one indexed query per dataset. Bronze: the `MERGE` reads the match columns of the target table; see Evidence for what was measured. Silver: a pending `snapshot` or `full_refresh` dataset reads its latest complete execution; a pending `incremental_window` or `append_only` dataset re-reads the whole Bronze table of that dataset. That cost grows with that dataset's Bronze history and is accepted until Silver `MERGE` lands. Gold: a full dbt build whenever any Silver table changed.
 - **Upgrade.** Existing Bronze tables have no `_raw_etag` column. The first refresh after this change bootstraps each dataset with a full rebuild, because the registry is empty. A `MERGE` against a table that the registry knows but whose schema lacks the column fails loudly; `make live-rebuild` is the fix.
 - **Raw executions without a marker** (landed before P3-12) no longer enter Bronze. For a `snapshot` source, Silver already ignored them. For `postgres_oltp` (`incremental_window`) the local windows were re-extracted with new execution ids so that they carry markers (Evidence).
-- **AWS mapping.** The registry needs a PostgreSQL-compatible database (RDS or Aurora Serverless) next to Glue. The Airflow metadata database on AWS is a candidate. Phase 7 records the choice.
 - **Concurrency.** Staging no longer collides. Two writers of the same Iceberg table still must not run at the same time; `make` targets and the DAG share the tables, the registry, and the Ivy cache ([one writer at a time](../architecture/phase-3-orchestration.md#one-writer-at-a-time)). The `lakehouse_gold` pool serializes the DAG's writes.
 - **Checks.** `bronze-checks` compares each written Bronze table's `COUNT(*)` with the registry row total of that dataset. `silver-checks` covers only the Silver tables rebuilt in the run.
 
@@ -74,7 +73,6 @@ Unit tests: `tests/unit/lakehouse/test_refresh.py` (bootstrap, no-op, new execut
 
 - A Silver `incremental_window` or `append_only` rebuild dominates refresh time (move to `MERGE`).
 - The raw listing of one prefix becomes the bottleneck (add a per-dataset listing watermark or S3 inventory).
-- The AWS path is implemented (registry database choice, Phase 7).
 - The `dbt_build` duration dominates a refresh (name incremental models).
 
 ## Notes

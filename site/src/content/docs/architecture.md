@@ -1,6 +1,6 @@
 ---
 title: Architecture
-description: Verified local runtime, verified lakehouse, and the planned AWS path.
+description: Verified local runtime, verified lakehouse, and the phases still ahead.
 ---
 
 What is verified locally today, and what remains planned until later phases land with evidence.
@@ -37,22 +37,22 @@ Verified in the repository, not yet drawn on this page:
 
 Later (not started):
   Airflow daily and weekly schedules, streaming CDC, Grafana
-  AWS path: MinIO→S3, catalog→Glue, SQL→Athena (Terraform, Phase 7)
 ```
 
 ## Lakehouse and later phases
 
-Bronze, Silver, and Gold are verified in the repository and are not drawn on this page yet. The Airflow scheduler runs on the orchestration profile. Daily and weekly schedules, CDC, observability, and the AWS Terraform modules are not running platform components.
+Bronze, Silver, and Gold are verified in the repository and are not drawn on this page yet. The Airflow scheduler runs on the orchestration profile. Daily and weekly schedules, CDC, and observability are not running platform components.
 
 - Bronze, Silver, and Gold tables are verified in the repository. Spark writes Bronze and Silver. Trino reads. dbt-trino builds Gold. This page does not yet show those diagrams or the Phase 9 charts. Index: [Gold layer](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/gold-layer.md)
 - Daily batch, weekly batch, and streaming CDC stay separate. The PostgreSQL windowed extract is verified. Airflow schedules and CDC are not (D-007, D-008, D-014, all `proposed`)
-- AWS as Infrastructure as Code — Phase 7; local Compose remains the verification environment
+- Every component is open source and runs on the local Compose stack; there is no cloud deployment path ([D-029](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0029-open-source-only-platform.md))
 
 ## Decisions
 
-- [D-001 — Compose local; AWS as Terraform IaC](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0001-runtime-compose-local-aws-iac.md) (approved)
-- [D-006 — Airflow locally; MWAA as the AWS counterpart](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0006-orchestration.md) (approved)
-- [D-002 — MinIO local; S3 on AWS](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0002-object-storage-minio-s3.md) (approved)
+- [D-001 — Docker Compose runtime](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0001-runtime-compose-local-aws-iac.md) (approved)
+- [D-006 — Airflow locally](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0006-orchestration.md) (approved)
+- [D-002 — MinIO object storage (S3 API)](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0002-object-storage-minio-s3.md) (approved)
+- [D-029 — Open-source-only platform](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0029-open-source-only-platform.md) (approved)
 - [D-013 — Data contracts](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0013-data-contracts.md) (approved)
 - [D-020 — Raw storage layout](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0020-raw-storage-layout.md) (approved)
 - Index: [DECISIONS.md](https://github.com/FilipeOliveira94/open-data-platform/blob/main/DECISIONS.md)

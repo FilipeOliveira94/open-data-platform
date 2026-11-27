@@ -4,7 +4,7 @@
 
 Spark writes one synthetic Iceberg table through the Iceberg JDBC catalog. Trino reads that same table. The warehouse is the existing MinIO bucket, under a prefix separate from the P2-01 Hadoop-catalog probe. D-003 and D-004 record the format and this catalog.
 
-The JDBC catalog stores table pointers in PostgreSQL. On AWS, the catalog role is Glue and the SQL role is Athena. The protocols are not the same. Phase 7 documents that mapping. This probe does not create cloud resources.
+The JDBC catalog stores table pointers in PostgreSQL.
 
 ## Pins
 
@@ -51,7 +51,7 @@ The current metadata location after those runs is `s3a://odp-warehouse/catalog/c
 ## Limitations
 
 - `INSERT OVERWRITE` adds a snapshot and leaves the previous Parquet files in the bucket.
-- The JDBC catalog is not the Glue protocol. A future Iceberg change to the JDBC metadata tables can break the pair. Both sides are pinned to schema `V1`.
+- A future Iceberg change to the JDBC metadata tables can break the pair. Both sides are pinned to schema `V1`.
 - `spark-sql` still logs Hive `ObjectStore` warnings from its session catalog. No Hive Metastore was added.
 - Pinned jars resolve from the host Ivy cache at `.local/spark-ivy`, mounted at `/tmp/.ivy2` (P2-08). See [Spark Ivy cache](phase-2-spark-ivy-cache.md). A cold cache downloads them once.
 - CI does not start Compose. The unit test checks the probe files only.

@@ -13,25 +13,25 @@
 
 ## Context / problem
 
-If business logic lives in Airflow DAGs or Terraform, it becomes hard to test, reuse across local/AWS, and review. The repository layout must enforce boundaries.
+If business logic lives in Airflow DAGs or job scripts, it becomes hard to test, reuse, and review. The repository layout must enforce boundaries.
 
 ## Decision
 
-Use a **GitHub monorepo**. Put reusable business and ingestion logic in `src/open_data_platform/` (and dbt models under `dbt/`). Keep Airflow DAGs and Terraform as **thin wrappers** over package entrypoints and modules. Environment-specific configuration stays outside business logic (env vars / config files).
+Use a **GitHub monorepo**. Put reusable business and ingestion logic in `src/open_data_platform/` (and dbt models under `dbt/`). Keep Airflow DAGs and Spark job scripts as **thin wrappers** over package entrypoints and modules. Environment-specific configuration stays outside business logic (env vars / config files).
 
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not (if rejected) |
 | --- | --- | --- | --- |
-| Monorepo + package-owned logic (chosen) | Testable; shared local/AWS logic; clear reviews | Requires discipline in DAG/IaC reviews | — |
+| Monorepo + package-owned logic (chosen) | Testable; shared logic; clear reviews | Requires discipline in DAG reviews | — |
 | Logic inside DAGs | Fast to hack | Untestable; duplicated across envs | Rejected |
 | Polyrepo per component | Independent versioning | Coordination overhead for this program size | Rejected |
-| Logic in Terraform / provisioners | Infra-centric | Wrong layer; poor data testing | Rejected |
+| Logic in provisioning scripts | Infra-centric | Wrong layer; poor data testing | Rejected |
 
 ## Consequences and trade-offs
 
 - Do not create empty later-phase directories until those phases start.
-- CI should lint/test the package independently of cloud apply.
+- CI should lint/test the package independently of the running stack.
 
 ## Evidence / validation
 

@@ -7,7 +7,7 @@
 | Date decided | 2026-11-12 |
 | Owner | Platform architect |
 | Index ID | D-006 |
-| Related issues | Phase 3 (`P3-01`–`P3-15`), Phase 7 AWS counterparts |
+| Related issues | Phase 3 (`P3-01`–`P3-15`) |
 | Supersedes | — |
 | Superseded by | — |
 
@@ -17,7 +17,7 @@ Validated batch flows need scheduling, retries, dependencies, backfills and clea
 
 ## Decision
 
-Use **Apache Airflow (OSS)** in local Docker Compose for orchestration. Document **Amazon MWAA** and **AWS Step Functions** as optional AWS counterparts for the IaC case study—not required core modules in Phase 7.
+Use **Apache Airflow (OSS)** in local Docker Compose for orchestration.
 
 The local topology is one pinned image and **LocalExecutor**. P3-01 used `apache/airflow:3.4.0-python3.12` directly. Since P3-03 the services run `odp-runtime:airflow3.4.0-spark3.5.8`, built on that image with Spark and dbt added ([ADR-0005](0005-compute-and-transform.md) addendum). The long-running processes are the API server, the scheduler, and the dag processor, on the Compose profile `orchestration`. The metadata database is `airflow` on the existing PostgreSQL 16. Finished task logs are objects in the MinIO bucket `odp-airflow-logs`.
 
@@ -31,8 +31,8 @@ CeleryExecutor, Redis, and Flower are not part of this platform and are not a pl
 | Dagster | Strong software-defined assets | Different mental model; team Airflow familiarity preferred here | Deferred |
 | Prefect | Modern Python workflows | Less common lakehouse teaching path in this program | Deferred |
 | Mage | Simple notebook-like UX | Less fit for multi-DAG batch + CDC coexistence demos | Rejected |
-| Amazon MWAA | Managed Airflow on AWS | Cost; not needed for local verification | Document as AWS counterpart |
-| AWS Step Functions | Serverless orchestration | Different paradigm than Airflow DAGs; weaker local parity | Document as optional AWS pattern |
+| Amazon MWAA | Managed Airflow on AWS | Cost; not needed for local verification | Rejected: managed cloud service (ADR-0029) |
+| AWS Step Functions | Serverless orchestration | Different paradigm than Airflow DAGs; no local runtime | Rejected: managed cloud service (ADR-0029) |
 | cron / Make only | Minimal | No dependency graph, backfill UX, or failure visibility | Rejected for Phase 3 goals |
 | CeleryExecutor + Flower | Separate worker process and a queue UI | Redis 7.2 license constraint; extra processes on the same host; Flower duplicates the Airflow UI and Phase 5 Grafana | Not a planned follow-up. Revisit only for a written multi-node worker requirement |
 | Business SQL/logic inside Airflow operators | Familiar anti-pattern | Untestable; duplicates logic | Rejected by project principles |
@@ -40,7 +40,6 @@ CeleryExecutor, Redis, and Flower are not part of this platform and are not a pl
 ## Consequences and trade-offs
 
 - Daily and weekly schedules (D-007) are Airflow concerns over a shared extract. Those schedules are not part of this approval.
-- Phase 7 may document MWAA/Step Functions without implementing them as required modules.
 - `docker compose up` does not start Airflow. The profile is `orchestration`.
 - A profile-wide `stop` with no service names also stops PostgreSQL and MinIO. Stop the three Airflow services by name.
 - The health payload reports `triggerer` as `down` because this profile does not run one.

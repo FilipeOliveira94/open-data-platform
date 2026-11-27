@@ -13,11 +13,11 @@
 
 ## Context / problem
 
-Business users need charts and dashboards over Gold marts. That is separate from **ops** dashboards in Grafana ([ADR-0009](0009-observability.md)) and from raw SQL in Trino/Athena ([ADR-0004](0004-table-catalog-and-sql-engines.md)).
+Business users need charts and dashboards over Gold marts. That is separate from **ops** dashboards in Grafana ([ADR-0009](0009-observability.md)) and from raw SQL in Trino ([ADR-0004](0004-table-catalog-and-sql-engines.md)).
 
 ## Decision
 
-On 2026-11-11 the platform selected **JupyterLab** for iterative exploration and **Apache Superset** for saved business charts. Both read verified Gold marts through Trino and do not write Iceberg. Spark stays the Bronze/Silver writer. dbt-trino stays the Gold writer. Grafana stays the operations UI ([ADR-0009](0009-observability.md)). Amazon QuickSight stays the AWS counterpart and is not built in Phase 8.
+On 2026-11-11 the platform selected **JupyterLab** for iterative exploration and **Apache Superset** for saved business charts. Both read verified Gold marts through Trino and do not write Iceberg. Spark stays the Bronze/Silver writer. dbt-trino stays the Gold writer. Grafana stays the operations UI ([ADR-0009](0009-observability.md)).
 
 This row stays `proposed` until P8-01 records one read-only Trino 484 query from JupyterLab and one Superset chart on a verified Gold mart. If that PoC fails, record the failure here and pick another candidate before any later Phase 8 issue starts.
 
@@ -32,9 +32,9 @@ JupyterLab runs as a host `uv` process against the published Trino port, the sam
 | Metabase | Simple question UX | AGPL-3.0; its semantic layer repeats Gold grain | Not selected on 2026-11-11 |
 | JupyterLab + Metabase | Familiar notebook plus a simple BI UI | Same AGPL and semantic-layer cost | Not selected on 2026-11-11 |
 | Marimo + Superset | Git-friendly notebooks plus Apache-2.0 BI | Still carries the Superset operational cost | Not selected on 2026-11-11 |
-| Amazon QuickSight | Native AWS BI | Cost; weaker local parity | AWS counterpart only; not built in Phase 8 |
+| Amazon QuickSight | Native AWS BI | Cost; no local runtime | Rejected: managed cloud service (ADR-0029) |
 | Tableau / Power BI | Familiar enterprise BI | Licensing; weak Compose reproducibility | External optional; not core |
-| SQL only (Trino/Athena) with no BI tool | Minimal | Poor repeated-chart path | Interim until Phase 8 |
+| SQL only (Trino) with no BI tool | Minimal | Poor repeated-chart path | Interim until Phase 8 |
 | Grafana as primary business BI | Already planned for Phase 5 | Ops-oriented; weak semantic BI modeling | Rejected as primary BI |
 
 ## Consequences and trade-offs

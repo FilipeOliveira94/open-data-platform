@@ -1,4 +1,4 @@
-"""Minimal S3-compatible object storage helpers (local MinIO / AWS S3)."""
+"""Minimal S3-compatible object storage helpers (MinIO)."""
 
 from __future__ import annotations
 

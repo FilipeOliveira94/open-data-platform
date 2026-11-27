@@ -1,5 +1,7 @@
 # ADR-0001: Runtime model (Compose local · AWS as IaC)
 
+> **Partly superseded 2026-11-27 by [ADR-0029](0029-open-source-only-platform.md).** Docker Compose as the local runtime stays approved. The AWS-as-Terraform half (Phase 7) is withdrawn; the text below is kept as history.
+
 | Field | Value |
 | --- | --- |
 | Status | `approved` |
@@ -9,7 +11,7 @@
 | Index ID | D-001 |
 | Related issues | P0-13, Phase 7 (`P7-01`–`P7-09`) |
 | Supersedes | — |
-| Superseded by | — |
+| Superseded by | [ADR-0029](0029-open-source-only-platform.md) (the AWS IaC half) |
 
 ## Context / problem
 

@@ -1,15 +1,17 @@
 # ADR-0011: IaC and CI credentials
 
+> **Superseded 2026-11-27 by [ADR-0029](0029-open-source-only-platform.md).** The platform has no cloud deployment path, so there is no Terraform tree or AWS OIDC role. CI stays on GitHub Actions without cloud credentials. The text below is kept as history.
+
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `superseded` |
 | Date opened | 2026-10-15 |
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-011 |
 | Related issues | P0-12, P6-03, P6-06, P7-02–P7-05 |
 | Supersedes | — |
-| Superseded by | — |
+| Superseded by | [ADR-0029](0029-open-source-only-platform.md) |
 
 ## Context / problem
 
