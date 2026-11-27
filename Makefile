@@ -182,6 +182,19 @@ coverage-report: ## Gap and overlap report of the PostgreSQL extract windows (FR
 	$(COMPOSE) up -d --wait postgres; \
 	$(COMPOSE) --profile lakehouse run --rm -T --no-deps spark python -m open_data_platform.ingestion.coverage report --frequency $(FREQUENCY)
 
+sources-requirements: ## Export docker/sources/requirements.txt from uv.lock (project deps + sources group)
+	$(UV) export --no-default-groups --group sources --format requirements-txt --no-emit-project --frozen -o docker/sources/requirements.txt
+
+sources-build: ## Build the odp-sources image (BioGuardia simulators, P11-02)
+	docker compose build bioguardia-ops-export
+
+sources-up: ## Start the BioGuardia export service (profile sources)
+	docker compose --profile sources up -d bioguardia-ops-export
+
+bioguardia-export: ## Publish BioGuardia drops: START=YYYY-MM-DD END=YYYY-MM-DD [WORKERS=4] [ARGS=--allow-future]
+	@test -n "$(START)" && test -n "$(END)" || (echo "START and END are required" >&2; exit 2)
+	docker compose --profile sources run --rm bioguardia-ops-export export generate --start $(START) --end $(END) --workers $(or $(WORKERS),4) $(ARGS)
+
 runtime-build: ## Build the shared runtime image (Airflow + Spark + dbt)
 	$(COMPOSE) --profile lakehouse build spark
 

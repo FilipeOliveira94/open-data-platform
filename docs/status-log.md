@@ -25,6 +25,25 @@ The first daily attempt on 2026-10-24 logged one FAIL: the script expected Silve
 
 ---
 
+### 2026-11-26 — P11-02 BioGuardia daily export generator
+
+`open_data_platform.simulators.bioguardia` generates the BioGuardia Operations Hub and Finance daily exports from one deterministic world model ([ADR-0027](decisions/0027-bioguardia-synthetic-sources.md), [domain model](architecture/bioguardia-domain.md), source notes [`bioguardia-ops-export.md`](sources/bioguardia-ops-export.md) and [`bioguardia-finance-export.md`](sources/bioguardia-finance-export.md)). Each drop is a set of gzip CSV and JSON Lines files, a `_manifest.json` (rows, bytes, uncompressed bytes, SHA-256, columns, exact decimal control totals, time range), and `_SUCCESS` written last, in MinIO `odp-landing`; the planted-defect lists go only to `odp-evaluation`. New: image `odp-sources` (`docker/sources/Dockerfile`, `python:3.12.15-slim-bookworm` by digest, dependencies exported from `uv.lock` with hashes), Compose service `bioguardia-ops-export` on profile `sources` (the release loop: ops at 02:00 BRT, finance at 06:00 BRT, version 2 three days after version 1, catch-up in date order), Make targets `sources-build`, `sources-up`, `sources-requirements`, `bioguardia-export`, and the `.env.example` names. The drops from 2026-11-26 to 2026-12-31 were published in advance at Filipe's request (`--allow-future`), so they are visible before their release time; P11-05 must ignore a drop whose `released_at` is in the future.
+
+| Check | Result |
+| --- | --- |
+| `uv run ruff check` | Passed |
+| `uv run pytest tests/unit/simulators` | 44 passed: determinism, a date alone equal to the same date inside a range, cost not growing with history, manifests against files, SCD2 signals (late-entered calibrations, future-dated assignments), deletes, synthetic PII (CPF and CNPJ checksums fail, `.example` emails, unassigned area codes), skew shares, referential integrity, file defects, version 2 corrections, the byte cap, release times, an upload interrupted mid-drop, logs without row values, source notes listing every column |
+| `make test`, `make lint` | 661 passed; lint passed |
+| `pytest tests/integration/simulators -m integration` | 1 passed against the local MinIO (`odp-test-landing`) |
+| Backfill 2026-11-26 to 2026-12-31 | 37 ops drops (36 dates and the version 2 of 2026-12-15) and 36 finance drops; 880,848,289 rows and 13,187,980,547 bytes of gzip (118.5 GB uncompressed); 23.8M rows and 356 MB per ops drop; 22 min 9 s with 12 workers in the `odp-sources` container; every manifest's time range parses; the 2026-12-01 drop holds 22 tables (`canopy_surveys`), the others 21. Per-drop figures are in the source note |
+| Planted | File defects on 2026-12-20 (`deleted_records` truncated, `deforestation_alerts` missing) and 2026-12-22 (`planting_lots` truncated); 19,065 corrections in the version 2 of 2026-12-15; 18,611 record defects and 7,605 free-text PII values in December; `devices` schema version 2 from 2026-12-15 |
+| Regeneration | 2026-12-07 regenerated in the same image into a test bucket: the 21 SHA-256 values equal the published ones |
+| Kill drill | A run for 2026-12-08 killed after 90 s left no object and no `_SUCCESS`; the rerun completed it with the published SHA-256 values |
+| One drop alone | 218 s and 432 MB of peak resident memory at scale 1 |
+| `code-reviewer` | Round 1 BLOCK: an outage ending at 00:00 UTC was never uploaded by the stream and overlapping outages were counted per outage; both fixed with tests (outages are merged and the upload reads the previous day's plan). Round 2 PASS; its warnings fixed |
+
+---
+
 ### 2026-11-26 — P11-01 BioGuardia Atlantic domain model and Phase 11
 
 Filipe approved the Phase 11 plan on 2026-11-26 with two changes: the daily batch export grows to at least 20M rows a day with a 2 GB cap per drop, and the telemetry stream is 1M events an hour instead of 5M. Added [`docs/architecture/bioguardia-domain.md`](architecture/bioguardia-domain.md) (organization, use cases, sources, 23-dataset catalog, telemetry topics, world model, the PII, skew, SCD2 and reconciliation cases, synthetic-data safety, planted defects, storage budget), [ADR-0027](decisions/0027-bioguardia-synthetic-sources.md) and [ADR-0028](decisions/0028-telemetry-message-broker.md) (`proposed`, D-027 and D-028), an addendum to ADR-0008, and Phase 11 in `ROADMAP.md` (P11-01 to P11-18). The waiver that lets P11-01 to P11-03 run before Phase 3 closes is in the `DECISIONS.md` changelog. P4-02 now runs Debezium on the P11-03 broker, P4-04 depends on the P11-04 proof, P4-08 is the only CDC-based SCD issue, and P5-07's maintenance command is shared with P11-08 and P11-15.

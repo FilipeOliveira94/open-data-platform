@@ -78,6 +78,34 @@ x-airflow-env: &airflow-env
   KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
   KAGGLE_KEY: ${KAGGLE_KEY:-}
 
+# BioGuardia source simulators (P11-02, ADR-0027). They play the agency's
+# systems and run outside Airflow: drops keep landing while Airflow is down.
+x-sources-env: &sources-env
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  MINIO_REGION: ${MINIO_REGION:-us-east-1}
+  MINIO_ENDPOINT_URL: http://minio:9000
+  ODP_LANDING_BUCKET: ${ODP_LANDING_BUCKET:-odp-landing}
+  ODP_EVALUATION_BUCKET: ${ODP_EVALUATION_BUCKET:-odp-evaluation}
+  ODP_BIOGUARDIA_SEED: ${ODP_BIOGUARDIA_SEED:-7}
+  ODP_BIOGUARDIA_SCALE: ${ODP_BIOGUARDIA_SCALE:-1}
+  ODP_BIOGUARDIA_DEFECTS: ${ODP_BIOGUARDIA_DEFECTS:-default}
+  ODP_BIOGUARDIA_SCHEMA_V2_FROM: ${ODP_BIOGUARDIA_SCHEMA_V2_FROM:-2026-12-15}
+  ODP_BIOGUARDIA_HISTORY_START: ${ODP_BIOGUARDIA_HISTORY_START:-2026-11-26}
+  ODP_BIOGUARDIA_MAX_DROP_BYTES: ${ODP_BIOGUARDIA_MAX_DROP_BYTES:-2000000000}
+  ODP_BIOGUARDIA_WORK_DIR: /var/lib/bioguardia
+  ODP_TELEMETRY_RATE_SCALE: ${ODP_TELEMETRY_RATE_SCALE:-1}
+  ODP_TELEMETRY_BUFFER_HOURS: ${ODP_TELEMETRY_BUFFER_HOURS:-12}
+
+x-sources-common: &sources-common
+  image: odp-sources:py3.12.15
+  build:
+    context: ./docker/sources
+  environment: *sources-env
+  volumes:
+    - ./src:/opt/odp/repo/src:ro
+    - odp_bioguardia_work:/var/lib/bioguardia
+
 x-airflow-common: &airflow-common
   image: *runtime-image
   build: *runtime-build
@@ -325,9 +353,34 @@ services:
       minio:
         condition: service_healthy
 
+  # The agency's export service: publishes each daily drop after its release
+  # time (ops 02:00 BRT, finance 06:00 BRT) and catches up missed days.
+  bioguardia-ops-export:
+    <<: *sources-common
+    profiles: [sources]
+    restart: unless-stopped
+    command: ["export", "serve", "--interval", "300"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys,time; sys.exit(time.time() - int(open('/tmp/bioguardia-export.heartbeat').read()) > 3600)",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
 volumes:
   odp_postgres_data:
   odp_minio_data:
   odp_airflow_logs:
   # Rendered SQL, Bronze counts, and dbt target/logs per run label.
   odp_lakehouse_work:
+  # Scratch files of the BioGuardia export service while it writes a drop.
+  odp_bioguardia_work:
