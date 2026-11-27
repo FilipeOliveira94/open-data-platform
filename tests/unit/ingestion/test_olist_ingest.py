@@ -112,7 +112,13 @@ def test_file_map_covers_olist_contracts() -> None:
         for source in OLIST_SOURCES
         for spec in source.files
     }
-    olist = {identity for identity in contracts if identity[0].startswith("olist_")}
+    # olist_synth_cdc is the synthetic PostgreSQL source, not an Olist file.
+    olist = {
+        identity
+        for identity in contracts
+        if identity[0].startswith("olist_")
+        and not identity[0].startswith("olist_synth")
+    }
     assert mapped == olist
     names = [spec.object_name for source in OLIST_SOURCES for spec in source.files]
     assert len(names) == len(set(names)) == 11

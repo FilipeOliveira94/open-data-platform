@@ -17,8 +17,8 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from open_data_platform.contracts.load import default_contracts_dir, load_contracts
 from open_data_platform.contracts.model import ContractError
-from open_data_platform.ingestion.postgres_oltp import (
-    PostgresOltpError,
+from open_data_platform.ingestion.olist_synth_cdc import (
+    OlistSynthCdcError,
     connect_from_env,
 )
 from open_data_platform.object_storage import client_from_env, put_and_get_object
@@ -32,7 +32,7 @@ _DATABASE_SQL = "SELECT current_database()"
 _SCHEMA_SQL = (
     "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s"
 )
-_OLTP_SCHEMA = "oltp"
+_OLIST_SYNTH_SCHEMA = "olist_synth"
 
 
 class EnvCheckError(Exception):
@@ -137,12 +137,12 @@ def check_minio_write(
     print(f"smoke_key={_SMOKE_KEY}")
 
 
-def check_postgres_oltp(
+def check_olist_synth_cdc(
     env: Mapping[str, str] | None = None,
     *,
     connect: Callable[[Mapping[str, str]], _Connection] | None = None,
 ) -> None:
-    """Open the OLTP database and require the ``oltp`` schema."""
+    """Open the olist-synth database and require the ``olist_synth`` schema."""
     settings = os.environ if env is None else env
     host = settings.get("POSTGRES_HOST", "").strip()
     if host != _COMPOSE_POSTGRES_HOST:
@@ -155,26 +155,26 @@ def check_postgres_oltp(
     database = _require_setting(settings, "POSTGRES_DB")
     forbidden = _forbidden_databases(settings)
     if database in forbidden:
-        msg = "POSTGRES_DB must be the OLTP database"
+        msg = "POSTGRES_DB must be the olist-synth database"
         raise EnvCheckError(msg)
     opener = connect_from_env if connect is None else connect
     try:
         connection = opener(settings)
-    except PostgresOltpError as exc:
+    except OlistSynthCdcError as exc:
         raise EnvCheckError(str(exc)) from None
     try:
         current, schema_present = _read_database(connection)
     finally:
         connection.close()
     if current != database or current in forbidden:
-        msg = "current_database does not match the OLTP database"
+        msg = "current_database does not match the olist-synth database"
         raise EnvCheckError(msg)
     if not schema_present:
-        msg = "oltp schema is absent"
+        msg = "olist_synth schema is absent"
         raise EnvCheckError(msg)
     print(f"postgres_host={host}")
     print(f"database={current}")
-    print("oltp_schema=present")
+    print("olist_synth_schema=present")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -189,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
             "contracts",
             "minio_raw",
             "minio_write",
-            "postgres_oltp",
+            "olist_synth_cdc",
         ),
     )
     args = parser.parse_args(argv)
@@ -198,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
         "contracts": check_contracts,
         "minio_raw": check_minio_raw,
         "minio_write": check_minio_write,
-        "postgres_oltp": check_postgres_oltp,
+        "olist_synth_cdc": check_olist_synth_cdc,
     }
     try:
         steps[args.step]()
@@ -263,7 +263,7 @@ def _read_database(connection: _Connection) -> tuple[str, bool]:
     with connection.cursor() as cursor:
         cursor.execute(_DATABASE_SQL)
         row = cursor.fetchone()
-        cursor.execute(_SCHEMA_SQL, (_OLTP_SCHEMA,))
+        cursor.execute(_SCHEMA_SQL, (_OLIST_SYNTH_SCHEMA,))
         schema = cursor.fetchone()
     current = ""
     if row is not None and row[0] is not None:

@@ -1,0 +1,915 @@
+"""Unit tests for the PostgreSQL windowed extract. No database connection."""
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta, timezone
+from decimal import Decimal
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
+
+import psycopg
+import pytest
+
+from open_data_platform.contracts.load import load_contracts
+from open_data_platform.contracts.model import ContractField, DataContract
+from open_data_platform.ingestion.coverage import SETTLE_LAG
+from open_data_platform.ingestion.olist_synth_cdc import (
+    DATASETS,
+    SNAPSHOT_SQL,
+    SOURCE_ID,
+    TRIGGER_CHECK_SQL,
+    OlistSynthCdcError,
+    apply_olist_synth_schema,
+    default_fixture_path,
+    extract_olist_synth_cdc,
+    main,
+    schema_sql,
+    seed_synthetic,
+    validate_window,
+)
+from open_data_platform.lakehouse.bronze import parse_payload
+from open_data_platform.lakehouse.silver.cli import policy_for
+from open_data_platform.lakehouse.silver.common import (
+    decimal_pattern,
+    render_silver_sql,
+)
+
+_TS = datetime(2026, 10, 25, 15, tzinfo=UTC)
+_DAY_START = datetime(2026, 10, 17, tzinfo=UTC)
+_DAY_END = datetime(2026, 10, 18, tzinfo=UTC)
+_WEEK_END = datetime(2026, 10, 24, tzinfo=UTC)
+
+
+@dataclass
+class _Table:
+    columns: list[str]
+    rows: list[tuple[object, ...]]
+
+
+class _RecordingCursor:
+    def __init__(self, queries: list[tuple[str, tuple[object, ...]]]) -> None:
+        self._queries = queries
+        self.description: list[tuple[str]] | None = None
+
+    def __enter__(self) -> _RecordingCursor:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def execute(self, query: str, params: Sequence[object] | None = None) -> None:
+        self._queries.append((query, tuple(params or ())))
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        return []
+
+
+class _RecordingConnection:
+    def __init__(self) -> None:
+        self.queries: list[tuple[str, tuple[object, ...]]] = []
+        self.commits = 0
+        self.rollbacks = 0
+
+    def cursor(self) -> _RecordingCursor:
+        return _RecordingCursor(self.queries)
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
+
+
+class _ScriptedCursor:
+    def __init__(self, owner: _ScriptedConnection) -> None:
+        self._owner = owner
+        self.description: list[tuple[str]] | None = None
+        self._rows: list[tuple[object, ...]] = []
+
+    def __enter__(self) -> _ScriptedCursor:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def execute(self, query: str, params: Sequence[object] | None = None) -> None:
+        # Snapshot setup and the trigger check are not data queries.
+        if query in {SNAPSHOT_SQL, TRIGGER_CHECK_SQL}:
+            self._owner.session.append((query, tuple(params or ())))
+            self.description = [("relname",)]
+            self._rows = [(name,) for name in self._owner.guarded]
+            return
+        self._owner.queries.append((query, tuple(params or ())))
+        if not self._owner.steps:
+            msg = "unexpected query"
+            raise AssertionError(msg)
+        step = self._owner.steps.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        self.description = [(name,) for name in step.columns]
+        self._rows = list(step.rows)
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        return self._rows
+
+
+class _ScriptedConnection:
+    def __init__(
+        self,
+        steps: list[_Table | Exception],
+        guarded: tuple[str, ...] = DATASETS,
+    ) -> None:
+        self.steps = steps
+        self.guarded = guarded
+        self.session: list[tuple[str, tuple[object, ...]]] = []
+        self.queries: list[tuple[str, tuple[object, ...]]] = []
+        self.commits = 0
+        self.rollbacks = 0
+
+    def cursor(self) -> _ScriptedCursor:
+        return _ScriptedCursor(self)
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
+
+
+def _client() -> MagicMock:
+    client = MagicMock()
+    client.head_bucket.return_value = {}
+    return client
+
+
+def _contracts() -> dict[str, DataContract]:
+    return {
+        item.dataset: item for item in load_contracts() if item.source_id == SOURCE_ID
+    }
+
+
+def _sample(field: ContractField) -> object:
+    if field.field_type == "timestamp":
+        return datetime(2026, 10, 17, 8, tzinfo=UTC)
+    if field.field_type == "integer":
+        return 7
+    if field.field_type in {"number", "decimal"}:
+        return Decimal("10.50")
+    return "value"
+
+
+def _row(contract: DataContract, **overrides: object) -> tuple[object, ...]:
+    values: list[object] = []
+    for field in contract.fields:
+        if field.name in overrides:
+            values.append(overrides[field.name])
+        elif field.nullable:
+            values.append(None)
+        else:
+            values.append(_sample(field))
+    return tuple(values)
+
+
+def _table(contract: DataContract, *rows: tuple[object, ...]) -> _Table:
+    return _Table([field.name for field in contract.fields], list(rows))
+
+
+def _extract(
+    connection: _ScriptedConnection,
+    client: MagicMock | None = None,
+    **overrides: Any,
+) -> tuple[Any, ...]:
+    storage = _client() if client is None else client
+    kwargs: dict[str, Any] = {
+        "bucket": "odp-raw",
+        "execution_id": "run-001",
+        "window_start": _DAY_START,
+        "window_end": _DAY_END,
+        "ingestion_ts": _TS,
+        "datasets": ("sellers",),
+    }
+    kwargs.update(overrides)
+    return extract_olist_synth_cdc(storage, connection, **kwargs)
+
+
+def _puts(client: MagicMock) -> list[Any]:
+    return _data_puts(client)
+
+
+def _env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ODP_RAW_BUCKET", "odp-raw")
+    monkeypatch.setenv("POSTGRES_USER", "odp")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "odp")
+    monkeypatch.setenv("POSTGRES_DB", "odp")
+
+
+def test_schema_covers_every_contract_column() -> None:
+    script = schema_sql()
+
+    assert script.count("updated_at timestamptz NOT NULL") == 4
+    for dataset, contract in _contracts().items():
+        assert f"CREATE TABLE IF NOT EXISTS olist_synth.{dataset}" in script
+        for field in contract.fields:
+            assert field.name in script
+
+
+def test_apply_schema_executes_the_shipped_script() -> None:
+    connection = _RecordingConnection()
+
+    apply_olist_synth_schema(connection)
+
+    statements = [query for query, _params in connection.queries]
+    assert len(statements) == 10
+    assert "CREATE SCHEMA IF NOT EXISTS olist_synth" in statements[0]
+    created = [query for query in statements if query.startswith("CREATE TABLE")]
+    assert len(created) == 4
+    function = [q for q in statements if "CREATE OR REPLACE FUNCTION" in q]
+    assert len(function) == 1
+    assert "clock_timestamp()" in function[0]
+    assert function[0].rstrip().endswith("$$")
+    triggers = [q for q in statements if "CREATE OR REPLACE TRIGGER" in q]
+    assert [q.split(" ON ")[1].split()[0] for q in triggers] == [
+        f"olist_synth.{dataset}" for dataset in DATASETS
+    ]
+    assert connection.commits == 1
+    assert connection.rollbacks == 0
+
+
+def test_empty_schema_script_is_rejected() -> None:
+    connection = _RecordingConnection()
+
+    with pytest.raises(OlistSynthCdcError, match="schema script is empty"):
+        apply_olist_synth_schema(connection, script="  ")
+
+    assert connection.queries == []
+    assert connection.commits == 0
+
+
+def test_seed_replaces_rows_with_parameterized_inserts() -> None:
+    connection = _RecordingConnection()
+
+    seed_synthetic(connection)
+    seed_synthetic(connection)
+
+    first_pass = connection.queries[: 1 + 11]
+    truncate, inserts = first_pass[0], first_pass[1:]
+    assert truncate[0].startswith("TRUNCATE TABLE ")
+    for dataset in DATASETS:
+        assert f'"olist_synth"."{dataset}"' in truncate[0]
+    assert all(query.startswith("INSERT INTO ") for query, _params in inserts)
+    assert all("%s" in query for query, _params in inserts)
+    seller_params = [params for query, params in inserts if '"sellers"' in query]
+    assert any(params[0] == "seller-17" for params in seller_params)
+    assert all("seller-17" not in query for query, _params in inserts)
+    assert connection.commits == 2
+    assert connection.queries[12][0].startswith("TRUNCATE TABLE ")
+
+
+def test_fixture_windows_keep_boundary_rows() -> None:
+    payload = json.loads(default_fixture_path().read_text(encoding="utf-8"))
+
+    def selected(start: datetime, end: datetime) -> list[str]:
+        found = []
+        for row in payload["sellers"]:
+            updated_at = datetime.fromisoformat(
+                row["updated_at"].replace("Z", "+00:00")
+            )
+            if start <= updated_at < end:
+                found.append(row["seller_id"])
+        return found
+
+    assert selected(_DAY_START, _DAY_END) == ["seller-17", "seller-17b"]
+    assert selected(_DAY_START, _WEEK_END) == ["seller-17", "seller-17b", "seller-18"]
+
+
+def test_duplicate_fixture_key_is_rejected(tmp_path: Path) -> None:
+    payload = json.loads(default_fixture_path().read_text(encoding="utf-8"))
+    payload["sellers"].append(payload["sellers"][0])
+    path = tmp_path / "synthetic.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    connection = _RecordingConnection()
+
+    with pytest.raises(OlistSynthCdcError, match="primary key is duplicated"):
+        seed_synthetic(connection, fixture_path=path)
+
+    assert connection.queries == []
+
+
+def test_daily_and_weekly_windows_share_one_extract() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract)), _table(contract, _row(contract))]
+    )
+    client = _client()
+
+    _extract(connection, client, window_end=_DAY_END)
+    _extract(connection, client, window_end=_WEEK_END)
+
+    assert connection.queries[0][0] == connection.queries[1][0]
+    assert connection.queries[0][1] == (_DAY_START, _DAY_END)
+    assert connection.queries[1][1] == (_DAY_START, _WEEK_END)
+    assert connection.queries[0][0].count("%s") == 2
+    assert "2026-10-17" not in connection.queries[0][0]
+    assert 'ORDER BY "seller_id"' in connection.queries[0][0]
+    keys = [call.kwargs["Key"] for call in _puts(client)]
+    assert keys[0] == (
+        "raw/olist_synth_cdc/sellers/dt=2026-10-25/"
+        "execution_id=run-001/sellers_2026-10-17_2026-10-18.json"
+    )
+    assert keys[1].endswith("/sellers_2026-10-17_2026-10-24.json")
+    assert keys[0] != keys[1]
+
+
+def test_offset_midnight_is_normalized_to_utc() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection([_table(contract, _row(contract))])
+    client = _client()
+    local = timezone(timedelta(hours=3))
+
+    _extract(
+        connection,
+        client,
+        window_start=datetime(2026, 10, 17, 3, tzinfo=local),
+        window_end=datetime(2026, 10, 18, 3, tzinfo=local),
+    )
+
+    assert connection.queries[0][1] == (_DAY_START, _DAY_END)
+    assert (
+        _puts(client)[0].kwargs["Key"].endswith("/sellers_2026-10-17_2026-10-18.json")
+    )
+
+
+def test_extract_encodes_contract_types_and_nulls() -> None:
+    contract = _contracts()["orders"]
+    row = _row(contract)
+    connection = _ScriptedConnection([_table(contract, row)])
+    client = _client()
+
+    _extract(connection, client, datasets=("orders",))
+
+    stored = json.loads(_puts(client)[0].kwargs["Body"])
+    assert list(stored[0]) == [field.name for field in contract.fields]
+    assert stored[0]["order_approved_at"] is None
+    assert stored[0]["order_purchase_timestamp"] == "2026-10-17T08:00:00Z"
+    assert _puts(client)[0].kwargs["ContentType"] == "application/json"
+    assert _puts(client)[0].kwargs["Metadata"]["source_id"] == SOURCE_ID
+    assert _puts(client)[0].kwargs["Metadata"]["execution_id"] == "run-001"
+
+
+def test_numbers_and_shifted_timestamps_are_json_values() -> None:
+    contract = _contracts()["order_items"]
+    shifted = datetime(2026, 10, 17, 11, tzinfo=timezone(timedelta(hours=3)))
+    row = _row(
+        contract,
+        price=Decimal("10.50"),
+        freight_value=Decimal("3.25"),
+        updated_at=shifted,
+    )
+    connection = _ScriptedConnection([_table(contract, row)])
+    client = _client()
+
+    _extract(connection, client, datasets=("order_items",))
+
+    body = _puts(client)[0].kwargs["Body"]
+    assert b'"price":10.50,"freight_value":3.25,' in body
+    stored = json.loads(body, parse_float=Decimal)
+    assert str(stored[0]["price"]) == "10.50"
+    assert stored[0]["updated_at"] == "2026-10-17T08:00:00Z"
+    assert 'ORDER BY "order_id", "order_item_id"' in connection.queries[0][0]
+
+
+def _order_item_prices(rows: list[tuple[object, ...]]) -> list[str | None]:
+    """Extract the rows, then read the raw body the way Bronze does."""
+    contract = _contracts()["order_items"]
+    client = _client()
+    _extract(
+        _ScriptedConnection([_table(contract, *rows)]),
+        client,
+        datasets=("order_items",),
+    )
+    body = _puts(client)[0].kwargs["Body"]
+    return [row["price"] for row in parse_payload(contract, body)]
+
+
+def test_a_planted_amount_survives_extract_bronze_and_silver_unchanged() -> None:
+    contract = _contracts()["order_items"]
+    planted = Decimal("1234567890.12")  # the largest scale-2 shape numeric(12,2) holds
+
+    [bronze_text] = _order_item_prices([_row(contract, price=planted)])
+
+    assert bronze_text == "1234567890.12"
+    silver_sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
+    assert (
+        "CASE WHEN `price` RLIKE '^-?(0|[1-9][0-9]{0,9})([.][0-9]{1,2})?$'"
+        " THEN TRY_CAST(`price` AS DECIMAL(12,2)) END"
+    ) in silver_sql
+    assert "CAST(`price` AS DECIMAL(12,2)) AS `price`" in silver_sql
+    assert re.search(decimal_pattern(12, 2), bronze_text) is not None
+    assert Decimal(bronze_text) == planted
+
+
+def test_an_old_float_token_and_a_new_exact_token_are_the_same_amount() -> None:
+    contract = _contracts()["order_items"]
+    old = b'[{"order_id":"o1","order_item_id":1,"product_id":"p","seller_id":"s",'
+    old += b'"shipping_limit_date":"2026-10-17T08:00:00Z","price":10.5,'
+    old += b'"freight_value":3.25,"updated_at":"2026-10-17T08:00:00Z"}]'
+
+    [old_text] = [row["price"] for row in parse_payload(contract, old)]
+    [new_text] = _order_item_prices([_row(contract, price=Decimal("10.50"))])
+
+    assert (old_text, new_text) == ("10.5", "10.50")
+    for text in (old_text, new_text):
+        assert re.search(decimal_pattern(12, 2), text) is not None
+    assert Decimal(old_text) == Decimal(new_text)
+
+
+def test_a_sum_of_planted_cents_is_exact() -> None:
+    contract = _contracts()["order_items"]
+    cents = [Decimal("0.10"), Decimal("0.20"), *([Decimal("0.01")] * 98)]
+    rows = [
+        _row(contract, order_item_id=index, price=amount)
+        for index, amount in enumerate(cents, start=1)
+    ]
+
+    texts = _order_item_prices(rows)
+
+    assert sum(Decimal(text) for text in texts if text is not None) == Decimal("1.28")
+    running = 0.0
+    for text in texts:
+        running += float(text or "0")
+    assert running != 1.28  # the same cents as binary doubles drift
+
+
+def test_empty_window_writes_an_empty_array() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection([_table(contract)])
+    client = _client()
+
+    _extract(connection, client)
+
+    assert _puts(client)[0].kwargs["Body"] == b"[]\n"
+
+
+def test_same_execution_overwrites_the_same_key() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [
+            _table(contract, _row(contract)),
+            _table(contract, _row(contract, seller_city="recife")),
+        ]
+    )
+    client = _client()
+
+    first = _extract(connection, client)
+    second = _extract(connection, client)
+
+    assert first[0].key == second[0].key
+    assert json.loads(_puts(client)[1].kwargs["Body"])[0]["seller_city"] == "recife"
+
+
+def test_datasets_run_in_canonical_order() -> None:
+    contracts = _contracts()
+    connection = _ScriptedConnection(
+        [
+            _table(contracts["sellers"], _row(contracts["sellers"])),
+            _table(contracts["order_items"], _row(contracts["order_items"])),
+        ]
+    )
+
+    _extract(connection, datasets=("order_items", "sellers"))
+
+    assert '"sellers"' in connection.queries[0][0]
+    assert '"order_items"' in connection.queries[1][0]
+
+
+def test_null_primary_key_stays_in_raw_and_is_quarantined() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection([_table(contract, _row(contract, seller_id=None))])
+    client = _client()
+
+    _extract(connection, client, datasets=("sellers",))
+
+    assert len(connection.queries) == 1
+    stored = json.loads(_puts(client)[0].kwargs["Body"])
+    assert stored[0]["seller_id"] is None
+    sidecar = _puts(client)[1].kwargs
+    assert sidecar["Key"].startswith("quarantine/olist_synth_cdc/sellers/")
+    finding = json.loads(sidecar["Body"].splitlines()[0])
+    assert finding["reason"] == "null_violation"
+    assert finding["field"] == "seller_id"
+    assert len(_data_deletes(client)) == 0
+
+
+def test_column_mismatch_keeps_the_dataset_already_written() -> None:
+    contracts = _contracts()
+    broken = _Table(["customer_id"], [("customer-17",)])
+    connection = _ScriptedConnection(
+        [
+            _table(contracts["sellers"], _row(contracts["sellers"])),
+            broken,
+            _table(contracts["orders"], _row(contracts["orders"])),
+        ]
+    )
+    client = _client()
+
+    with pytest.raises(OlistSynthCdcError, match="result columns do not match"):
+        _extract(connection, client, datasets=("sellers", "customers", "orders"))
+
+    # All three are read in one snapshot; the write stops at the bad one.
+    assert len(connection.queries) == 3
+    assert len(_data_puts(client)) == 1
+    assert not connection.steps
+
+
+def test_database_error_during_the_snapshot_writes_nothing() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract)), psycopg.OperationalError("secret-row")]
+    )
+    client = _client()
+
+    with pytest.raises(OlistSynthCdcError, match="PostgreSQL extract failed") as caught:
+        _extract(connection, client, datasets=("sellers", "customers"))
+
+    assert "secret-row" not in str(caught.value)
+    assert len(_data_puts(client)) == 0
+    assert len(connection.queries) == 2
+    assert connection.rollbacks == 1
+    assert connection.commits == 0
+
+
+def test_naive_timestamp_value_fails_the_batch() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract, updated_at=datetime(2026, 10, 17, 8)))]
+    )
+    client = _client()
+
+    with pytest.raises(OlistSynthCdcError, match="timezone"):
+        _extract(connection, client)
+
+    assert len(_data_puts(client)) == 0
+
+
+def test_boolean_in_an_integer_field_is_quarantined() -> None:
+    contract = _contracts()["sellers"]
+    client = _client()
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract, seller_zip_code_prefix=True))]
+    )
+
+    _extract(connection, client)
+
+    stored = json.loads(_puts(client)[0].kwargs["Body"])
+    assert stored[0]["seller_zip_code_prefix"] is True
+    finding = json.loads(_puts(client)[1].kwargs["Body"].splitlines()[0])
+    assert finding["reason"] == "type_mismatch"
+    assert finding["field"] == "seller_zip_code_prefix"
+
+
+def test_non_finite_numbers_fail_before_the_write() -> None:
+    items = _contracts()["order_items"]
+    infinite = _ScriptedConnection([_table(items, _row(items, price=float("nan")))])
+    client = _client()
+
+    with pytest.raises(OlistSynthCdcError, match="finite number"):
+        _extract(infinite, client, datasets=("order_items",))
+
+    assert len(_data_puts(client)) == 0
+
+
+def test_unsafe_identifier_never_reaches_the_database() -> None:
+    sellers = _contracts()["sellers"]
+    bad_fields = tuple(
+        replace(field, name="seller_id;drop") if field.name == "seller_id" else field
+        for field in sellers.fields
+    )
+    bad = replace(sellers, fields=bad_fields, primary_key=("seller_id;drop",))
+    others = [
+        contract for contract in _contracts().values() if contract.dataset != "sellers"
+    ]
+    connection = _ScriptedConnection([])
+    client = _client()
+
+    with pytest.raises(OlistSynthCdcError, match="invalid SQL identifier"):
+        _extract(
+            connection,
+            client,
+            datasets=("sellers",),
+            contracts=(bad, *others),
+        )
+
+    assert connection.queries == []
+    assert len(_data_puts(client)) == 0
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "message"),
+    [
+        (datetime(2026, 10, 17), _DAY_END, "timezone"),
+        (_DAY_END, _DAY_START, "after window start"),
+        (_DAY_START, _DAY_START, "after window start"),
+        (
+            datetime(2026, 10, 17, 12, tzinfo=UTC),
+            _DAY_END,
+            "UTC midnight",
+        ),
+    ],
+)
+def test_window_bounds_are_rejected(
+    start: datetime,
+    end: datetime,
+    message: str,
+) -> None:
+    with pytest.raises(OlistSynthCdcError, match=message):
+        validate_window(start, end)
+
+
+def test_unknown_dataset_is_rejected() -> None:
+    connection = _ScriptedConnection([])
+
+    with pytest.raises(OlistSynthCdcError, match="unknown dataset"):
+        _extract(connection, datasets=("sellers;drop",))
+
+    assert connection.queries == []
+
+
+def test_cli_requires_postgres_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ODP_RAW_BUCKET", "odp-raw")
+    monkeypatch.delenv("POSTGRES_USER", raising=False)
+
+    assert main(["seed"]) == 1
+
+
+def test_cli_requires_the_raw_bucket(monkeypatch: pytest.MonkeyPatch) -> None:
+    _env(monkeypatch)
+    monkeypatch.setenv("ODP_RAW_BUCKET", "  ")
+
+    code = main(
+        [
+            "extract",
+            "--window-start",
+            "2026-10-17T00:00:00Z",
+            "--window-end",
+            "2026-10-18T00:00:00Z",
+            "--execution-id",
+            "run-001",
+        ]
+    )
+
+    assert code == 1
+
+
+def test_cli_rejects_a_window_before_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _env(monkeypatch)
+
+    def explode(_env: dict[str, str]) -> None:
+        msg = "connected"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(
+        "open_data_platform.ingestion.olist_synth_cdc.connect_from_env",
+        explode,
+    )
+
+    code = main(
+        [
+            "extract",
+            "--window-start",
+            "2026-10-17T12:00:00Z",
+            "--window-end",
+            "2026-10-18T00:00:00Z",
+            "--execution-id",
+            "run-001",
+        ]
+    )
+
+    assert code == 1
+
+
+def test_cli_rejects_a_naive_ingestion_timestamp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _env(monkeypatch)
+
+    code = main(
+        [
+            "extract",
+            "--window-start",
+            "2026-10-17T00:00:00Z",
+            "--window-end",
+            "2026-10-18T00:00:00Z",
+            "--execution-id",
+            "run-001",
+            "--ingestion-ts",
+            "2026-10-25T15:00:00",
+        ]
+    )
+
+    assert code == 1
+
+
+def test_cli_rejects_a_non_integer_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    _env(monkeypatch)
+    monkeypatch.setenv("POSTGRES_PORT", "abc")
+
+    assert main(["seed"]) == 1
+
+
+def _is_marker(call: Any) -> bool:
+    return str(call.kwargs["Key"]).endswith("/_COMPLETE")
+
+
+def _data_puts(client: MagicMock) -> list[Any]:
+    """Raw and quarantine puts, without completion markers."""
+    return [call for call in client.put_object.call_args_list if not _is_marker(call)]
+
+
+def _data_deletes(client: MagicMock) -> list[Any]:
+    """Deletes of stale objects, without completion marker clears."""
+    return [
+        call for call in client.delete_object.call_args_list if not _is_marker(call)
+    ]
+
+
+def _markers(client: MagicMock) -> list[dict[str, Any]]:
+    """Bodies of the completion markers written, in order."""
+    return [
+        json.loads(call.kwargs["Body"])
+        for call in client.put_object.call_args_list
+        if _is_marker(call)
+    ]
+
+
+class _CoverageSink:
+    def __init__(self, client: MagicMock | None = None) -> None:
+        self.calls: list[list[Any]] = []
+        self.puts_at_call: list[int] = []
+        self._client = client
+
+    def record(self, records: Sequence[Any]) -> None:
+        self.calls.append(list(records))
+        if self._client is not None:
+            self.puts_at_call.append(len(self._client.put_object.call_args_list))
+
+
+def test_coverage_is_recorded_once_after_every_marker() -> None:
+    contracts = _contracts()
+    connection = _ScriptedConnection(
+        [
+            _table(contracts["sellers"], _row(contracts["sellers"])),
+            _table(
+                contracts["customers"],
+                _row(contracts["customers"]),
+                _row(contracts["customers"], customer_id="customer-2"),
+            ),
+        ]
+    )
+    client = _client()
+    sink = _CoverageSink(client)
+
+    _extract(
+        connection,
+        client,
+        datasets=("sellers", "customers"),
+        coverage=sink,
+        frequency="daily",
+        dag_id="ingest_olist_synth_cdc_daily",
+        airflow_run_id="scheduled__2026-10-18",
+    )
+
+    assert len(sink.calls) == 1
+    records = sink.calls[0]
+    assert [(r.dataset, r.row_count) for r in records] == [
+        ("sellers", 1),
+        ("customers", 2),
+    ]
+    assert {(r.window_start, r.window_end) for r in records} == {(_DAY_START, _DAY_END)}
+    assert {r.frequency for r in records} == {"daily"}
+    assert {r.airflow_run_id for r in records} == {"scheduled__2026-10-18"}
+    # Every put (data, quarantine, marker) happened before the ledger call.
+    assert sink.puts_at_call == [len(client.put_object.call_args_list)]
+    assert sum(_is_marker(call) for call in client.put_object.call_args_list) == 2
+
+
+def test_failed_extract_records_no_coverage() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract)), psycopg.OperationalError("boom")]
+    )
+    sink = _CoverageSink()
+
+    with pytest.raises(OlistSynthCdcError):
+        _extract(connection, datasets=("sellers", "customers"), coverage=sink)
+
+    assert sink.calls == []
+
+
+def test_frequency_must_match_the_window_before_any_query() -> None:
+    connection = _ScriptedConnection([])
+
+    with pytest.raises(OlistSynthCdcError, match="weekly window must be 7"):
+        _extract(connection, frequency="weekly", coverage=_CoverageSink())
+
+    assert connection.queries == []
+
+
+def test_cli_rejects_a_frequency_that_does_not_match_the_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _env(monkeypatch)
+
+    def explode(_env: dict[str, str]) -> None:
+        msg = "connected"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(
+        "open_data_platform.ingestion.olist_synth_cdc.connect_from_env",
+        explode,
+    )
+
+    code = main(
+        [
+            "extract",
+            "--window-start",
+            "2026-10-17T00:00:00Z",
+            "--window-end",
+            "2026-10-18T00:00:00Z",
+            "--execution-id",
+            "run-001",
+            "--frequency",
+            "weekly",
+        ]
+    )
+
+    assert code == 1
+
+
+def test_all_datasets_are_read_in_one_read_only_snapshot() -> None:
+    contracts = _contracts()
+    connection = _ScriptedConnection(
+        [_table(contracts[name]) for name in ("orders", "order_items")]
+    )
+    client = _client()
+
+    _extract(connection, client, datasets=("orders", "order_items"))
+
+    assert [query for query, _params in connection.session] == [
+        SNAPSHOT_SQL,
+        TRIGGER_CHECK_SQL,
+    ]
+    assert "REPEATABLE READ" in SNAPSHOT_SQL and "READ ONLY" in SNAPSHOT_SQL
+    assert connection.session[1][1] == ("olist_synth", "set_updated_at")
+    # Both reads happen before the first write, then the snapshot ends.
+    assert len(connection.queries) == 2
+    assert connection.rollbacks == 1
+    assert connection.commits == 0
+
+
+def test_a_table_without_the_updated_at_trigger_fails_before_reading() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection(
+        [_table(contract, _row(contract))], guarded=("customers",)
+    )
+    client = _client()
+
+    with pytest.raises(OlistSynthCdcError, match="without the set_updated_at trigger"):
+        _extract(connection, client)
+
+    assert connection.queries == []
+    assert len(_data_puts(client)) == 0
+
+
+def test_a_window_is_not_read_before_its_settle_lag() -> None:
+    contract = _contracts()["sellers"]
+    connection = _ScriptedConnection([_table(contract)])
+    client = _client()
+
+    with pytest.raises(OlistSynthCdcError, match="settle lag"):
+        _extract(connection, client, now=_DAY_END + SETTLE_LAG - timedelta(seconds=1))
+    assert connection.session == []
+
+    _extract(connection, client, now=_DAY_END + SETTLE_LAG)
+    assert len(connection.queries) == 1
+
+
+def test_the_schema_splitter_keeps_a_dollar_quoted_body_whole() -> None:
+    connection = _RecordingConnection()
+    script = "CREATE SCHEMA a; CREATE FUNCTION f() AS $$ BEGIN x; y; END $$; SELECT 1"
+
+    apply_olist_synth_schema(connection, script=script)
+
+    assert [query for query, _params in connection.queries] == [
+        "CREATE SCHEMA a",
+        "CREATE FUNCTION f() AS $$ BEGIN x; y; END $$",
+        "SELECT 1",
+    ]
+    with pytest.raises(OlistSynthCdcError, match="unterminated"):
+        apply_olist_synth_schema(connection, script="CREATE FUNCTION f() AS $$ BEGIN")

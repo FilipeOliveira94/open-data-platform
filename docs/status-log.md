@@ -4,6 +4,36 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-27 — R1-03 Rename the PostgreSQL source to olist-synth-cdc
+
+Owner request: the name says the source is synthetic. `postgres_oltp` is now `olist_synth_cdc`, the PostgreSQL schema `oltp` is now `olist_synth`, and the Gold schema `oltp_operations` is now `olist_synth_operations`, with `_olist_synth_` model names. The rename covers code, DAG ids, the raw Asset, contracts, fixtures, dbt, storage paths, tests, scripts, and living docs. Dated records (this log, reviews, ADRs, `DECISIONS.md`, phase live-run docs, the ROADMAP changelog, and Phase 0–3 sections) keep the old names. `tests/unit/infrastructure/test_r1_03_rename.py` fails on any other tracked use.
+
+Migration on the local stack, with every DAG paused first (`scripts/r1_03_rename_check.sh`; evidence in `.local/r1-03/`, counts and names only):
+
+1. `counts old` took the baseline. Silver and Gold held 11 sellers while PostgreSQL held 8: three keys exist only in raw history (rows hard-deleted by P3 checks, which the window extract cannot see). Owner decision: copy the raw history rather than re-extract only.
+2. `rename-pg-schema` ran `ALTER SCHEMA oltp RENAME TO olist_synth` (rows and the four `set_updated_at` triggers move with it), then `apply-schema` and the `platform_env` check of the new schema.
+3. `scripts/r1_03_copy_raw.py` copied 496 objects (66 windows and 58 `_COMPLETE` markers per dataset) to `raw/olist_synth_cdc/`, rewriting only the `source_id` metadata and marker field.
+4. The rebuild (`transform_lakehouse` run `r1-03-copy`) succeeded in 170 s. `compare copy` passed with all counts equal to the baseline, including raw, Bronze, Silver, all 13 Gold tables, and the passed layer checks.
+5. The new DAGs re-extracted: `ingest_olist_synth_cdc_daily` caught up 8 windows (2026-11-19 to 2026-11-26), the weekly DAG ran once, and the manual DAG ran the 2026-10-17 window. Two batched transform runs succeeded, in 284 s from the first trigger to idle. The final `compare` passed. PostgreSQL (8/2/2/2), Silver (sellers 11, the others 2 each), and the 13 Gold tables equal the baseline. Bronze grew by the rows that were re-read (sellers 34 to 37, the others +1). Raw grew from 66 to 76 windows per dataset because each of the 10 new runs wrote its own execution id; Bronze keys rows by object key, so the re-read rows are new Bronze rows and Silver keeps one row per key.
+6. The coverage report for `olist_synth_cdc` is clean: 8 expected daily windows, 0 gaps, 0 overlaps. A re-run of the manual window with the same execution id changed no Bronze or Silver count. A refresh with no new raw data skipped every write step, and none of the 115 Iceberg tables got a new version.
+7. `delete` ran 31 steps:
+   - dropped `bronze`/`silver.postgres_oltp__*` and the 13 `oltp_operations` tables and their schema;
+   - deleted the old source's rows in `lakehouse_state`, `ingestion_state.extract_coverage`, and `silver_audit.quality_counts`;
+   - removed the raw, quarantine, and warehouse prefixes;
+   - deleted the four old DAG ids.
+
+   `leftovers` reports every section empty, and a second `delete` was a no-op. The DAG pause states were restored.
+
+| Check | Result |
+| --- | --- |
+| `make lint` | Clean; markdown tables: 72 files, 0 with an empty header row |
+| `make test-unit` | 668 passed, including the 7 R1-03 tests (`test_r1_03_rename.py`, `test_r1_03_copy_raw.py`) |
+| `make dbt-parse` | OK |
+| `pytest tests/integration/ingestion/test_olist_synth_cdc_ingest.py` | 4 passed (scratch database, `ODP_TEST_RAW_BUCKET`) |
+| `make dbt-test-reconciliation` | PASS=56 WARN=0 ERROR=0, including the 13 `olist_synth_operations` tests |
+
+---
+
 ### 2026-11-27 — R1-02 Site update at the end of each phase
 
 Owner request: the report site starts now and is updated after each phase from Phase 4 on. Phase 9 becomes Site v1: the five pages from verified Phase 0–3 material, hosted on GitHub Pages (owner decision), depending on Phase 3 only and running before Phase 4. P9-02 and P9-03 fix the stale status lines the scaffold still shows (Phase 2 in progress). Phases 4, 5, 6, 8, 10, and 11 each get a site update issue before the close pair (P4-11, P5-10, P6-10, P8-08, P10-13, P11-19) that publishes only results of that phase's verified issues; each live run compares the site to its result, and each documentation issue fixes and redeploys a mismatch. P8-08 now exports figures 1–10 and the caption manifest, and P8-06 checks every value. The site figure table gains a Published by column and figure 11 (Grafana refresh time per layer, P5-10; owner decision). ADR-0017 and `site/README.md` point to the new issues. Docs only: no `site/src/` change.

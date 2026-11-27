@@ -19,12 +19,12 @@ set +a
 
 AIRFLOW_DB="${AIRFLOW_DB:-airflow}"
 CATALOG_DB="${ICEBERG_CATALOG_DB:-iceberg}"
-OLTP_DB="${POSTGRES_DB}"
+OLIST_SYNTH_DB="${POSTGRES_DB}"
 TAG="$(date -u +%Y%m%dT%H%M%S)"
 COMPOSE=(docker compose)
-DAILY="ingest_postgres_oltp_daily"
-WEEKLY="ingest_postgres_oltp_weekly"
-MANUAL="ingest_postgres_oltp"
+DAILY="ingest_olist_synth_cdc_daily"
+WEEKLY="ingest_olist_synth_cdc_weekly"
+MANUAL="ingest_olist_synth_cdc"
 TRANSFORM="transform_lakehouse"
 RECONCILE="reconcile_gold"
 SCENARIO="${SCENARIO:-setup}"
@@ -208,7 +208,7 @@ catalog_versions() {  # one line per Iceberg table: name and metadata location
 silver_counts() {
   local t
   for t in customers order_items orders sellers; do
-    echo "silver.postgres_oltp__${t} $(trino "SELECT count(*) FROM iceberg.silver.postgres_oltp__${t}" | tr -d '"')"
+    echo "silver.olist_synth_cdc__${t} $(trino "SELECT count(*) FROM iceberg.silver.olist_synth_cdc__${t}" | tr -d '"')"
   done
 }
 

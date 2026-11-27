@@ -20,10 +20,10 @@ sources:
       - name: ibge_localidades__municipios
       - name: dummyjson_products__products
       - name: demo_storefront__clickstream
-      - name: postgres_oltp__customers
-      - name: postgres_oltp__orders
-      - name: postgres_oltp__order_items
-      - name: postgres_oltp__sellers
+      - name: olist_synth_cdc__customers
+      - name: olist_synth_cdc__orders
+      - name: olist_synth_cdc__order_items
+      - name: olist_synth_cdc__sellers
 
   - name: gold_staging
     database: iceberg

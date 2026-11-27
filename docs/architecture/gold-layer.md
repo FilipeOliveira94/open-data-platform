@@ -25,7 +25,7 @@ Silver remains the **Spark** writer. Gold only reads `iceberg.silver.*`.
 | `seller_acquisition` | Marketing funnel facts and marts |
 | `catalog_commerce` | DummyJSON catalog |
 | `storefront_behavior` | Demo clickstream |
-| `oltp_operations` | PostgreSQL OLTP star |
+| `olist_synth_operations` | olist-synth-cdc star |
 | `gold_staging` | `quarantine_findings` (MinIO JSONL staged for contract violations) |
 
 Every model is a **full refresh** (`table` + `on_table_exists: replace`). Dimensions are type 1. SCD Type 2 is P4-08 only.

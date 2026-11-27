@@ -11,6 +11,8 @@
 | Supersedes | — |
 | Superseded by | — |
 
+> **R1-03 (2026-11-27):** the source `postgres_oltp` is now `olist_synth_cdc`, the PostgreSQL schema `oltp` is now `olist_synth`, and the Gold schema `oltp_operations` is now `olist_synth_operations` (with `_olist_synth_` model names). This record keeps the names of its date.
+
 ## Context / problem
 
 Scheduled loads and CDC are different patterns. This platform needs **both** cadence-based batch refreshes and streaming change capture, with clear grain and watermarks. Coexistence rules are in [ADR-0014](0014-batch-vs-streaming-coexistence.md).

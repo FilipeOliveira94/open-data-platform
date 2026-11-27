@@ -8,7 +8,7 @@
 #
 # Usage: scripts/p3_09_orchestration_check.sh <scenario>...
 #   catchup        The daily DAG was paused over a scheduled midnight. Unpause it
-#                  with the OLTP database refusing connections: the missed run
+#                  with the olist-synth database refusing connections: the missed run
 #                  is created, the settle sensor holds it, the extract fails all
 #                  tries, the run fails, and the gap report lists the window.
 #                  Allow connections, clear the run: it succeeds, the gap closes,
@@ -16,7 +16,7 @@
 #   happy          Manual PostgreSQL extract, daily backfill, manual weekly run,
 #                  and reconcile_gold: every run succeeds and each extract is
 #                  followed by a transform_lakehouse run.
-#   retry          Daily backfill with the OLTP database refusing connections on
+#   retry          Daily backfill with the olist-synth database refusing connections on
 #                  try 1, allowed before try 2. Then Trino stopped while dbt_build
 #                  runs its first try and started before the retry.
 #   reconcile      reconcile_gold with Trino down on try 1 (retry succeeds), then
@@ -48,9 +48,9 @@ mkdir -p "${OUT}"
 
 # --- Faults ---------------------------------------------------------------
 
-oltp_connections() {  # oltp_connections true|false
-  pgq postgres "ALTER DATABASE \"${OLTP_DB}\" ALLOW_CONNECTIONS $1" >/dev/null
-  log "  fault: ${OLTP_DB} ALLOW_CONNECTIONS $1"
+olist_synth_connections() {  # olist_synth_connections true|false
+  pgq postgres "ALTER DATABASE \"${OLIST_SYNTH_DB}\" ALLOW_CONNECTIONS $1" >/dev/null
+  log "  fault: ${OLIST_SYNTH_DB} ALLOW_CONNECTIONS $1"
 }
 trino_stop() { "${COMPOSE[@]}" --profile lakehouse stop trino >/dev/null 2>&1; log "  fault: trino stopped"; }
 trino_start() {
@@ -60,7 +60,7 @@ trino_start() {
 
 # Leaves no fault behind when a scenario stops early.
 cleanup() {
-  pgq postgres "ALTER DATABASE \"${OLTP_DB}\" ALLOW_CONNECTIONS true" >/dev/null 2>&1
+  pgq postgres "ALTER DATABASE \"${OLIST_SYNTH_DB}\" ALLOW_CONNECTIONS true" >/dev/null 2>&1
   "${COMPOSE[@]}" --profile lakehouse up -d --wait trino >/dev/null 2>&1
   gate_unplant >/dev/null 2>&1
   rm -f "${OUT}/.reader_stop"
@@ -76,7 +76,7 @@ scenario_catchup() {
   log "daily paused=${paused}; last scheduled interval end ${last_run}"
   [[ "${paused}" == "t" ]] || { log "FAIL the daily DAG must be paused"; FAILURES=$((FAILURES + 1)); return; }
 
-  oltp_connections false
+  olist_synth_connections false
   since="$(now)"
   airflow dags unpause "${DAILY}" >/dev/null
   log "  unpaused ${DAILY}"
@@ -98,7 +98,7 @@ scenario_catchup() {
   sed 's/^/    report /' "${OUT}/catchup-gap-report.txt" | tee -a "${OUT}/${SCENARIO}.log" >/dev/null
   check "the gap report exits 1 and lists the failed window" test "${rc}" == 1 -a -n "$(grep -F "gap [${start%%T*}," "${OUT}/catchup-gap-report.txt")"
 
-  oltp_connections true
+  olist_synth_connections true
   since="$(now)"
   clear_run "${DAILY}" "${run}"
   wait_run "${DAILY}" "${run}" 1800
@@ -157,12 +157,12 @@ scenario_happy() {
 scenario_retry() {
   local since run tr
   wait_transform_idle
-  oltp_connections false
+  olist_synth_connections false
   since="$(now)"
   run="$(backfill_daily "$(free_backfill_day 2026-10-06)")"
   require "daily backfill run" "${run}" || return
   wait_ti "${DAILY}" "${run}" extract "up_for_retry"
-  oltp_connections true
+  olist_synth_connections true
   wait_run "${DAILY}" "${run}"
   check "daily extract succeeds on try 2" test "$(ti_state "${DAILY}" "${run}" extract)" == "success 2"
   local exec_id="${DAILY}__${run}"
@@ -319,7 +319,7 @@ scenario_coalesce() {
   step_runs "${follow}"
 }
 
-GATE_WHERE="layer='bronze' AND source_id='postgres_oltp' AND dataset='orders'"
+GATE_WHERE="layer='bronze' AND source_id='olist_synth_cdc' AND dataset='orders'"
 gate_plant() {
   pgq "${CATALOG_DB}" "CREATE OR REPLACE FUNCTION lakehouse_state.p309_plant_mismatch() RETURNS trigger
     LANGUAGE plpgsql AS \$\$ BEGIN NEW.expected_rows := NEW.expected_rows + 1; RETURN NEW; END \$\$" >/dev/null
@@ -328,7 +328,7 @@ gate_plant() {
   # fires a BEFORE INSERT trigger and then a BEFORE UPDATE trigger on EXCLUDED,
   # so a trigger on both adds two rows. The orders row exists (checked below).
   pgq "${CATALOG_DB}" "CREATE TRIGGER p309_plant_mismatch BEFORE UPDATE ON lakehouse_state.layer_checks
-    FOR EACH ROW WHEN (NEW.layer='bronze' AND NEW.source_id='postgres_oltp' AND NEW.dataset='orders' AND NEW.status='pending')
+    FOR EACH ROW WHEN (NEW.layer='bronze' AND NEW.source_id='olist_synth_cdc' AND NEW.dataset='orders' AND NEW.status='pending')
     EXECUTE FUNCTION lakehouse_state.p309_plant_mismatch()" >/dev/null
   log "  fault: Bronze orders check expects one row more than written"
 }
@@ -354,12 +354,12 @@ scenario_gate() {
   log "  check: $(gate_state)"
   step_runs "${r1}"
 
-  silver_before="$(pgq "${CATALOG_DB}" "SELECT metadata_location FROM iceberg_tables WHERE table_namespace='silver' AND table_name='postgres_oltp__orders'")"
+  silver_before="$(pgq "${CATALOG_DB}" "SELECT metadata_location FROM iceberg_tables WHERE table_namespace='silver' AND table_name='olist_synth_cdc__orders'")"
   trigger "${TRANSFORM}" "${r2}"
   wait_run "${TRANSFORM}" "${r2}"
   check "r2 (no new raw) fails again on the open check" test "$(ti_state "${TRANSFORM}" "${r2}" bronze_checks)" == "failed 1"
   check "r2 does not build Silver" test "$(ti_state "${TRANSFORM}" "${r2}" silver | cut -d' ' -f1)" == upstream_failed
-  check "Silver orders keeps its version" test "$(pgq "${CATALOG_DB}" "SELECT metadata_location FROM iceberg_tables WHERE table_namespace='silver' AND table_name='postgres_oltp__orders'")" == "${silver_before}"
+  check "Silver orders keeps its version" test "$(pgq "${CATALOG_DB}" "SELECT metadata_location FROM iceberg_tables WHERE table_namespace='silver' AND table_name='olist_synth_cdc__orders'")" == "${silver_before}"
   log "  check: $(gate_state)"
   step_runs "${r2}"
 

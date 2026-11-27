@@ -11,6 +11,8 @@
 | Supersedes | — |
 | Superseded by | — |
 
+> **R1-03 (2026-11-27):** the source `postgres_oltp` is now `olist_synth_cdc`, the PostgreSQL schema `oltp` is now `olist_synth`, and the Gold schema `oltp_operations` is now `olist_synth_operations` (with `_olist_synth_` model names). This record keeps the names of its date.
+
 ## Context / problem
 
 The daily and weekly PostgreSQL DAGs (P3-04, P3-05) take their window from the Airflow data interval and keep no watermark. Two questions had no answer outside the Airflow metadata database: which windows have been extracted successfully, and which are missing or overlap. Raw object keys carry the window in their name, but listing raw storage does not say whether all datasets of an execution finished, which Airflow run wrote them, or how many rows they held. P3-06 needs a queryable record that a gap report can compare with the expected windows of each cadence.

@@ -11,6 +11,8 @@
 | Supersedes | The `FULL_OVERWRITE` default of `lakehouse/write_mode.py` (P2-03 / P2-04) |
 | Superseded by | — |
 
+> **R1-03 (2026-11-27):** the source `postgres_oltp` is now `olist_synth_cdc`, the PostgreSQL schema `oltp` is now `olist_synth`, and the Gold schema `oltp_operations` is now `olist_synth_operations` (with `_olist_synth_` model names). This record keeps the names of its date.
+
 ## Context / problem
 
 Until P3-13 every lakehouse refresh rebuilt every Bronze table from every raw object, in one Python process that held each dataset's rows in memory, then rebuilt every Silver table and every Gold model. The work of one refresh grew with total raw history, not with what was new. Three more defects came with it:

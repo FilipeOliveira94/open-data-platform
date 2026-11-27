@@ -48,7 +48,7 @@ RUN_INGESTION_TS = "{{ dag_run.run_after.isoformat() }}"
 # never run at the same time. Compose ``airflow-init`` creates the pool.
 LAKEHOUSE_GOLD_POOL = "lakehouse_gold"
 
-POSTGRES_OLTP = "open_data_platform.ingestion.postgres_oltp"
+OLIST_SYNTH_CDC = "open_data_platform.ingestion.olist_synth_cdc"
 
 # ``medallion_build --skip-exit-code``: a step with nothing to do exits with
 # this status and the task ends as skipped (ADR-0024).
@@ -63,7 +63,7 @@ RAW_SOURCES = (
     "ibge_localidades",
     "olist_brazilian_ecommerce",
     "olist_marketing_funnel",
-    "postgres_oltp",
+    "olist_synth_cdc",
 )
 
 
@@ -183,13 +183,13 @@ def postgres_extract_task(
 
     ``frequency`` (``daily``, ``weekly``, or ``manual``) is recorded with the
     DAG id and run id in the coverage ledger (P3-06). A successful extract
-    emits the ``postgres_oltp`` raw Asset.
+    emits the ``olist_synth_cdc`` raw Asset.
     """
     return python_task(
         "extract",
         [
             "-m",
-            POSTGRES_OLTP,
+            OLIST_SYNTH_CDC,
             "extract",
             "--window-start",
             window_start,
@@ -206,5 +206,5 @@ def postgres_extract_task(
             "--ingestion-ts",
             RUN_INGESTION_TS,
         ],
-        outlets=[raw_asset("postgres_oltp")],
+        outlets=[raw_asset("olist_synth_cdc")],
     )

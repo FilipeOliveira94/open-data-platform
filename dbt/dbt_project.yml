@@ -36,8 +36,8 @@ models:
       +schema: catalog_commerce
     storefront_behavior:
       +schema: storefront_behavior
-    oltp_operations:
-      +schema: oltp_operations
+    olist_synth_operations:
+      +schema: olist_synth_operations
 
 # `make dbt-build` and `make live-gold` pass `--exclude tag:reconciliation`.
 # Run the suite with `make dbt-test-reconciliation`. A plain `dbt build` still includes it.
@@ -58,5 +58,5 @@ tests:
         +tags: ["reconciliation", "catalog_commerce"]
       storefront_behavior:
         +tags: ["reconciliation", "storefront_behavior"]
-      oltp_operations:
-        +tags: ["reconciliation", "oltp_operations"]
+      olist_synth_operations:
+        +tags: ["reconciliation", "olist_synth_operations"]

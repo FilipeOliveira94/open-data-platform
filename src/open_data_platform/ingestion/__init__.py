@@ -8,7 +8,7 @@ __all__ = [
     "IngestionMetadata",
     "RawWriteResult",
     "build_raw_object_key",
-    "extract_postgres_oltp",
+    "extract_olist_synth_cdc",
     "fetch_olist_snapshots",
     "ingest_demo_storefront",
     "ingest_dummyjson_products",
@@ -26,7 +26,7 @@ _OLIST_EXPORTS = frozenset(
     }
 )
 _DUMMYJSON_PRODUCTS_EXPORTS = frozenset({"ingest_dummyjson_products"})
-_POSTGRES_OLTP_EXPORTS = frozenset({"extract_postgres_oltp"})
+_OLIST_SYNTH_CDC_EXPORTS = frozenset({"extract_olist_synth_cdc"})
 _DEMO_STOREFRONT_EXPORTS = frozenset({"ingest_demo_storefront"})
 _IBGE_LOCALIDADES_EXPORTS = frozenset({"ingest_ibge_localidades"})
 
@@ -43,8 +43,8 @@ def __getattr__(name: str) -> object:
         from open_data_platform.ingestion import (
             dummyjson_products as source_module,
         )
-    elif name in _POSTGRES_OLTP_EXPORTS:
-        from open_data_platform.ingestion import postgres_oltp as source_module
+    elif name in _OLIST_SYNTH_CDC_EXPORTS:
+        from open_data_platform.ingestion import olist_synth_cdc as source_module
     elif name in _DEMO_STOREFRONT_EXPORTS:
         from open_data_platform.ingestion import demo_storefront as source_module
     elif name in _IBGE_LOCALIDADES_EXPORTS:

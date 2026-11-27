@@ -11,7 +11,7 @@ covered:
 - fct_catalog_quality_findings
 - fct_crm_quality_findings
 - fct_geography_quality_findings
-- fct_oltp_quality_findings
+- fct_olist_synth_quality_findings
 - fct_operations_quality_findings
 - fct_storefront_quality_findings
 - int_order_primary_payment
@@ -23,12 +23,12 @@ covered:
 - mart_late_orders
 - mart_lead_outcome
 - mart_marketing_acquisition
-- mart_oltp_cancellations
-- mart_oltp_delivery_performance
-- mart_oltp_freight
-- mart_oltp_late_orders
-- mart_oltp_platform_sales
-- mart_oltp_seller_performance
+- mart_olist_synth_cancellations
+- mart_olist_synth_delivery_performance
+- mart_olist_synth_freight
+- mart_olist_synth_late_orders
+- mart_olist_synth_platform_sales
+- mart_olist_synth_seller_performance
 - mart_order_cancellations
 - mart_order_milestones
 - mart_platform_sales
@@ -41,24 +41,24 @@ exempt:
   dim_catalog_products: cast and rename of one Silver row
   dim_date: generated calendar; reconciliation checks the range
   dim_municipality: cast and rename of one Silver row
-  dim_oltp_customers: cast and rename of one Silver row
-  dim_oltp_sellers: cast and rename of one Silver row
+  dim_olist_synth_customers: cast and rename of one Silver row
+  dim_olist_synth_sellers: cast and rename of one Silver row
   dim_sellers: cast and rename of one Silver row
   dim_storefront_products: distinct product ids
   dim_storefront_users: distinct user ids
   fct_catalog_reviews: unnest of the reviews array, one row per element
   fct_closed_deals: cast and rename of one Silver row
   fct_leads: cast and rename of one Silver row
-  fct_oltp_order_items: cast and rename plus a many-to-one lookup
-  fct_oltp_orders: cast and rename plus many-to-one lookups
+  fct_olist_synth_order_items: cast and rename plus a many-to-one lookup
+  fct_olist_synth_orders: cast and rename plus many-to-one lookups
   fct_order_items: cast and rename plus a many-to-one lookup
   fct_orders: cast and rename plus many-to-one lookups
   fct_payments: cast and rename of one Silver row
   fct_reviews: cast and rename of one Silver row
   fct_storefront_events: cast and rename of one Silver row
   mart_catalog_prices: plain group by one key
-  mart_oltp_buyer_geography: plain group by over a many-to-one join
-  mart_oltp_order_milestones: plain counts per month
+  mart_olist_synth_buyer_geography: plain group by over a many-to-one join
+  mart_olist_synth_order_milestones: plain counts per month
   mart_payment_mix: plain group by two keys
   mart_seller_buyer_geography: plain group by over a many-to-one join
 pending: {}

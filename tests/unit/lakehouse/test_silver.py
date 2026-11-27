@@ -73,7 +73,7 @@ def test_geolocation_partitions_payload_fields() -> None:
 
 
 def test_postgres_orders_by_updated_at() -> None:
-    contract = _by_identity()[("postgres_oltp", "orders")]
+    contract = _by_identity()[("olist_synth_cdc", "orders")]
     sql = render_silver_sql(
         contract,
         "odp-warehouse",
@@ -153,10 +153,10 @@ def test_no_complete_execution_fails_before_the_replace(
 
 
 def test_incremental_window_unions_every_window_and_ignores_markers() -> None:
-    contract = _by_identity()[("postgres_oltp", "orders")]
+    contract = _by_identity()[("olist_synth_cdc", "orders")]
     sql = render_silver_sql(contract, "odp-warehouse", policy_for(contract))
     assert contract.update_pattern == "incremental_window"
-    assert "    FROM bronze.`postgres_oltp__orders`\n;" in sql
+    assert "    FROM bronze.`olist_synth_cdc__orders`\n;" in sql
     assert "assert_true" not in sql
     assert "LEFT SEMI JOIN" not in sql
     assert "ORDER BY `updated_at` DESC" in sql
@@ -387,7 +387,7 @@ def test_money_columns_are_decimal_in_silver() -> None:
     money = {
         ("olist_brazilian_ecommerce", "order_items"): ("price", "freight_value"),
         ("olist_brazilian_ecommerce", "order_payments"): ("payment_value",),
-        ("postgres_oltp", "order_items"): ("price", "freight_value"),
+        ("olist_synth_cdc", "order_items"): ("price", "freight_value"),
         ("dummyjson_products", "products"): ("price",),
         ("olist_marketing_funnel", "closed_deals"): ("declared_monthly_revenue",),
     }

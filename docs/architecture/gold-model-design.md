@@ -18,7 +18,7 @@ Ingestion contracts label a source family on `governance.source_family`: `olist_
 | `brazil_geography` | Every domain that places a person or a shipment | Which municipality and which ZIP prefix is this? | IBGE municipalities, Olist geolocation |
 | `catalog_commerce` | Catalog manager | How are DummyJSON products priced, and how do their reviews look? | DummyJSON products |
 | `storefront_behavior` | Storefront product and CRM | What does a shopper do in a session before buying? | Demo storefront clickstream |
-| `oltp_operations` | Operations on the live store database | The same operating questions as the marketplace, on the PostgreSQL stream | `postgres_oltp` customers, orders, items, sellers |
+| `olist_synth_operations` | Operations on the live store database | The same operating questions as the marketplace, on the PostgreSQL stream | `olist_synth_cdc` customers, orders, items, sellers |
 
 `dim_date` sits outside those schemas. Every domain uses it.
 
@@ -28,7 +28,7 @@ Ingestion contracts label a source family on `governance.source_family`: `olist_
 
 | Model | Type | Grain | What you see |
 | --- | --- | --- | --- |
-| `dim_date` | Dimension | One day, from 2016-09-01 through 2026-12-31 | The day key for purchases, lead dates, deliveries, catalog timestamps, clickstream events, and OLTP orders |
+| `dim_date` | Dimension | One day, from 2016-09-01 through 2026-12-31 | The day key for purchases, lead dates, deliveries, catalog timestamps, clickstream events, and olist-synth orders |
 
 ### Marketplace operations
 
@@ -123,27 +123,27 @@ These tokens do not join the catalog or the marketplace.
 | `mart_storefront_user_behavior` | Mart | Storefront user | Sessions, purchases, products touched, sessions with a cart and no purchase, last session time |
 | `fct_storefront_quality_findings` | Quality | One finding | Contract violations, and cart or purchase events with no product |
 
-### OLTP operations
+### olist-synth operations
 
 Same operating questions as the marketplace, on the PostgreSQL tables. Those ids (`customer-17`, `order-17`) are a different population from the historical file. There is no payment table and no review table here, so there is no payment mix and no review mart. City and state use the same municipality bridge. ZIP is an integer and is padded to 5 characters before it joins `dim_zip_prefix`.
 
-The `purchase_city`, `purchase_state`, and `purchase_zip_prefix` columns on `fct_oltp_orders` come from the **current** customer row (Type 1), not from the address at purchase time. A later change to the customer row rewrites them on the next build. The names keep `purchase_*` for parity with the marketplace fact. Address history arrives with the CDC path (P4-08).
+The `purchase_city`, `purchase_state`, and `purchase_zip_prefix` columns on `fct_olist_synth_orders` come from the **current** customer row (Type 1), not from the address at purchase time. A later change to the customer row rewrites them on the next build. The names keep `purchase_*` for parity with the marketplace fact. Address history arrives with the CDC path (P4-08).
 
 | Model | Type | Grain | What you see |
 | --- | --- | --- | --- |
-| `dim_oltp_customers` | Dimension | One order-scoped customer | Current customer attributes, plus `updated_at` |
-| `dim_oltp_sellers` | Dimension | One seller | Current seller attributes, plus `updated_at` |
-| `fct_oltp_orders` | Fact | One order | Milestones, status, current customer address (Type 1) |
-| `fct_oltp_order_items` | Fact | One item | Price, freight, product, seller, shipping deadline |
-| `mart_oltp_platform_sales` | Mart | Purchase date | Orders, delivered orders, item GMV |
-| `mart_oltp_seller_performance` | Mart | Seller | Item GMV, orders, freight relative to price, handoff-eligible pairs, on-time handoff rate |
-| `mart_oltp_buyer_geography` | Mart | Seller and municipality | Buyer location, with a null-municipality row |
-| `mart_oltp_order_milestones` | Mart | Purchase month | Approval, carrier, and delivery counts |
-| `mart_oltp_delivery_performance` | Mart | Purchase month | On-time rate and late rate against the estimate, handoff-eligible orders, on-time handoff rate |
-| `mart_oltp_late_orders` | Mart | One delivered order past the estimate | Days late, state, seller, handoff miss |
-| `mart_oltp_freight` | Mart | Customer state and distance band | Freight ratio. Unknown band when the padded ZIP misses the prefix dimension |
-| `mart_oltp_cancellations` | Mart | Purchase month and status | Canceled and unavailable orders, and whether approval had already happened |
-| `fct_oltp_quality_findings` | Quality | One finding | The operating breaks that this source can show: missing items, delivered without a delivery timestamp, unmatched city, ZIP prefix miss, contract violations |
+| `dim_olist_synth_customers` | Dimension | One order-scoped customer | Current customer attributes, plus `updated_at` |
+| `dim_olist_synth_sellers` | Dimension | One seller | Current seller attributes, plus `updated_at` |
+| `fct_olist_synth_orders` | Fact | One order | Milestones, status, current customer address (Type 1) |
+| `fct_olist_synth_order_items` | Fact | One item | Price, freight, product, seller, shipping deadline |
+| `mart_olist_synth_platform_sales` | Mart | Purchase date | Orders, delivered orders, item GMV |
+| `mart_olist_synth_seller_performance` | Mart | Seller | Item GMV, orders, freight relative to price, handoff-eligible pairs, on-time handoff rate |
+| `mart_olist_synth_buyer_geography` | Mart | Seller and municipality | Buyer location, with a null-municipality row |
+| `mart_olist_synth_order_milestones` | Mart | Purchase month | Approval, carrier, and delivery counts |
+| `mart_olist_synth_delivery_performance` | Mart | Purchase month | On-time rate and late rate against the estimate, handoff-eligible orders, on-time handoff rate |
+| `mart_olist_synth_late_orders` | Mart | One delivered order past the estimate | Days late, state, seller, handoff miss |
+| `mart_olist_synth_freight` | Mart | Customer state and distance band | Freight ratio. Unknown band when the padded ZIP misses the prefix dimension |
+| `mart_olist_synth_cancellations` | Mart | Purchase month and status | Canceled and unavailable orders, and whether approval had already happened |
+| `fct_olist_synth_quality_findings` | Quality | One finding | The operating breaks that this source can show: missing items, delivered without a delivery timestamp, unmatched city, ZIP prefix miss, contract violations |
 
 ## What connects them
 
@@ -151,22 +151,22 @@ The `purchase_city`, `purchase_state`, and `purchase_zip_prefix` columns on `fct
 | --- | --- | --- |
 | Day | Any fact date | `dim_date` |
 | Municipality | Purchase or seller city + UF, after lowercase, accent stripping, and hyphen turned into a space | `dim_municipality` |
-| ZIP prefix | Olist ZIP text, or OLTP ZIP padded to 5 characters | `dim_zip_prefix` |
+| ZIP prefix | Olist ZIP text, or olist-synth ZIP padded to 5 characters | `dim_zip_prefix` |
 | Seller sales | Closed deal `seller_id` | `dim_sellers`, only when the id exists |
 | Distance | Customer prefix centroid to seller prefix centroid | Freight marts. Haversine. A missing prefix is the `unknown` band |
 | Review and delay | `fct_reviews` and the delivery dates on `fct_orders` | `mart_review_drivers` and the score on `mart_late_orders` |
 
-DummyJSON `id`, storefront `product_id`, storefront `user_id`, and OLTP ids do not point at Olist keys. Lead `mql_id` does not point at an order.
+DummyJSON `id`, storefront `product_id`, storefront `user_id`, and olist-synth ids do not point at Olist keys. Lead `mql_id` does not point at an order.
 
 ## Rules for implementers
 
 Gold reads `iceberg.silver.*`. P2-06 does not replace the Spark Silver writer. A later change may re-express the same cast, JSON expansion, and survivor SQL as dbt, and only then retire that writer.
 
-Every model is a full refresh. Dimensions are type 1: one current row per business key. A key that leaves Silver leaves Gold on the next overwrite. P2-06 does not add `valid_from` / `valid_to`. Hard deletes (P3-12): a product or municipality absent from the latest complete `full_refresh` execution leaves Silver and then Gold. A row deleted in PostgreSQL does not: the batch extract filters on `updated_at` and never sees a hard delete, so OLTP models keep it until the CDC path (Phase 4).
+Every model is a full refresh. Dimensions are type 1: one current row per business key. A key that leaves Silver leaves Gold on the next overwrite. P2-06 does not add `valid_from` / `valid_to`. Hard deletes (P3-12): a product or municipality absent from the latest complete `full_refresh` execution leaves Silver and then Gold. A row deleted in PostgreSQL does not: the batch extract filters on `updated_at` and never sees a hard delete, so olist-synth models keep it until the CDC path (Phase 4).
 
 A null foreign key stays. An orphan key stays. Rows are not dropped to make a rate look complete (D-013). Review comments are `pii` and stay on `fct_reviews`. CRM marts use the score, a comment-present flag, and the answer lag.
 
-On time for `mart_delivery_performance` and `mart_oltp_delivery_performance`: customer delivery date on or before the estimated date, among delivered orders that have both timestamps. Handoff on time: carrier timestamp on or before the latest `shipping_limit_date` on the order's items. The handoff rate in `mart_delivery_performance`, `mart_seller_performance`, `mart_oltp_delivery_performance`, and `mart_oltp_seller_performance` divides by the orders (or seller–order pairs) eligible for a handoff: a carrier timestamp and a shipping limit both present. Each mart exposes that denominator as `handoff_eligible_count`. An order never handed to a carrier, such as one cancelled before shipping, is not eligible and does not count as late. The rate is null when no row is eligible.
+On time for `mart_delivery_performance` and `mart_olist_synth_delivery_performance`: customer delivery date on or before the estimated date, among delivered orders that have both timestamps. Handoff on time: carrier timestamp on or before the latest `shipping_limit_date` on the order's items. The handoff rate in `mart_delivery_performance`, `mart_seller_performance`, `mart_olist_synth_delivery_performance`, and `mart_olist_synth_seller_performance` divides by the orders (or seller–order pairs) eligible for a handoff: a carrier timestamp and a shipping limit both present. Each mart exposes that denominator as `handoff_eligible_count`. An order never handed to a carrier, such as one cancelled before shipping, is not eligible and does not count as late. The rate is null when no row is eligible.
 
 Review category (`mart_review_drivers`): the category is resolved per order before the review join, so a review of an order with N items counts once. One distinct English category across the order's items gives that category. More than one gives `mixed`. An order with no items, or whose products have no category, gives null. `sum(review_count)` equals the `(review_id, order_id)` pairs on `fct_reviews`.
 
@@ -190,7 +190,7 @@ Local Gold, before and after the P3-17 change, on the same Silver. "Pooled" is o
 | `mart_seller_performance` handoff denominator | 100_010 pairs | 99_000 eligible pairs |
 | `mart_seller_performance` pooled handoff rate | 0.9008 (90_087 / 100_010) | 0.9100 (90_087 / 99_000) |
 | `mart_seller_performance` row mean of `on_time_handoff_rate` | 0.8310 | 0.8798 |
-| `mart_oltp_delivery_performance` and `mart_oltp_seller_performance` handoff rate | 0.0 (2 orders, none shipped) | null (0 eligible) |
+| `mart_olist_synth_delivery_performance` and `mart_olist_synth_seller_performance` handoff rate | 0.0 (2 orders, none shipped) | null (0 eligible) |
 
 ### P3-18 exact money (2026-11-22)
 
@@ -237,7 +237,7 @@ A late delivery is not a quality finding. It is `mart_late_orders`. An allowed n
 | `brazil_geography` | `zip_prefix_multi_state` | `ibge_localidades.municipios`, `olist_brazilian_ecommerce.geolocation` |
 | `catalog_commerce` | `repeated_reviewer_email` | `dummyjson_products.products` |
 | `storefront_behavior` | `cart_or_purchase_without_product` | `demo_storefront.clickstream` |
-| `oltp_operations` | `order_without_items`, `delivered_without_timestamp`, `address_without_municipality`, `zip_prefix_unknown` | `postgres_oltp` customers, orders, order items, sellers |
+| `olist_synth_operations` | `order_without_items`, `delivered_without_timestamp`, `address_without_municipality`, `zip_prefix_unknown` | `olist_synth_cdc` customers, orders, order items, sellers |
 
 ### SCD Type 2
 
@@ -247,7 +247,7 @@ Today's raw bucket has one execution per dataset. Silver overwrites and keeps th
 
 | Application | Why | What P4-08 builds | What stays as designed here |
 | --- | --- | --- | --- |
-| OLTP customer, seller, order, order item | CDC will emit updates and deletes. This snapshot only repeats the same `updated_at` across the daily and weekly windows | History with `valid_from`, `valid_to`, and `is_current`. A delete closes the current row. OLTP dimensions read the current row | Purchase city, state, and ZIP copied on `fct_oltp_orders` |
+| olist-synth customer, seller, order, order item | CDC will emit updates and deletes. This snapshot only repeats the same `updated_at` across the daily and weekly windows | History with `valid_from`, `valid_to`, and `is_current`. A delete closes the current row. olist-synth dimensions read the current row | Purchase city, state, and ZIP copied on `fct_olist_synth_orders` |
 | Olist person | Some people change city across orders in the one published file. The file has no effective date | Optional versions ordered by purchase time. `valid_from` is the purchase where the new address was observed, not the edit time of a master record | `fct_orders` keeps the purchase address. `dim_customers` stays the latest address |
 | Olist seller, product, order status | One published row per key. Status milestones are columns | Nothing until a second snapshot or a CDC feed exists | Type 1 dimensions and milestone columns |
 | DummyJSON product | Created and updated timestamps show change. The table stores the current row | Versions only after a later full refresh is kept | `dim_catalog_products` type 1 |
@@ -257,7 +257,7 @@ Today's raw bucket has one execution per dataset. Silver overwrites and keeps th
 
 ### Build order in P2-06
 
-Shared calendar and `brazil_geography` first, then marketplace operations, customer CRM, seller acquisition, catalog commerce, storefront behavior, and OLTP operations. P2-06 chose **dbt-trino**; implementation detail: [Gold layer](gold-layer.md).
+Shared calendar and `brazil_geography` first, then marketplace operations, customer CRM, seller acquisition, catalog commerce, storefront behavior, and olist-synth operations. P2-06 chose **dbt-trino**; implementation detail: [Gold layer](gold-layer.md).
 
 ## Profile of the 2026-11-06 snapshot
 

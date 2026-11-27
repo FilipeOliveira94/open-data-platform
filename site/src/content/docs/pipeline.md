@@ -13,7 +13,7 @@ Five sources write objects to MinIO. The key is `raw/{source_id}/{dataset}/dt={Y
 | --- | --- |
 | Olist e-commerce and marketing funnel | One raw CSV per published file |
 | DummyJSON `/products` | One JSON page per object |
-| PostgreSQL OLTP | One JSON array per table for a half-open `updated_at` window |
+| olist-synth-cdc | One JSON array per table for a half-open `updated_at` window |
 | Demo storefront clickstream | One `events.jsonl` per execution |
 | IBGE Localidades | One `municipios.json` array |
 

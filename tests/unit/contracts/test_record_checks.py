@@ -181,7 +181,7 @@ def _money_contract() -> DataContract:
     return contract_from_mapping(
         {
             "contract_version": 1,
-            "source_id": "postgres_oltp",
+            "source_id": "olist_synth_cdc",
             "dataset": "order_items",
             "description": "Decimal classifier fixture.",
             "payload_format": "json",

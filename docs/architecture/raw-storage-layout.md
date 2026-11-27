@@ -41,7 +41,7 @@ raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_na
 | Olist e-commerce | `raw/olist_brazilian_ecommerce/orders/dt=2026-10-18/execution_id=run-001/olist_orders_dataset.csv` |
 | Olist marketing funnel | `raw/olist_marketing_funnel/qualified_leads/dt=2026-10-18/execution_id=run-001/olist_marketing_qualified_leads_dataset.csv` |
 | DummyJSON products | `raw/dummyjson_products/products/dt=2026-10-18/execution_id=run-001/products-skip-000000.json` |
-| PostgreSQL extract | `raw/postgres_oltp/orders/dt=2026-10-18/execution_id=run-001/orders_2026-10-17_2026-10-18.json` |
+| PostgreSQL extract | `raw/olist_synth_cdc/orders/dt=2026-10-18/execution_id=run-001/orders_2026-10-17_2026-10-18.json` |
 | IBGE Localidades | `raw/ibge_localidades/municipios/dt=2026-10-18/execution_id=run-001/municipios.json` |
 | Demo storefront clickstream | `raw/demo_storefront/clickstream/dt=2026-10-18/execution_id=run-001/events.jsonl` |
 
@@ -86,7 +86,7 @@ Time vocabulary (for later transforms; raw records write time as `_ingestion_ts`
 | `open_data_platform.ingestion.kaggle_download` | Download one Kaggle dataset zip and extract an expected file set |
 | `open_data_platform.ingestion.olist` | Fetch the Olist snapshots and write each CSV through the raw writer |
 | `open_data_platform.ingestion.dummyjson_products` | Fetch DummyJSON `/products` pages and write each page through the raw writer |
-| `open_data_platform.ingestion.postgres_oltp` | Extract a half-open `updated_at` window from schema `oltp` and write one JSON array per dataset |
+| `open_data_platform.ingestion.olist_synth_cdc` | Extract a half-open `updated_at` window from schema `olist_synth` and write one JSON array per dataset |
 | `open_data_platform.ingestion.demo_storefront` | Generate a fictional storefront clickstream and write one JSONL object |
 | `open_data_platform.ingestion.ibge_localidades` | Fetch the IBGE municipality list and write one JSON array through the raw writer |
 

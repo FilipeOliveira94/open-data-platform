@@ -1,4 +1,4 @@
-"""Check Python, contracts, MinIO, and the OLTP database.
+"""Check Python, contracts, MinIO, and the olist-synth database.
 
 The tasks call ``docker/airflow/check_ingest_env.py``.
 """
@@ -35,8 +35,8 @@ with DAG(
         "minio_write",
         ["/opt/odp/check_ingest_env.py", "minio_write"],
     )
-    postgres_oltp = python_task(
-        "postgres_oltp",
-        ["/opt/odp/check_ingest_env.py", "postgres_oltp"],
+    olist_synth_cdc = python_task(
+        "olist_synth_cdc",
+        ["/opt/odp/check_ingest_env.py", "olist_synth_cdc"],
     )
-    imports >> [contracts, minio_raw, minio_write, postgres_oltp]
+    imports >> [contracts, minio_raw, minio_write, olist_synth_cdc]

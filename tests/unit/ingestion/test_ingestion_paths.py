@@ -45,7 +45,7 @@ def test_build_quarantine_object_key_appends_jsonl_to_the_raw_name() -> None:
 
 def test_build_raw_object_key_accepts_uuid_execution_id() -> None:
     key = build_raw_object_key(
-        source_id="postgres_oltp",
+        source_id="olist_synth_cdc",
         dataset="orders",
         execution_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         object_name="orders.json",

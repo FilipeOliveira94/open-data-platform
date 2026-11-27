@@ -23,10 +23,10 @@ EXPECTED_DATASETS = {
     ("olist_marketing_funnel", "qualified_leads"),
     ("olist_marketing_funnel", "closed_deals"),
     ("dummyjson_products", "products"),
-    ("postgres_oltp", "sellers"),
-    ("postgres_oltp", "customers"),
-    ("postgres_oltp", "orders"),
-    ("postgres_oltp", "order_items"),
+    ("olist_synth_cdc", "sellers"),
+    ("olist_synth_cdc", "customers"),
+    ("olist_synth_cdc", "orders"),
+    ("olist_synth_cdc", "order_items"),
     ("ibge_localidades", "municipios"),
     ("demo_storefront", "clickstream"),
 }
@@ -52,7 +52,7 @@ def test_shipped_contracts_declare_governance_and_invalid_policy() -> None:
 # Silver drops a quarantined fact or event and keeps a quarantined reference
 # or historical record with a flag (P3-07).
 SILVER_POLICY = {
-    "postgres_oltp": "quarantine_exclude",
+    "olist_synth_cdc": "quarantine_exclude",
     "demo_storefront": "quarantine_exclude",
     "olist_brazilian_ecommerce": "quarantine_flag",
     "olist_marketing_funnel": "quarantine_flag",
@@ -117,7 +117,7 @@ def test_dummyjson_page_envelope_is_not_an_olist_key() -> None:
 def test_postgres_v1_is_windowed_and_has_updated_at() -> None:
     contracts = _by_identity()
     for dataset in ("sellers", "customers", "orders", "order_items"):
-        contract = contracts[("postgres_oltp", dataset)]
+        contract = contracts[("olist_synth_cdc", dataset)]
         assert contract.update_pattern == "incremental_window"
         assert contract.payload_format == "json"
         updated_at = next(
@@ -301,7 +301,7 @@ def test_money_fields_are_exact_decimals() -> None:
     money = {
         ("olist_brazilian_ecommerce", "order_items"): ("price", "freight_value"),
         ("olist_brazilian_ecommerce", "order_payments"): ("payment_value",),
-        ("postgres_oltp", "order_items"): ("price", "freight_value"),
+        ("olist_synth_cdc", "order_items"): ("price", "freight_value"),
         ("dummyjson_products", "products"): ("price",),
         ("olist_marketing_funnel", "closed_deals"): ("declared_monthly_revenue",),
     }

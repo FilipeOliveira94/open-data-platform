@@ -11,6 +11,8 @@
 | Supersedes | — |
 | Superseded by | — |
 
+> **R1-03 (2026-11-27):** the source `postgres_oltp` is now `olist_synth_cdc`, the PostgreSQL schema `oltp` is now `olist_synth`, and the Gold schema `oltp_operations` is now `olist_synth_operations` (with `_olist_synth_` model names). This record keeps the names of its date.
+
 ## Context / problem
 
 Without explicit layer contracts, “Bronze/Silver/Gold” becomes a folder naming habit rather than an architecture. Consumers need to know what guarantees each layer provides.

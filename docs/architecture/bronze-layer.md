@@ -100,29 +100,29 @@ Then run the shared Spark runtime once per file in that directory. Mount the fil
 
 ## Result (2026-11-20 incremental refresh, P3-13)
 
-Local Compose, runtime image `odp-runtime:airflow3.4.0-spark3.5.8`, one Spark JVM per dataset. Raw held 102 data objects in 18 prefixes, 28 of them in complete executions; the other 74 predate the P3-12 markers and wait as incomplete. Before the run, the two `postgres_oltp` windows that existed only without markers were re-extracted under `p3-13-reland-*`.
+Local Compose, runtime image `odp-runtime:airflow3.4.0-spark3.5.8`, one Spark JVM per dataset. Raw held 102 data objects in 18 prefixes, 28 of them in complete executions; the other 74 predate the P3-12 markers and wait as incomplete. Before the run, the two `olist_synth_cdc` windows that existed only without markers were re-extracted under `p3-13-reland-*`.
 
 | Refresh | Raw objects read / rows appended | Tables written | Step durations | Wall |
 | --- | --- | --- | --- | --- |
 | `make live-rebuild` (`--full-rebuild`, also the registry bootstrap) | 28 / 1_565_638 (geolocation 1_000_163) | Bronze 18, Silver 18, quarantine, Gold | bronze 251.7 s, bronze-checks 2.3 s (18 passed), silver 255.4 s, silver-checks 5.2 s (20 passed), stage-quarantine 15.1 s, dbt-build 26.5 s (PASS=287) | 565 s |
 | `make live-refresh`, no new raw object | 0 / 0; 102 keys listed, no object body or marker read | None | bronze 1.0 s (0.2 s promotion), every later step skipped in 0.5–0.7 s | 13 s |
-| `make live-refresh` after one new daily window (`postgres_oltp` `[2026-10-17, 2026-10-18)`) | 4 / 5 | Bronze 4 (`MERGE`), Silver 4, quarantine, Gold | bronze 50.7 s, bronze-checks 0.7 s (4 passed), silver 50.3 s, silver-checks 0.8 s (4 passed), stage-quarantine 14.2 s, dbt-build 26.2 s (PASS=287) | 151 s |
+| `make live-refresh` after one new daily window (`olist_synth_cdc` `[2026-10-17, 2026-10-18)`) | 4 / 5 | Bronze 4 (`MERGE`), Silver 4, quarantine, Gold | bronze 50.7 s, bronze-checks 0.7 s (4 passed), silver 50.3 s, silver-checks 0.8 s (4 passed), stage-quarantine 14.2 s, dbt-build 26.2 s (PASS=287) | 151 s |
 | `make live-bronze` after the same execution was re-ingested with 60, then 100 events | 1 / 60, then 1 / 100 | Bronze 1 (`MERGE` with delete) | bronze 16.8 s, 15.8 s; Bronze count 60, then 100, equal to the registry total | — |
 | `make live-refresh` with Silver and Gold still pending, no new raw object | 0 / 0 | Silver 1, quarantine, Gold | bronze 1.0 s, silver 16.3 s, stage-quarantine 14.3 s, dbt-build 25.2 s | 67 s |
 
-Iceberg snapshot summaries show what the commits did. Each insert-only `MERGE` into `bronze.postgres_oltp__orders` committed as `append`, one data file added and none rewritten. The re-ingested clickstream object committed as `overwrite`: 60 added and 100 deleted, then 100 added and 60 deleted, one file replaced each time. `bronze.olist_brazilian_ecommerce__geolocation` kept 14 snapshots and `silver.…__geolocation` kept 4 through the daily-window refresh, so untouched tables were not rewritten.
+Iceberg snapshot summaries show what the commits did. Each insert-only `MERGE` into `bronze.olist_synth_cdc__orders` committed as `append`, one data file added and none rewritten. The re-ingested clickstream object committed as `overwrite`: 60 added and 100 deleted, then 100 added and 60 deleted, one file replaced each time. `bronze.olist_brazilian_ecommerce__geolocation` kept 14 snapshots and `silver.…__geolocation` kept 4 through the daily-window refresh, so untouched tables were not rewritten.
 
 Airflow (`make airflow-up`, same stack):
 
 - With the default `batch_asset_events=False`, four raw Asset events produced four `transform_lakehouse` runs, one event each. The last two wrote nothing (8–9 s). The DAG now sets `batch_asset_events=True`.
-- After the change, `ingest_demo_storefront` started run A (1 event). Three `ingest_postgres_oltp` runs landed while A ran. When A ended, one follow-up run consumed all 3 events and promoted the 3 executions at once (12 objects, 15 rows). No third run was created, and the queue was empty.
+- After the change, `ingest_demo_storefront` started run A (1 event). Three `ingest_olist_synth_cdc` runs landed while A ran. When A ended, one follow-up run consumed all 3 events and promoted the 3 executions at once (12 objects, 15 rows). No third run was created, and the queue was empty.
 - A manual `transform_lakehouse` run with nothing new finished in 8.2 s with all six tasks `skipped`.
 
 Bronze time in an incremental run is mostly one Spark JVM start per changed dataset (about 12 s). `dbt-build` took 25–27 s in every run against Silver rebuilds of 16–255 s, so Gold stays a full dbt build ([ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md)). A `MERGE` into a large Bronze table was not measured: no new Olist release landed. Raw listing still grows with the number of keys under a prefix (metadata only).
 
 ## Result (2026-11-05 full-data live)
 
-`make live-bronze` against `odp-raw` (`WriteMode.FULL_OVERWRITE`). Spark promoted all 18 contract tables. Trino matched the raw counts recorded for that run (18/18), including geolocation 1_000_163, DummyJSON products 194, Olist customers 99_441, and postgres_oltp window stacks 3/3/3/5. Those figures describe the 2026-11-05 snapshot. Chronological note: [status log](../status-log.md).
+`make live-bronze` against `odp-raw` (`WriteMode.FULL_OVERWRITE`). Spark promoted all 18 contract tables. Trino matched the raw counts recorded for that run (18/18), including geolocation 1_000_163, DummyJSON products 194, Olist customers 99_441, and olist_synth_cdc window stacks 3/3/3/5. Those figures describe the 2026-11-05 snapshot. Chronological note: [status log](../status-log.md).
 
 ## Earlier fixture-shaped check (2026-10-31 / 2026-11-01)
 

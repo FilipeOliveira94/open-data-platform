@@ -58,7 +58,7 @@ def _sql(contract: DataContract, **kwargs: object) -> str:
 
 
 def test_exclude_drops_quarantined_rows_and_flag_keeps_them() -> None:
-    excluded = _sql(_contract("postgres_oltp", "orders"))
+    excluded = _sql(_contract("olist_synth_cdc", "orders"))
     assert "WHERE `order_id` IS NOT NULL AND NOT `_quarantined`" in excluded
     assert "'quarantine_excluded'" in excluded
 
@@ -102,26 +102,26 @@ def test_json_expansions_count_their_cast_nulls() -> None:
 
 
 def test_counts_merge_on_the_run_key_and_replace_a_rerun() -> None:
-    sql = _sql(_contract("postgres_oltp", "orders"), run_label="run-7")
+    sql = _sql(_contract("olist_synth_cdc", "orders"), run_label="run-7")
     assert "MERGE INTO silver_audit.`quality_counts` AS target" in sql
-    assert "SELECT 'run-7' AS run_label, 'postgres_oltp' AS source_id" in sql
+    assert "SELECT 'run-7' AS run_label, 'olist_synth_cdc' AS source_id" in sql
     assert "WHEN MATCHED THEN UPDATE SET" in sql
     # The target is fixed to this run and dataset in the ON clause, with no
     # NOT MATCHED BY SOURCE clause, so other runs' files are pruned (P3-08).
     merge = sql[sql.index("MERGE INTO silver_audit") :]
     assert (
-        "ON target.run_label = 'run-7' AND target.source_id = 'postgres_oltp' "
+        "ON target.run_label = 'run-7' AND target.source_id = 'olist_synth_cdc' "
         "AND target.dataset = 'orders' AND " in merge
     )
     assert "NOT MATCHED BY SOURCE" not in merge
     # The counts are written after the replace, from the same typed view.
     assert sql.index("CREATE OR REPLACE TABLE silver.") < sql.index("MERGE INTO")
-    assert sql.count("FROM `typed_postgres_oltp__orders`") == 2
+    assert sql.count("FROM `typed_olist_synth_cdc__orders`") == 2
 
 
 def test_run_label_must_be_one_path_segment() -> None:
     with pytest.raises(SilverError, match="run label"):
-        _sql(_contract("postgres_oltp", "orders"), run_label="a'; DROP")
+        _sql(_contract("olist_synth_cdc", "orders"), run_label="a'; DROP")
 
 
 @pytest.mark.parametrize(
@@ -143,7 +143,7 @@ def test_guarded_patterns_fail_before_the_replace(
 
 
 @pytest.mark.parametrize(
-    "identity", [("postgres_oltp", "orders"), ("demo_storefront", "clickstream")]
+    "identity", [("olist_synth_cdc", "orders"), ("demo_storefront", "clickstream")]
 )
 def test_unguarded_patterns_have_no_volume_guard(identity: tuple[str, str]) -> None:
     assert "volume guard" not in _sql(_contract(*identity)).lower()
@@ -163,7 +163,7 @@ def test_a_guarded_contract_without_a_ratio_is_rejected() -> None:
 
 
 def test_relation_check_leaves_excluded_rows_out_of_the_bronze_groups() -> None:
-    excluded = _contract("postgres_oltp", "orders")
+    excluded = _contract("olist_synth_cdc", "orders")
     flagged = _contract("olist_brazilian_ecommerce", "orders")
     assert "AND _quarantine_reasons IS NULL GROUP BY" in silver_relation_sql(
         excluded, policy_for(excluded)
@@ -174,7 +174,7 @@ def test_relation_check_leaves_excluded_rows_out_of_the_bronze_groups() -> None:
 
 
 def test_quality_checks_expect_every_metric_of_the_latest_run() -> None:
-    excluded = _contract("postgres_oltp", "orders")
+    excluded = _contract("olist_synth_cdc", "orders")
     checks = silver_quality_checks(excluded, policy_for(excluded))
     expected = len(quality_metrics(excluded, policy_for(excluded)))
     assert len(checks) == 2
@@ -215,9 +215,9 @@ def test_a_bad_sidecar_line_fails_without_echoing_its_value(line: bytes) -> None
 
 
 def test_quarantine_key_mirrors_the_raw_key() -> None:
-    raw = "raw/postgres_oltp/orders/dt=2026-11-01/execution_id=run-a/orders.json"
+    raw = "raw/olist_synth_cdc/orders/dt=2026-11-01/execution_id=run-a/orders.json"
     assert quarantine_key_for(raw) == (
-        "quarantine/postgres_oltp/orders/dt=2026-11-01/execution_id=run-a/"
+        "quarantine/olist_synth_cdc/orders/dt=2026-11-01/execution_id=run-a/"
         "orders.json.jsonl"
     )
 
@@ -317,7 +317,7 @@ def test_refresh_rejects_allow_volume_drop_for_an_unguarded_dataset(
             work=tmp_path,
             warehouse_bucket=WAREHOUSE,
             run_spark=lambda _path: None,
-            allow_volume_drop=frozenset({("postgres_oltp", "orders")}),
+            allow_volume_drop=frozenset({("olist_synth_cdc", "orders")}),
         )
 
 
@@ -371,20 +371,22 @@ def test_staged_findings_carry_the_silver_action_of_their_contract() -> None:
     )
 
     actions = silver_actions()
-    assert actions[("postgres_oltp", "orders")] == "excluded"
+    assert actions[("olist_synth_cdc", "orders")] == "excluded"
     assert actions[("olist_brazilian_ecommerce", "order_reviews")] == "flagged"
     store = FakeS3()
     line = (
         b'{"record_index":0,"reason":"null_violation","field":"x","primary_key":{}}\n'
     )
-    oltp = "quarantine/postgres_oltp/orders/dt=2026-11-01/execution_id=r/o.json.jsonl"
-    store.put_object(Bucket=RAW, Key=oltp, Body=line)
-    rows = tuple(iter_quarantine_rows(store, RAW, [oltp]))  # type: ignore[arg-type]
+    olist_synth = (
+        "quarantine/olist_synth_cdc/orders/dt=2026-11-01/execution_id=r/o.json.jsonl"
+    )
+    store.put_object(Bucket=RAW, Key=olist_synth, Body=line)
+    rows = tuple(iter_quarantine_rows(store, RAW, [olist_synth]))  # type: ignore[arg-type]
     assert [row.silver_action for row in rows] == ["excluded"]
     assert b'"silver_action":"excluded"' in encode_findings_jsonl(rows)
 
     unknown = (
-        "quarantine/postgres_oltp/refunds/dt=2026-11-01/execution_id=r/o.json.jsonl"
+        "quarantine/olist_synth_cdc/refunds/dt=2026-11-01/execution_id=r/o.json.jsonl"
     )
     store.put_object(Bucket=RAW, Key=unknown, Body=line)
     with pytest.raises(QuarantineStageError, match="no quarantine policy"):
