@@ -67,40 +67,43 @@ Every issue that adds or changes a pipeline step (ingestion, Bronze, Silver, Gol
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
 | 7 | Withdrawn: AWS deployment path ([R1-01](#refactor-r1--project-level-adjustments), [ADR-0029](docs/decisions/0029-open-source-only-platform.md)) | — | — | Withdrawn |
 | 8 | JupyterLab exploration and Superset charts over Gold, read-only via Trino | After Phase 2 (parallel with 3–6) | Phase 2 verified | Not started |
-| 9 | Platform report site: multi-page static report | After Phases 3 and 8 | Phase 3 and Phase 8 verified | Not started |
+| 9 | Platform report site v1: multi-page static report on GitHub Pages from verified Phase 0–3 material; later phases add theirs through site update issues | Now, after Refactor R1 and before Phase 4 | Phase 3 verified | Not started |
 | 10 | Table contracts and quality observability (ODCS contracts, Data Contract CLI, BCB SGS source) | Position not fixed; toward the end, decided by Filipe during execution | Phase 3 verified | Not started |
 | 11 | BioGuardia Atlantic operational sources at scale: daily export (about 24M rows a day), telemetry stream (1M events an hour), PII masking, data skew, SCD Type 2, reconciliation | Position not fixed, decided by Filipe; P11-01 to P11-03 run now under a waiver | P11-01 to P11-03: none (waiver, `DECISIONS.md` 2026-11-26); P11-04 onward: Phase 3 verified; P11-08 and P11-15: P5-07 | In progress (P11-01 to P11-03) |
 
 ### Platform report site — growth scheme
 
-Public-facing **platform report** (not a separate product): a small static hub that presents the verified platform. Tone stays technical and factual.
+Public-facing **platform report** (not a separate product): a small static hub on GitHub Pages that presents the verified platform. Tone stays technical and factual.
 
 | Page | Role | Primary sources |
 | --- | --- | --- |
 | **Home** | What the platform is, current status, and the on-time delivery chart | `README.md`, `PROJECT_STATUS.md`, figure 1 |
 | **Architecture** | Stack, medallion, contracts, batch vs stream, and the read path through Trino to JupyterLab and Superset | `docs/architecture/`, ADRs, figure 10 |
-| **Pipeline** | Ingestion → Bronze / Silver / Gold, one chart per Gold domain, orchestration and CDC when those phases are verified | Phase 1–4 docs; figures 2–9 |
-| **Operations** | Quality, lineage, CI, resource footprint; a Grafana image when Phase 5 is verified | Phases 5–6 docs |
+| **Pipeline** | Ingestion → Bronze / Silver / Gold, one chart per Gold domain, orchestration and CDC when those phases are verified | Phase 1–4, 10, and 11 docs; figures 2–9 |
+| **Operations** | Quality, lineage, CI, resource footprint, and the Grafana image | Phase 0, 3, 5, 6, and 10 docs; figure 11 |
 | **Reference** | Links to the repository, ADRs, roadmap, setup, and the figure manifest | Repo root docs |
 
 **Figure caption.** Each caption records the question, the value, the grain, what the rate excludes, the Gold table, the tool, the version, and the run id. The number in the caption is the number in the image and the number recorded for that run.
 
-**Site figures.** Phase 8 draws them. Phase 9 publishes them as static images under `site/src/assets/figures/`, with a caption manifest. The site does not embed Jupyter or Superset. `.ipynb` files stay free of outputs. An image shows an aggregate. It does not show an order id, a review text, an email, a customer name, or a single-person location. Olist figures are aggregates of the CC BY-NC-SA source, the same class of fact already written in the Gold docs, and the caption says so. A Grafana image is added on Operations only when Phase 5 is verified. P9-06 compares every caption to the manifest and to that run.
+**Site updates.** Site v1 (Phase 9) publishes the verified Phase 0–3 material now. From Phase 4 on, each phase has a site update issue before its close pair (P4-11, P5-10, P6-10, P8-08, P10-13, P11-19). It updates the pages above with results of that phase's verified issues only and redeploys the site. The phase's live run compares the site to its result, and the phase documentation issue fixes and redeploys any mismatch. Planned work stays labeled planned.
 
-| # | Page | Question | Mart | What the image shows | Tool |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Home | Did delivery meet the promised date? | `mart_delivery_performance` | On-time rate | Superset |
-| 2 | Pipeline | How late are the missed promises? | `mart_late_orders` | Days-late buckets or a count, not order rows | Superset |
-| 3 | Pipeline | How does marketplace GMV move? | `mart_platform_sales` | Item GMV by purchase date | Superset |
-| 4 | Pipeline | Does delay change the review score? | `mart_review_drivers` | Mean score by delay bucket | Superset |
-| 5 | Pipeline | Which lead origins become sellers that sell? | `mart_marketing_acquisition` | Win rate and matched item GMV by origin | Superset |
-| 6 | Pipeline | Where are the buyers, by state? | `mart_customer_geography` | Buyer counts by UF | Superset |
-| 7 | Pipeline | How are catalog prices spread? | `mart_catalog_prices` | Median price by category | Superset |
-| 8 | Pipeline | How often does a session purchase? | `mart_storefront_session` | Session counts by cart and purchase | Superset |
-| 9 | Pipeline | Does the OLTP sample keep the same promise? | `mart_oltp_delivery_performance` | On-time rate, labeled as a different population from Olist | Superset |
-| 10 | Architecture | Does the notebook reach the same rate? | `mart_delivery_performance` | The on-time query, same value as figure 1 | JupyterLab |
+**Site figures.** P8-08 publishes figures 1–10 as static images under `site/src/assets/figures/`, with a caption manifest; P5-10 adds figure 11 from the P5-03 Grafana dashboard. The site does not embed Jupyter or Superset. `.ipynb` files stay free of outputs. An image shows an aggregate. It does not show an order id, a review text, an email, a customer name, or a single-person location. Olist figures are aggregates of the CC BY-NC-SA source, the same class of fact already written in the Gold docs, and the caption says so. The live run of the publishing phase (P8-06, P5-08) compares every caption to the manifest and to that run.
 
-**Incremental rule (Phases 1–8):** a scaffold under `site/` may exist early (Astro Starlight + Catppuccin theme). Content updates must use only facts already **verified** in `PROJECT_STATUS.md`. Do **not** complete public hosting, the figure gallery, or final copy polish until Phase 9. Phase 8 may add the exported images and the manifest once P8-06 has checked them. It does not publish the hosted report.
+| # | Page | Question | Source | What the image shows | Tool | Published by |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Home | Did delivery meet the promised date? | `mart_delivery_performance` | On-time rate | Superset | P8-08 |
+| 2 | Pipeline | How late are the missed promises? | `mart_late_orders` | Days-late buckets or a count, not order rows | Superset | P8-08 |
+| 3 | Pipeline | How does marketplace GMV move? | `mart_platform_sales` | Item GMV by purchase date | Superset | P8-08 |
+| 4 | Pipeline | Does delay change the review score? | `mart_review_drivers` | Mean score by delay bucket | Superset | P8-08 |
+| 5 | Pipeline | Which lead origins become sellers that sell? | `mart_marketing_acquisition` | Win rate and matched item GMV by origin | Superset | P8-08 |
+| 6 | Pipeline | Where are the buyers, by state? | `mart_customer_geography` | Buyer counts by UF | Superset | P8-08 |
+| 7 | Pipeline | How are catalog prices spread? | `mart_catalog_prices` | Median price by category | Superset | P8-08 |
+| 8 | Pipeline | How often does a session purchase? | `mart_storefront_session` | Session counts by cart and purchase | Superset | P8-08 |
+| 9 | Pipeline | Does the OLTP sample keep the same promise? | `mart_oltp_delivery_performance` | On-time rate, labeled as a different population from Olist | Superset | P8-08 |
+| 10 | Architecture | Does the notebook reach the same rate? | `mart_delivery_performance` | The on-time query, same value as figure 1 | JupyterLab | P8-08 |
+| 11 | Operations | Where does refresh time go? | P3-08 refresh records | Refresh duration and rows read per layer over time | Grafana | P5-10 |
+
+**Content rule:** every site change uses only facts from verified issues. The site summarizes the platform; `PROJECT_STATUS.md`, the phase docs, and the ADRs stay the source of truth.
 
 
 ---
@@ -112,7 +115,7 @@ Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as 
 | ID | Title | Depends on | Expected/Seen Risk | Expected/Seen Size | Status | Acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
 | R1-01 | Remove the AWS deployment path | — | Med/Med | Md/Md | Verified | Phase 7 and P6-03 withdrawn; Phase 5 FinOps becomes the local resource footprint with machine cost to run and a performance analysis (P5-05); [ADR-0029](docs/decisions/0029-open-source-only-platform.md) supersedes ADR-0011 and the AWS half of ADR-0001; AGENTS.md, README, DECISIONS.md, ADRs, architecture docs, and the site no longer present an AWS path. S3 client libraries that MinIO needs and historical records stay |
-| R1-02 | Site update at the end of each phase | R1-01 | Lo/- | Sm/- | Not started | Site v1 starts now from verified Phase 0–3 material. From Phase 4 on, every phase gets a site update issue before its closing pair that publishes only that phase's verified results. Phase 9 and the site figure table are restructured to match |
+| R1-02 | Site update at the end of each phase | R1-01 | Lo/Med | Sm/Sm | Verified | Site v1 starts now from verified Phase 0–3 material. From Phase 4 on, every phase gets a site update issue before its closing pair that publishes only that phase's verified results. Phase 9 and the site figure table are restructured to match |
 | R1-03 | Rename the PostgreSQL OLTP source to olist-synth-cdc | R1-01, R1-02 | Hi/- | Md/- | Not started | `postgres_oltp` becomes `olist_synth_cdc` (prose: olist-synth-cdc) in code, DAGs, dbt models and schemas, contracts, storage paths, tests and docs. The source is re-ingested under the new paths, row counts match the pre-rename run, and the old prefixes and tables are deleted after that check |
 
 ---
@@ -310,6 +313,7 @@ Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as 
 - [ ] Restart and replay do not corrupt sinking state.
 - [ ] Docs contrast streaming CDC vs daily/weekly batch and do not claim “exactly once” without proof.
 - [ ] Validated daily and weekly batch paths still work after CDC is introduced.
+- [ ] The site shows only results of this phase's verified issues (P4-11); P4-09 compares them, and P4-10 fixes and redeploys any mismatch.
 - [ ] A live run result is recorded and compared to the PostgreSQL source and the batch baseline (P4-09).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P4-10).
 
@@ -325,10 +329,11 @@ Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as 
 | P4-06 | Streaming resilience scenarios | P4-04, P4-05 | Hi/- | Md/- | Not started | Tests or runbooks for duplicates, out-of-order, restart/replay and deletes |
 | P4-07 | Batch path regression check | P3-04, P3-05, P4-04 | Med/- | Sm/- | Not started | Evidence that daily and weekly batch extracts still succeed alongside the streaming path |
 | P4-08 | SCD Type 2 history | P4-04, P4-05 | Hi/- | Lg/- | Not started | Implement the type 2 applications in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). First history is PostgreSQL CDC for customers, sellers, orders, and order items: `valid_from`, `valid_to`, and `is_current`, including deletes that close the current row. Purchase-time city, UF, and ZIP stay copied on the order fact. Do not invent history for a single snapshot. Clickstream events and reviews stay immutable. This issue is the only CDC-based SCD implementation; P11-07 builds Type 2 from daily snapshots for the BioGuardia dimensions (amended 2026-11-26). P4-05 stays the batch-vs-stream semantics note |
-| P4-09 | Live run, result, and consistency check | P4-04, P4-06, P4-07 | Med/- | Md/- | Not started | Run inserts, updates, and deletes through the local CDC path into the sink. Restart the consumer once and replay. Record event counts and the sink row set before and after replay. Compare the sink to the PostgreSQL source for those keys. Run the daily and weekly batch paths and compare them to their pre-CDC baseline. Record mismatches. Do not claim exactly-once. Unit tests alone do not close this issue |
-| P4-10 | Phase 4 documentation and status | P4-09 | Med/- | Sm/- | Not started | Document batch vs streaming from the P4-09 result. P4-05 remains the semantics write-up. `PROJECT_STATUS.md` cites the live-run evidence |
+| P4-11 | Site update: Phase 4 | P4-05 to P4-08, P9-05 | Med/- | Sm/- | Not started | Update the site pages the growth scheme assigns to this phase, using only results of this phase's verified issues: Pipeline shows the CDC path (logical replication, Debezium, Kafka, Spark Structured Streaming), the P4-05 batch-vs-stream semantics, and SCD Type 2 history; Architecture shows batch vs stream. No exactly-once claim. Planned work stays labeled planned, and the Home status table matches the phase overview. `npm run build` passes and the GitHub Pages site is redeployed. No row value, secret, or figure without its recorded run (AGENTS.md §8). P4-09 compares these claims to its result |
+| P4-09 | Live run, result, and consistency check | P4-04, P4-06, P4-07, P4-11 | Med/- | Md/- | Not started | Run inserts, updates, and deletes through the local CDC path into the sink. Restart the consumer once and replay. Record event counts and the sink row set before and after replay. Compare the sink to the PostgreSQL source for those keys. Run the daily and weekly batch paths and compare them to their pre-CDC baseline. Record mismatches. Do not claim exactly-once. Unit tests alone do not close this issue. Compare the P4-11 site claims to this result and record mismatches |
+| P4-10 | Phase 4 documentation and status | P4-09 | Med/- | Sm/- | Not started | Document batch vs streaming from the P4-09 result. P4-05 remains the semantics write-up. `PROJECT_STATUS.md` cites the live-run evidence. Site copy matches the P4-09 result; a mismatch is fixed and the site redeployed |
 
-**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07 → P4-08 → P4-09 → P4-10. Phase close is P4-09 then P4-10.
+**Suggested order:** P4-01 → P4-02 → P4-03 → P4-04 → P4-05 → P4-06 → P4-07 → P4-08 → P4-11 → P4-09 → P4-10. Phase close is P4-09 then P4-10.
 
 ---
 
@@ -347,6 +352,7 @@ Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as 
 - [ ] Metrics are measured, not invented.
 - [ ] The resource footprint records measured CPU, memory, disk, and MinIO/Iceberg storage per service and run duration per layer for a documented run. The machine cost to run states its hardware and electricity assumptions and is labeled an estimate. The performance analysis cites those measurements.
 - [ ] Iceberg snapshots past the retention named in the footprint document are expired and orphan Parquet files are removed, with counts recorded (P5-07).
+- [ ] The site shows only results of this phase's verified issues (P5-10); P5-08 compares them, and P5-09 fixes and redeploys any mismatch.
 - [ ] A live run result is recorded and compared to that run's logs, metrics, lineage, and the snapshot-expiration counts (P5-08).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P5-09).
 
@@ -361,10 +367,11 @@ Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as 
 | P5-05 | Local resource footprint and cost to run | Phase 3 | Med/- | Md/- | Not started | For one documented pipeline run on a stated machine, measure CPU, memory, and disk per Compose service (for example sampled `docker stats`), MinIO and Iceberg storage bytes, and run duration per layer. Derive the machine cost to run from stated hardware-amortization and electricity assumptions, labeled an estimate. Write a performance analysis from those measurements: where time and resources go, and what grows with history. Name the Iceberg snapshot retention P5-07 applies and its storage effect. No figure without a measurement or a stated assumption. Rescoped from the AWS cost model by R1-01 (expected size raised from Sm: it now measures) |
 | P5-06 | Alerts and runbooks | P5-03 | Med/- | Sm/- | Not started | Alert thresholds and at least one failure runbook under `docs/runbooks/` |
 | P5-07 | Expire Iceberg snapshots and delete orphan Parquet | P2-03, P5-05 | Hi/- | Md/- | Not started | A maintenance command expires snapshots older than the retention named in the P5-05 footprint document and deletes orphan data files. It keeps the current snapshot. A recorded run for one table lists the snapshots and files removed as counts. It does not run on `docker compose up` and does not invent a spend figure. The same command compacts the tables the daily refresh appends to (`rewrite_data_files`, `rewrite_manifests`) and records file counts before and after ([review](docs/reviews/2026-11-21-verified-issues-review.md) R15). The command is shared: P11-08 and P11-15 run it on the BioGuardia tables (amended 2026-11-26) |
-| P5-08 | Live run, result, and consistency check | P5-03, P5-04, P5-05, P5-06, P5-07 | Med/- | Md/- | Not started | Run one real local pipeline execution that emits logs, metrics, and lineage. Record the dashboard values and the lineage edges. Compare them to that run's execution id, counts, and failure state. Check the footprint figures against the measurements and the stated cost assumptions. Record the P5-07 before/after object counts. It is not a measured cloud bill. Record mismatches. Do not invent metrics or spend figures |
-| P5-09 | Phase 5 documentation and status | P5-08 | Med/- | Sm/- | Not started | Document the dashboards, lineage demo, footprint measurements and cost assumptions, snapshot retention, and the P5-08 result. `PROJECT_STATUS.md` cites that evidence |
+| P5-10 | Site update: Phase 5 | P5-03 to P5-07, P9-05 | Hi/- | Sm/- | Not started | Update the site pages the growth scheme assigns to this phase, using only results of this phase's verified issues: Operations shows structured logging, the Prometheus and Grafana stack, the lineage demo, the resource footprint, the cost to run labeled an estimate with its assumptions, and the snapshot retention, and adds figure 11 with its caption from the P5-03 dashboard. Planned work stays labeled planned, and the Home status table matches the phase overview. `npm run build` passes and the GitHub Pages site is redeployed. No row value, secret, or figure without its recorded run (AGENTS.md §8). P5-08 compares these claims to its result |
+| P5-08 | Live run, result, and consistency check | P5-03, P5-04, P5-05, P5-06, P5-07, P5-10 | Med/- | Md/- | Not started | Run one real local pipeline execution that emits logs, metrics, and lineage. Record the dashboard values and the lineage edges. Compare them to that run's execution id, counts, and failure state. Check the footprint figures against the measurements and the stated cost assumptions. Record the P5-07 before/after object counts. It is not a measured cloud bill. Record mismatches. Do not invent metrics or spend figures. Compare the P5-10 site claims to this result and record mismatches |
+| P5-09 | Phase 5 documentation and status | P5-08 | Med/- | Sm/- | Not started | Document the dashboards, lineage demo, footprint measurements and cost assumptions, snapshot retention, and the P5-08 result. `PROJECT_STATUS.md` cites that evidence. Site copy matches the P5-08 result; a mismatch is fixed and the site redeployed |
 
-**Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06 → P5-07 → P5-08 → P5-09.
+**Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06 → P5-07 → P5-10 → P5-08 → P5-09.
 
 ---
 
@@ -382,6 +389,7 @@ Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as 
 - [ ] Integration tests are reproducible and isolated.
 - [ ] Recovery scenarios have recorded evidence.
 - [ ] Secrets and credentials are not exposed in logs or artifacts.
+- [ ] The site shows only results of this phase's verified issues (P6-10); P6-07 compares them, and P6-08 fixes and redeploys any mismatch.
 - [ ] A live run result is recorded and compared to the local checks (P6-07).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P6-08).
 
@@ -396,10 +404,11 @@ Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as 
 | P6-05 | Resilience test evidence | P3-09; P4-06 if present | Med/- | Md/- | Not started | Failure/retry/recovery scenarios executed and linked from `PROJECT_STATUS.md` |
 | P6-06 | Security checks | P6-01 | Hi/- | Md/- | Not started | Appropriate secret scanning / dependency audit; no credential leakage in CI logs. The Olist download checks a recorded SHA-256 per file and fails on a mismatch (review R18) |
 | P6-09 | Write-audit-publish for Silver and Gold | P3-11, P3-16 | Hi/- | Lg/- | Not started | From the [2026-11-21 review](docs/reviews/2026-11-21-verified-issues-review.md) (R6). Silver writes to an Iceberg branch or staging table and is published only after its checks pass; Gold builds into a staging schema and readers switch only after `dbt build` tests pass. A failed check leaves readers on the previous version of every table in the set. The plan proves Spark, the JDBC catalog, Trino 484, and dbt-trino support the chosen mechanism before adopting it. Scripted evidence: a planted check failure leaves the published Silver and Gold counts unchanged, and a Trino loop during a publish never joins a new fact to an old mart |
-| P6-07 | Live run, result, and consistency check | P6-01, P6-02, P6-04, P6-05, P6-06, P6-09 | Med/- | Sm/- | Not started | Run the documented CI workflow and one recovery scenario. Record pass/fail. Compare CI results to the local results for the same checks. Confirm logs and artifacts from that run do not contain credentials. Record mismatches |
-| P6-08 | Phase 6 documentation and status | P6-07 | Med/- | Sm/- | Not started | Document the CI and recovery evidence, and cite the P6-07 result in `PROJECT_STATUS.md` |
+| P6-10 | Site update: Phase 6 | P6-01 to P6-09, P9-05 | Med/- | Sm/- | Not started | Update the site pages the growth scheme assigns to this phase, using only results of this phase's verified issues: Operations shows the CI gates, the resilience evidence, the security checks, and write-audit-publish. Planned work stays labeled planned, and the Home status table matches the phase overview. `npm run build` passes and the GitHub Pages site is redeployed. No row value, secret, or figure without its recorded run (AGENTS.md §8). P6-07 compares these claims to its result |
+| P6-07 | Live run, result, and consistency check | P6-01, P6-02, P6-04, P6-05, P6-06, P6-09, P6-10 | Med/- | Sm/- | Not started | Run the documented CI workflow and one recovery scenario. Record pass/fail. Compare CI results to the local results for the same checks. Confirm logs and artifacts from that run do not contain credentials. Record mismatches. Compare the P6-10 site claims to this result and record mismatches |
+| P6-08 | Phase 6 documentation and status | P6-07 | Med/- | Sm/- | Not started | Document the CI and recovery evidence, and cite the P6-07 result in `PROJECT_STATUS.md`. Site copy matches the P6-07 result; a mismatch is fixed and the site redeployed |
 
-**Suggested order:** P6-01 → P6-02 ∥ P6-04 → P6-05 → P6-06 → P6-09 → P6-07 → P6-08. P6-09 comes from the 2026-11-21 review and runs before the close pair.
+**Suggested order:** P6-01 → P6-02 ∥ P6-04 → P6-05 → P6-06 → P6-09 → P6-10 → P6-07 → P6-08. P6-09 comes from the 2026-11-21 review and runs before the close pair.
 
 ---
 
@@ -429,7 +438,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 
 **Depends on:** Phase 2 verified. This phase may run in parallel with Phases 3–6. It does not wait for Airflow or CDC.
 
-**Out of scope:** Writing Iceberg or PostgreSQL from notebooks or Superset. Using Superset SQL Lab as the exploration product. Using Grafana as business BI (Phase 5 keeps Grafana for operations). Replacing the static site or embedding a live BI session in it. SSO, public embedding, and row-level security as a product. Kubernetes. New business metrics. Committing `.ipynb` cell outputs, row extracts, or Olist source rows. Creating `notebooks/` before this phase starts. The reviewed aggregate images for the site figure table are in scope at P8-06.
+**Out of scope:** Writing Iceberg or PostgreSQL from notebooks or Superset. Using Superset SQL Lab as the exploration product. Using Grafana as business BI (Phase 5 keeps Grafana for operations). Replacing the static site or embedding a live BI session in it. SSO, public embedding, and row-level security as a product. Kubernetes. New business metrics. Committing `.ipynb` cell outputs, row extracts, or Olist source rows. Creating `notebooks/` before this phase starts. The reviewed aggregate images for the site figure table are in scope at P8-08.
 
 **Phase acceptance (all required):**
 
@@ -438,8 +447,8 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 - [ ] Superset runs in Compose with its metadata in a PostgreSQL database that is neither `odp` nor `iceberg`.
 - [ ] Saved charts use only metrics already defined for Gold. They do not invent a figure.
 - [ ] Secrets stay out of argv, SQL text, notebook output, and logs.
-- [ ] Docs name four surfaces: JupyterLab, Superset, Grafana, and the Phase 9 site.
-- [ ] P8-06 exports one static image per row of the site figure table, plus a caption manifest a later page can publish.
+- [ ] Docs name four surfaces: JupyterLab, Superset, Grafana, and the report site.
+- [ ] P8-08 publishes one static image per figure row 1–10 with its caption, and the caption manifest, on the site; P8-06 compares them, and P8-07 fixes and redeploys any mismatch.
 - [ ] A live run result is recorded and compared to Trino or the Phase 2 result for that run (P8-06).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P8-07).
 
@@ -451,30 +460,30 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 | P8-02 | JupyterLab exploration notebooks | P8-01 | Med/- | Md/- | Not started | Notebooks live under `notebooks/` and start with a documented host command against the published Trino port, same pattern as dbt. Cover at least two verified marts, including on-time rate and late orders. Connection secrets, if any, come from the environment or a mode-600 file, not from argv. A test fails if a code cell contains `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `DROP`, or `ALTER`. A test fails if a committed notebook has non-empty outputs. Cells do not print record values |
 | P8-03 | Superset in local Compose | P8-01 | Med/- | Md/- | Not started | Pinned image, health check, and a documented UI URL. Metadata database on the existing PostgreSQL, separate from `odp` and `iceberg`. Admin and database passwords come from the environment, not argv. Compose adds only the services named in P8-01. The saved Trino connection is read-only: a repo check rejects DDL and DML in the committed Superset assets |
 | P8-04 | Dashboards as code on verified Gold marts | P8-03 | Hi/- | Md/- | Not started | Commit a re-importable Superset export with the nine Superset charts in the site figure table (growth scheme). Each chart uses that row's mart and a measure already named in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). No new metric. Charts read Gold through Trino. Re-import does not duplicate the dashboard. A chart does not render an order id, review text, email, or a single-customer location |
-| P8-05 | Exploration, BI, ops, and site boundaries | P8-02, P8-04 | Lo/- | Sm/- | Not started | Document the four surfaces: JupyterLab explores, Superset saves business charts, Grafana (Phase 5) is operations, the Phase 9 site publishes the static figures from those tools. State that SQL Lab is not a second notebook product. State the Olist CC BY-NC-SA limit: aggregate figures may be published with the caption; row extracts stay out of git and off the site |
-| P8-06 | Live run, result, and consistency check | P8-02, P8-04, P8-05 | Med/- | Md/- | Not started | On the local stack, run the documented notebooks and open the Superset charts. Record component versions, the Gold tables queried, and the chart values. Compare those values to the same metrics from Trino, or to the Phase 2 result for that run. Export one static image per row of the site figure table, including the Jupyter image of the same on-time query, and a caption manifest (question, value, grain, Gold table, tool, version, run id). The image shows the caption value. Images are aggregates only. Confirm committed notebooks have empty outputs and that logs from this run do not contain credentials or row values. Record mismatches. Unit tests alone do not close this issue. Persist evidence in architecture docs / `docs/status-log.md` (not only `PROJECT_STATUS.md`) |
-| P8-07 | Phase 8 documentation and status | P8-06 | Med/- | Sm/- | Not started | Document versions, start commands, the four surfaces, licenses, known limitations, and the P8-06 result. `PROJECT_STATUS.md` cites that evidence |
+| P8-05 | Exploration, BI, ops, and site boundaries | P8-02, P8-04 | Lo/- | Sm/- | Not started | Document the four surfaces: JupyterLab explores, Superset saves business charts, Grafana (Phase 5) is operations, the report site publishes the static figures P8-08 exports from those tools. State that SQL Lab is not a second notebook product. State the Olist CC BY-NC-SA limit: aggregate figures may be published with the caption; row extracts stay out of git and off the site |
+| P8-08 | Site update: Phase 8 | P8-02, P8-04, P8-05, P9-05 | Hi/- | Sm/- | Not started | Export one static image per figure row 1–10 from the verified P8-04 charts and the P8-02 notebook, including the Jupyter image of the same on-time query, and write the caption manifest (question, value, grain, what the rate excludes, Gold table, tool, version, run id). The image shows the caption value. Images are aggregates only. Place each image with its caption on its page under `site/src/assets/figures/`; Architecture adds the read path Gold → Trino → JupyterLab and Superset, and Reference links the manifest. Planned work stays labeled planned, and the Home status table matches the phase overview. `npm run build` passes and the GitHub Pages site is redeployed. A figure is live before P8-06 checks it; P8-06 compares every value |
+| P8-06 | Live run, result, and consistency check | P8-02, P8-04, P8-05, P8-08 | Med/- | Md/- | Not started | On the local stack, run the documented notebooks and open the Superset charts. Record component versions, the Gold tables queried, and the chart values. Compare those values to the same metrics from Trino, or to the Phase 2 result for that run. Compare every value in the P8-08 caption manifest and each figure on the site to the same metric from Trino for that run; figure 1 and figure 10 match. Confirm committed notebooks have empty outputs and that logs from this run do not contain credentials or row values. Record mismatches. Unit tests alone do not close this issue. Persist evidence in architecture docs / `docs/status-log.md` (not only `PROJECT_STATUS.md`) |
+| P8-07 | Phase 8 documentation and status | P8-06 | Med/- | Sm/- | Not started | Document versions, start commands, the four surfaces, licenses, known limitations, and the P8-06 result. `PROJECT_STATUS.md` cites that evidence. Site copy matches the P8-06 result; a mismatch is fixed and the site redeployed |
 
-**Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-06 → P8-07. Phase close is P8-06 then P8-07.
+**Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-08 → P8-06 → P8-07. Phase close is P8-06 then P8-07.
 
 ---
 
-## Phase 9 — Platform report site
+## Phase 9 — Platform report site (Site v1)
 
-**Goal:** Publish a small, polished **multi-page static report** of the verified platform, including the site figures. Host it and link it from the repository Website field and the README.
+**Goal:** Publish Site v1: a hosted multi-page static report of the verified platform, built from Phase 0–3 material, on GitHub Pages, and linked from the repository Website field and the README. Later phases add their verified results through their own site update issues ([growth scheme](#platform-report-site--growth-scheme)).
 
-**Depends on:** Phase 3 verified (verified platform material to publish) and Phase 8 verified (exploration and Superset evidence available to cite).
+**Depends on:** Phase 3 verified. Runs now, after Refactor R1 and before Phase 4. The number 9 is an identifier, not an order.
 
-**Out of scope:** Backend, CMS, authentication, analytics pixels, interactive demos that require a live cluster, duplicating the full `ROADMAP.md` issue backlog on the site, embedding a live Superset or Jupyter service.
+**Out of scope:** Backend, CMS, authentication, analytics pixels, interactive demos that require a live cluster, duplicating the full `ROADMAP.md` issue backlog on the site, embedding a live Superset or Jupyter service. Results of Phases 4 to 11, including the site figures: each phase's site update publishes them.
 
 **Phase acceptance (all required):**
 
-- [ ] Static site under `site/` (or equivalent) with the five pages populated from verified platform material.
-- [ ] Content matches delivered/verified work; no planned-but-unbuilt capabilities presented as complete.
-- [ ] Site builds locally via a documented command; CI builds (and optionally deploys) the static output.
+- [ ] Static site under `site/` with the five pages populated from verified Phase 0–3 material.
+- [ ] Content matches delivered/verified work; no planned-but-unbuilt capabilities presented as complete. The Home status table matches the phase overview.
+- [ ] Site builds locally via a documented command; CI builds the static output and deploys it to GitHub Pages.
 - [ ] Public URL is set on the GitHub repository Website field and linked from the README Platform report block.
 - [ ] Navigation and page roles match the growth scheme above; reference page links back to repo docs/ADRs.
-- [ ] Every row of the site figure table is a static image on the named page, with its caption. Figure 1 and figure 10 show the same on-time value.
 - [ ] A live site result is recorded and compared to `PROJECT_STATUS.md` (P9-06).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P9-07).
 
@@ -482,14 +491,13 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 
 | ID | Title | Depends on | Expected/Seen Risk | Expected/Seen Size | Status | Acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| P9-01 | Site scaffold and page map | Phase 3 | Lo/- | Sm/- | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev`. Early scaffold allowed before Phase 8; Phase 9 completes content depth and hosting |
-| P9-02 | Home and Architecture pages | P9-01, Phase 8 | Hi/- | Md/- | Not started | Home states platform purpose, verified status, and figure 1 (on-time Superset chart) with its caption. Architecture covers stack, medallion, contracts, batch vs stream, and the read path Gold → Trino → JupyterLab and Superset, with figure 10 beside figure 1's value. Diagrams come from `docs/` and from the P8-06 export |
-| P9-03 | Pipeline and Operations pages | P9-01, Phase 8 | Hi/- | Md/- | Not started | Pipeline covers ingestion through Gold, orchestration and CDC, and places figures 2–9 on the domain each question belongs to. Operations covers quality, observability, lineage, CI, and the local resource footprint. It includes a Grafana image only when Phase 5 is verified, and it says so when that image is absent |
-| P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/- | Sm/- | Not started | Reference links to GitHub, ADRs, roadmap, setup, and the figure manifest; README Platform report block points to the live URL (or staging URL if deploy is gated) |
-| P9-05 | Static hosting and GitHub Website field | P9-04 | Hi/- | Sm/- | Not started | Hosting documented (e.g. GitHub Pages or equivalent); CI build green; repository About → Website set to the report URL |
-| P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Med/- | Sm/- | Not started | Build the site and open the published URL, or the production build when the URL is not up yet. Walk Home, Architecture, Pipeline, Operations, and Reference. Open each figure. Compare status, counts, caption values, and any metric or cost claim to `PROJECT_STATUS.md`, the phase docs, and the P8-06 manifest. Figure 1 and figure 10 match. Record broken links, missing images, and mismatches. Do not treat a single screenshot of the site as this check |
-| P9-07 | Phase 9 documentation and status | P9-06 | Med/- | Sm/- | Not started | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
-
+| P9-01 | Site scaffold and page map | Phase 3 | Lo/- | Sm/- | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev` |
+| P9-02 | Home and Architecture pages | P9-01 | Hi/- | Md/- | Not started | Home states the platform purpose and the verified status of Phases 0–3; its status table matches the phase overview (the scaffold still shows Phase 2 in progress). Architecture covers the stack, medallion, contracts, Airflow orchestration, and batch vs stream, with streaming CDC labeled planned. Diagrams come from `docs/`. No figure: figures 1 and 10 arrive with P8-08 |
+| P9-03 | Pipeline and Operations pages | P9-01 | Hi/- | Md/- | Not started | Pipeline covers ingestion through Gold and the Airflow daily and weekly schedules, backfills, quality gate, and quarantine from the Phase 1–3 docs; CDC is labeled planned. Operations covers CI (Phase 0) and the Phase 3 quality gate; observability, lineage, and the resource footprint are labeled planned. The stale status lines on both pages are fixed. No figure: figures 2–9 arrive with P8-08 and figure 11 with P5-10 |
+| P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/- | Sm/- | Not started | Reference links to GitHub, ADRs, roadmap, and setup; README Platform report block points to the GitHub Pages URL. The figure manifest link arrives with P8-08 |
+| P9-05 | GitHub Pages hosting and Website field | P9-04 | Hi/- | Sm/- | Not started | A GitHub Actions workflow builds `site/` and deploys it to GitHub Pages, with the Astro `site` and `base` set for the project URL; hosting documented in `site/README.md`; CI build green; repository About → Website set to the Pages URL. Later site updates redeploy through the same workflow |
+| P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Med/- | Sm/- | Not started | Open the published GitHub Pages URL. Walk Home, Architecture, Pipeline, Operations, and Reference. Compare status, counts, and any metric claim to `PROJECT_STATUS.md` and the Phase 0–3 docs. Record broken links, missing pages, and mismatches. Do not treat a single screenshot of the site as this check |
+| P9-07 | Phase 9 documentation and status | P9-06 | Med/- | Sm/- | Not started | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings; a mismatch is fixed and the site redeployed. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
 
 **Suggested order:** P9-01 → P9-02 ∥ P9-03 → P9-04 → P9-05 → P9-06 → P9-07. Phase close is P9-06 then P9-07.
 
@@ -515,6 +523,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 - [ ] `data_quality.check_results` holds the result history as counts and names, with no row values.
 - [ ] Alerts reach the terminal, e-mail through Mailpit, and a fictional Slack payload, and a repeated failure does not notify twice.
 - [ ] Each failure scenario in P10-10 has recorded evidence with the expected status.
+- [ ] The site shows only results of this phase's verified issues (P10-13); P10-11 compares them, and P10-12 fixes and redeploys any mismatch.
 - [ ] A live run that crosses a weekend is recorded and compared to Trino and to the source window (P10-11).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P10-12).
 
@@ -532,10 +541,11 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 | P10-08 | `check_contracts` DAG | P10-06, P10-07, P3-04 | Med/- | Md/- | Not started | Thin wrapper: one task runs `datacontract test` per contract with JSON output to a work file, the next appends that file to `data_quality.check_results`. A failed check does not fail the write task, so the history records failures. Trino settings come from the environment only. Created paused. A DagBag test covers it. Its test task takes the 1-slot `lakehouse_gold` pool that P3-04 defines, so it never runs while a lakehouse table is written or reconciled |
 | P10-09 | Alerts and runbook | P10-08 | Med/- | Md/- | Not started | Alert state is computed in this repository's package from `data_quality.check_results`: a notification goes out only when a check's result differs from its previous run. The terminal alert always prints. E-mail goes through Mailpit in Compose (pinned image), with SMTP settings from the environment only. The fictional Slack alert is a Block Kit payload written to a file; there is no real workspace, and the docs say so. A runbook is under `docs/runbooks/`. Two consecutive runs prove deduplication: the second failing run does not notify again. Messages carry counts and thresholds, never values |
 | P10-10 | Failure scenarios | P10-08 | Med/- | Md/- | Not started | Recorded evidence, each with the expected status, for: a removed column, a late window, a missing series, a Monday with no false alarm (Friday's data is on time), and a missing business day reported as a gap |
-| P10-11 | Live run, result, and consistency check | P10-09, P10-10 | Med/- | Md/- | Not started | On the local stack, ingest two consecutive real windows from the BCB SGS API and repeat one of them. The run crosses a weekend. Compare the history counts to Trino and to the source window. Record mismatches. Unit tests alone do not close this issue |
-| P10-12 | Phase 10 documentation and status | P10-11 | Med/- | Sm/- | Not started | Docs and `PROJECT_STATUS.md` cite the P10-11 result |
+| P10-13 | Site update: Phase 10 | P10-09, P10-10, P9-05 | Med/- | Sm/- | Not started | Update the site pages the growth scheme assigns to this phase, using only results of this phase's verified issues: Pipeline shows the BCB SGS source with its ODbL 1.0 attribution to Banco Central do Brasil; Operations shows the table contracts, the check history, and the alerts as counts and names. Planned work stays labeled planned, and the Home status table matches the phase overview. `npm run build` passes and the GitHub Pages site is redeployed. No row value, secret, or figure without its recorded run (AGENTS.md §8). P10-11 compares these claims to its result |
+| P10-11 | Live run, result, and consistency check | P10-09, P10-10, P10-13 | Med/- | Md/- | Not started | On the local stack, ingest two consecutive real windows from the BCB SGS API and repeat one of them. The run crosses a weekend. Compare the history counts to Trino and to the source window. Record mismatches. Unit tests alone do not close this issue. Compare the P10-13 site claims to this result and record mismatches |
+| P10-12 | Phase 10 documentation and status | P10-11 | Med/- | Sm/- | Not started | Docs and `PROJECT_STATUS.md` cite the P10-11 result. Site copy matches the P10-11 result; a mismatch is fixed and the site redeployed |
 
-**Suggested order:** P10-01 ∥ P10-02 → P10-03 → P10-04 → P10-05 → P10-06 → P10-07 → P10-08 → P10-09 → P10-10 → P10-11 → P10-12. Phase close is P10-11 then P10-12.
+**Suggested order:** P10-01 ∥ P10-02 → P10-03 → P10-04 → P10-05 → P10-06 → P10-07 → P10-08 → P10-09 → P10-10 → P10-13 → P10-11 → P10-12. Phase close is P10-11 then P10-12.
 
 ---
 
@@ -563,6 +573,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 - [ ] Reconciliation reports every planted defect, with exact decimal totals (P11-12).
 - [ ] Gold answers the four use cases and field operations with documented grain (P11-13, P11-14).
 - [ ] Telemetry storage stays inside a documented, measured budget (P11-15).
+- [ ] The site shows only results of this phase's verified issues (P11-19); P11-17 compares them, and P11-18 fixes and redeploys any mismatch.
 - [ ] A live run result is recorded and compared to the planted defects and the source counts (P11-17).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P11-18).
 
@@ -586,10 +597,11 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 | P11-14 | Gold: biodiversity, restoration and operations | P11-06, P11-08 | Hi/- | Lg/- | Not started | Marts with documented grain: species activity and diversity (Shannon index) per zone-week from acoustic and camera-trap detections; camera-trap occupancy per species and zone; planting survival by species and zone; carbon stock per zone from canopy surveys, wood density, and soil carbon, updated when late lab results arrive; patrol coverage per zone-hour without individual tracks; incident lifecycle and enforcement outcome. Same build, re-run, and unit-test rules as P11-13. No mart puts a pseudonym next to a location at single-person grain |
 | P11-15 | Telemetry storage maintenance | P11-09, P5-07 | Hi/- | Md/- | Not started | The P5-07 maintenance command compacts the telemetry Bronze and Silver tables, expires their snapshots, and deletes Bronze partitions older than a retention chosen from measured growth; file counts, bytes, and snapshot counts before and after are recorded. Kafka retention and the storage budget in the domain model are updated with the measured growth per day and layer. A daily DAG runs it outside the stream's write path; a commit conflict with the stream retries. Checklist: deletes only past the retention; compaction is one atomic commit for readers; evidence = a recorded run |
 | P11-16 | Orchestration and outage drills | P11-05 to P11-15 | Hi/- | Md/- | Not started | Every Phase 11 DAG is wired with Assets: the daily ingestion triggers the Bronze and Silver refresh, the stream monitor triggers the hourly telemetry work, and reconciliation and Gold follow them; DagBag tests cover them. Drills, each with counts: Airflow stopped for at least six hours while the producer and the stream keep landing, after which every DAG catches up with no gap and no duplicate; the stream consumer stopped for an hour while Kafka holds the backlog, after which it resumes; the producer stopped longer than a short test buffer, after which R2 reports gateway-skipped equal to the gateway record; the consumer stopped longer than a short test retention, after which R2 reports unexplained loss for exactly the expired range |
-| P11-17 | Live run, result, and consistency check | P11-16 | Med/- | Md/- | Not started | On the local stack, at least three consecutive daily drops at scale 1, including a planted defect day and a version 2, and 24 hours of stream at the full rate, with one Airflow outage drill. Record rows and bytes per drop, the stream rate per hour, task durations, storage growth per layer, SCD2 version counts, the reconciliation findings compared to the planted lists and drill records, a PII scan of Gold and logs (no planted canary found), and the skew figures. Record mismatches. Unit tests alone do not close this issue |
-| P11-18 | Phase 11 documentation and status | P11-17 | Med/- | Sm/- | Not started | The domain model, the source notes, ADR-0027, ADR-0028, and `PROJECT_STATUS.md` cite the P11-17 result |
+| P11-19 | Site update: Phase 11 | P11-16, P9-05 | Hi/- | Sm/- | Not started | Update the site pages the growth scheme assigns to this phase, using only results of this phase's verified issues: Pipeline shows the BioGuardia sources, the telemetry stream, SCD Type 2, reconciliation, and the skew results as aggregates, with no direct identifier, pseudonym, or single-person location. Planned work stays labeled planned, and the Home status table matches the phase overview. `npm run build` passes and the GitHub Pages site is redeployed. No row value, secret, or figure without its recorded run (AGENTS.md §8). P11-17 compares these claims to its result |
+| P11-17 | Live run, result, and consistency check | P11-16, P11-19 | Med/- | Md/- | Not started | On the local stack, at least three consecutive daily drops at scale 1, including a planted defect day and a version 2, and 24 hours of stream at the full rate, with one Airflow outage drill. Record rows and bytes per drop, the stream rate per hour, task durations, storage growth per layer, SCD2 version counts, the reconciliation findings compared to the planted lists and drill records, a PII scan of Gold and logs (no planted canary found), and the skew figures. Record mismatches. Unit tests alone do not close this issue. Compare the P11-19 site claims to this result and record mismatches |
+| P11-18 | Phase 11 documentation and status | P11-17 | Med/- | Sm/- | Not started | The domain model, the source notes, ADR-0027, ADR-0028, and `PROJECT_STATUS.md` cite the P11-17 result. Site copy matches the P11-17 result; a mismatch is fixed and the site redeployed |
 
-**Suggested order:** P11-01 → P11-02 → P11-03 (now, under the waiver). After Phase 3: P11-04 → P11-05 → P11-06 → P11-07 → P11-08, with P11-09 → P11-10 beside P11-06 to P11-08 → P11-11 → P11-12 → P11-13 ∥ P11-14 → P11-15 → P11-16 → P11-17 → P11-18. Phase close is P11-17 then P11-18. D-027 moves to `approved` when P11-02 is verified; D-028 when P11-03 and P11-04 are.
+**Suggested order:** P11-01 → P11-02 → P11-03 (now, under the waiver). After Phase 3: P11-04 → P11-05 → P11-06 → P11-07 → P11-08, with P11-09 → P11-10 beside P11-06 to P11-08 → P11-11 → P11-12 → P11-13 ∥ P11-14 → P11-15 → P11-16 → P11-19 → P11-17 → P11-18. Phase close is P11-17 then P11-18. D-027 moves to `approved` when P11-02 is verified; D-028 when P11-03 and P11-04 are.
 
 ---
 
@@ -616,9 +628,9 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Kubernetes | Out of scope unless an explicit approved requirement |
 | Secrets | Never commit credentials, tokens, live `.env`, or private datasets |
 | Open source only | The platform runs on open-source components on the local stack; there is no cloud deployment path ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)). Footprint and cost-to-run figures come from measurements and state their assumptions. Never invent metrics or cost figures |
-| Phase close | From Phase 2 on, every phase ends with a live run, result, and consistency check, then a phase documentation and status issue. The next phase waits until both are verified. Phases 0 and 1 stay verified on results already in `docs/status-log.md` |
-| Exploration vs BI | JupyterLab explores iteratively and is read-only. Superset holds saved charts over verified Gold metrics. Grafana (Phase 5) is operations. The static site (Phase 9) publishes the checked images from those tools and does not embed them |
-| Platform report site | Scaffold may land early; figures, full content, design, and hosting are finalized in Phase 9. Earlier phases may add verified facts only. Phase 8 may add the exported images once P8-06 has checked them. The site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
+| Phase close | From Phase 2 on, every phase ends with a live run, result, and consistency check, then a phase documentation and status issue. The next phase waits until both are verified. Phases 0 and 1 stay verified on results already in `docs/status-log.md`. From Phase 4 on, a site update issue comes before the close pair, and the live run compares the site to its result |
+| Exploration vs BI | JupyterLab explores iteratively and is read-only. Superset holds saved charts over verified Gold metrics. Grafana (Phase 5) is operations. The report site publishes the images P8-08 exports from those tools and does not embed them |
+| Platform report site | Site v1 (Phase 9) is hosted on GitHub Pages from verified Phase 0–3 material. From Phase 4 on, each phase's site update issue adds only that phase's verified results, before its close pair. The site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
 | Empty dirs | Do not scaffold later-phase trees until that phase starts |
 | Language | Code/docs in English; agent↔user communication in Brazilian Portuguese |
 
@@ -639,7 +651,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-27 (R1-01; AWS path removed) |
+| Last updated | 2026-11-27 (R1-02; site update per phase) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -648,6 +660,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-27: R1-02 verified. Phase 9 becomes Site v1 on GitHub Pages from verified Phase 0–3 material and depends on Phase 3 only. Site update issues before each close pair: P4-11, P5-10, P6-10, P8-08, P10-13, P11-19; the live runs compare the site and the documentation issues fix it. P8-08 exports the figures and P8-06 checks them; the figure table gains a Published by column and figure 11 (Grafana, P5-10). Seen risk Med (phase acceptance changed).
 - 2026-11-27: R1-01 verified. Refactor R1 table added (R1-01 to R1-03). Phase 7 and P6-03 withdrawn; Phase 5 FinOps becomes the local resource footprint and cost to run (P5-05 rescoped, expected size Md); Phase 9 depends on Phases 3 and 8; ADR-0029 approved (open source only).
 - 2026-11-27: P3-15 verified. Phase 3 verified. Phase documentation issues are rated at least Med risk (P3-15 raised from Lo; P4-10 to P11-18 expected Med). Phase index `docs/architecture/phase-3-orchestration.md` (schedules, catchup, backfill, quarantine, one writer at a time, review findings closed, P3-14 result).
 - 2026-11-27: P3-14 verified. The live-run Phase 3 acceptance item is checked.

@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-27 (R1-01 verified; AWS path removed) |
+| Last updated | 2026-11-27 (R1-02 verified; site update per phase) |
 | Current phase | Phase 4 — Streaming CDC |
 | Phase status | Not started |
 
@@ -22,12 +22,12 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn.
+Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue.
 
 ## Next work
 
-1. **R1-02** — Site update at the end of each phase; Site v1 from verified Phase 0–3 material. Acceptance: `ROADMAP.md` → Refactor R1.
-2. **R1-03** — Rename the PostgreSQL OLTP source to olist-synth-cdc, re-ingest, delete old prefixes. Acceptance: `ROADMAP.md` → Refactor R1.
+1. **R1-03** — Rename the PostgreSQL OLTP source to olist-synth-cdc, re-ingest, delete old prefixes. Acceptance: `ROADMAP.md` → Refactor R1.
+2. **Phase 9 (Site v1)** — P9-01 to P9-07: pages from verified Phase 0–3 material, GitHub Pages hosting. Acceptance: `ROADMAP.md` → Phase 9.
 3. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
 4. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
 
@@ -154,7 +154,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 6 | CI/CD expansion, resilience, security | Not started |
 | 7 | Withdrawn: AWS path (R1-01, ADR-0029) | Withdrawn |
 | 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–6) |
-| 9 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
+| 9 | Platform report site v1 on GitHub Pages from Phase 0–3 material | Not started (early `site/` scaffold exists); runs before Phase 4 |
 | 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3) |
 | 11 | BioGuardia Atlantic sources at scale: daily export, telemetry stream, PII, skew, SCD2, reconciliation | In progress (waiver): P11-01 to P11-03 verified; drops 2026-11-26 to 2026-12-31 in MinIO; stream running. Processing (P11-04 on) waits for Phase 3 |
 
@@ -190,7 +190,7 @@ None.
 
 ## Platform report site
 
-Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only). Public hosting and the figure gallery are Phase 9. Preview: `cd site && npm run dev` — see `site/README.md`. JupyterLab and Superset are Phase 8 and are not started. The site figure table in `ROADMAP.md` names the charts Phase 9 will publish.
+Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only). Site v1 (Phase 9) fills the pages from verified Phase 0–3 material and hosts them on GitHub Pages; its pages still show Phase 2 in progress until P9-02 and P9-03. From Phase 4 on, each phase has a site update issue before its close pair. Preview: `cd site && npm run dev` — see `site/README.md`. The site figure table in `ROADMAP.md` names each figure and the issue that publishes it (P8-08, P5-10).
 
 | Page | Status |
 | --- | --- |
