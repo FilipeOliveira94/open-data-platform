@@ -1394,6 +1394,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3.0,<9" },
     { name = "ruff", specifier = ">=0.9.0,<1" },
 ]
+sources = []
 
 [[package]]
 name = "opentelemetry-api"
