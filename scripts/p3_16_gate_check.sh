@@ -18,7 +18,7 @@ EXEC="p316-live-$TAG"
 psqlc() { docker exec odp-postgres psql -U "$POSTGRES_USER" -d "$1" -Atc "$2"; }
 checks() {
   echo "  layer_checks:"
-  psqlc iceberg "select layer, source_id||'.'||dataset, status, coalesce(expected_rows::text,'-'), marked_by_run, coalesce(checked_by_run,'-') from lakehouse_state.layer_checks where source_id='postgres_oltp' order by 1,2" | sed 's/^/    /'
+  psqlc iceberg "select layer, source_id||'.'||dataset, status, coalesce(expected_rows::text,'-'), marked_by_run, coalesce(checked_by_run,'-') from lakehouse_state.layer_checks where source_id='olist_synth_cdc' order by 1,2" | sed 's/^/    /'
   echo "  pending_layers: $(psqlc iceberg "select string_agg(layer||':'||source_id||'.'||dataset, ' ' order by 1) from lakehouse_state.pending_layers")"
 }
 run() {  # run <name> <module> <args...>
@@ -34,7 +34,7 @@ step() {  # step <run-label> <medallion step>
   run "$1-$2" open_data_platform.lakehouse.medallion_build "$2" --run-label "$1"
 }
 extract() {
-  run "extract-$1" open_data_platform.ingestion.postgres_oltp extract \
+  run "extract-$1" open_data_platform.ingestion.olist_synth_cdc extract \
     --window-start 2026-10-19T00:00:00Z --window-end 2026-10-20T00:00:00Z \
     --execution-id "$EXEC" --ingestion-ts 2026-11-22T00:00:00Z
 }
@@ -43,13 +43,13 @@ docker compose --profile lakehouse up -d --wait trino > /dev/null 2>&1
 
 echo "### 0. extract on the old schema (no triggers)"
 extract before-schema
-run apply-schema open_data_platform.ingestion.postgres_oltp apply-schema
+run apply-schema open_data_platform.ingestion.olist_synth_cdc apply-schema
 echo "  triggers: $(psqlc "$POSTGRES_DB" "select count(*) from pg_trigger where tgname='set_updated_at'")"
 extract after-schema
 
 echo "### 1. run r1: Bronze writes; planted failure on orders"
 step "p316-r1-$TAG" bronze
-psqlc iceberg "update lakehouse_state.layer_checks set expected_rows = expected_rows + 1 where layer='bronze' and source_id='postgres_oltp' and dataset='orders' and status='pending'" > /dev/null
+psqlc iceberg "update lakehouse_state.layer_checks set expected_rows = expected_rows + 1 where layer='bronze' and source_id='olist_synth_cdc' and dataset='orders' and status='pending'" > /dev/null
 step "p316-r1-$TAG" bronze-checks
 checks
 
@@ -61,7 +61,7 @@ step "p316-r2-$TAG" dbt-build
 checks
 
 echo "### 3. run r3: planted value removed"
-psqlc iceberg "update lakehouse_state.layer_checks set expected_rows = expected_rows - 1 where layer='bronze' and source_id='postgres_oltp' and dataset='orders'" > /dev/null
+psqlc iceberg "update lakehouse_state.layer_checks set expected_rows = expected_rows - 1 where layer='bronze' and source_id='olist_synth_cdc' and dataset='orders'" > /dev/null
 for s in bronze bronze-checks silver silver-checks stage-quarantine dbt-build; do
   step "p316-r3-$TAG" "$s"
 done

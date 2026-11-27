@@ -20,7 +20,7 @@ from open_data_platform.lakehouse.silver import (
     ibge_localidades,
     olist_brazilian_ecommerce,
     olist_marketing_funnel,
-    postgres_oltp,
+    olist_synth_cdc,
 )
 from open_data_platform.lakehouse.silver.common import (
     DedupPolicy,
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 SOURCE_MODULES: Mapping[str, Mapping[str, DedupPolicy]] = {
     olist_brazilian_ecommerce.SOURCE_ID: olist_brazilian_ecommerce.POLICIES,
     olist_marketing_funnel.SOURCE_ID: olist_marketing_funnel.POLICIES,
-    postgres_oltp.SOURCE_ID: postgres_oltp.POLICIES,
+    olist_synth_cdc.SOURCE_ID: olist_synth_cdc.POLICIES,
     dummyjson_products.SOURCE_ID: dummyjson_products.POLICIES,
     demo_storefront.SOURCE_ID: demo_storefront.POLICIES,
     ibge_localidades.SOURCE_ID: ibge_localidades.POLICIES,

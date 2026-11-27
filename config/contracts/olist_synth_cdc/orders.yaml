@@ -1,0 +1,69 @@
+contract_version: 3
+source_id: olist_synth_cdc
+dataset: orders
+description: "olist-synth-cdc orders. JSON array of rows. Extract windows filter on updated_at."
+payload_format: json
+grain: "One row per order."
+primary_key:
+  - order_id
+update_pattern: incremental_window
+on_invalid: quarantine_exclude
+on_structural_error: fail_batch
+governance:
+  source_family: olist_analysis
+  owner: platform
+provenance:
+  system: postgres
+fields:
+  - name: order_id
+    type: string
+    nullable: false
+    classification: internal
+    description: "Order identifier."
+  - name: customer_id
+    type: string
+    nullable: false
+    classification: pii
+    description: "Order-scoped customer identifier."
+  - name: order_status
+    type: string
+    nullable: false
+    classification: internal
+    description: "Current order status."
+  - name: order_purchase_timestamp
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "When the order was placed."
+  - name: order_approved_at
+    type: timestamp
+    nullable: true
+    classification: internal
+    description: "When payment was approved."
+  - name: order_delivered_carrier_date
+    type: timestamp
+    nullable: true
+    classification: internal
+    description: "When the order was handed to the carrier."
+  - name: order_delivered_customer_date
+    type: timestamp
+    nullable: true
+    classification: internal
+    description: "When the order was delivered to the customer."
+  - name: order_estimated_delivery_date
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "Delivery date estimated at purchase."
+  - name: updated_at
+    type: timestamp
+    nullable: false
+    classification: internal
+    description: "Platform watermark for windowed extract. Not an Olist source column."
+changelog:
+  - version: 1
+    note: "Initial v1 contract. Columns align with the Olist dataset of the same grain, plus updated_at for the P1-06 watermark."
+  - version: 2
+    note: "Rename governance.domain to governance.source_family. The value is the ingest source family, not a Gold schema."
+  - version: 3
+    note: "on_invalid is quarantine_exclude: Silver drops a quarantined record (P3-07)."

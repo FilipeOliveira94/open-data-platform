@@ -52,7 +52,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 - **Source:** Olist marketing funnel. Kaggle dataset. CC BY-NC-SA 4.0. Not stored in git. [Note](docs/sources/olist-marketing-funnel.md)
 - **Source:** DummyJSON products. Paginated HTTP API. [Note](docs/sources/dummyjson-products.md)
 - **Source:** IBGE municipalities. HTTP collection. [Note](docs/sources/ibge-localidades.md)
-- **Source:** PostgreSQL orders. Windowed database extract. [Note](docs/sources/postgres-oltp.md)
+- **Source:** PostgreSQL orders. Windowed database extract. [Note](docs/sources/olist-synth-cdc.md)
 - **Source:** Storefront clicks. Generated event log. [Note](docs/sources/demo-storefront.md)
 - **Docs:** [Phase 1 ingestion](docs/architecture/phase-1-ingestion.md)
 

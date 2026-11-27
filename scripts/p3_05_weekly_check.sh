@@ -9,7 +9,7 @@
 #   2. Record Silver, Bronze, and PostgreSQL counts for that day.
 #   3. Commit one synthetic seller whose updated_at falls in DAILY_DAY: a
 #      late commit after its daily window was extracted.
-#   4. Trigger ingest_postgres_oltp_weekly by hand. Its data interval is the
+#   4. Trigger ingest_olist_synth_cdc_weekly by hand. Its data interval is the
 #      last complete Monday week before now; the extract window lags it by
 #      one day and must contain DAILY_DAY. Wait for the extract and the
 #      transform it schedules.
@@ -35,8 +35,8 @@ set -a
 [[ -f .env ]] && . ./.env
 set +a
 
-DAILY="ingest_postgres_oltp_daily"
-WEEKLY="ingest_postgres_oltp_weekly"
+DAILY="ingest_olist_synth_cdc_daily"
+WEEKLY="ingest_olist_synth_cdc_weekly"
 TRANSFORM="transform_lakehouse"
 DAILY_DAY="${P3_05_DAILY_DAY:-2026-11-13}"
 DAY_START="${DAILY_DAY}T00:00:00+00:00"
@@ -116,18 +116,18 @@ print(latest["run_id"], latest["state"], latest["start_date"], latest["end_date"
 silver_counts() {
   local label="$1"
   trino "
-SELECT 'sellers', count(*), count(DISTINCT seller_id) FROM iceberg.silver.postgres_oltp__sellers
-UNION ALL SELECT 'customers', count(*), count(DISTINCT customer_id) FROM iceberg.silver.postgres_oltp__customers
-UNION ALL SELECT 'orders', count(*), count(DISTINCT order_id) FROM iceberg.silver.postgres_oltp__orders
-UNION ALL SELECT 'order_items', count(*), count(DISTINCT (order_id, order_item_id)) FROM iceberg.silver.postgres_oltp__order_items
+SELECT 'sellers', count(*), count(DISTINCT seller_id) FROM iceberg.silver.olist_synth_cdc__sellers
+UNION ALL SELECT 'customers', count(*), count(DISTINCT customer_id) FROM iceberg.silver.olist_synth_cdc__customers
+UNION ALL SELECT 'orders', count(*), count(DISTINCT order_id) FROM iceberg.silver.olist_synth_cdc__orders
+UNION ALL SELECT 'order_items', count(*), count(DISTINCT (order_id, order_item_id)) FROM iceberg.silver.olist_synth_cdc__order_items
 " | sort >"${OUT}/silver_${label}.tsv"
   awk -F'\t' '$2 != $3 { bad = 1 } END { exit bad }' "${OUT}/silver_${label}.tsv" \
     || fail "duplicate keys in Silver (${label})"
   trino "
-SELECT 'sellers', count(*) FROM iceberg.silver.postgres_oltp__sellers WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
-UNION ALL SELECT 'customers', count(*) FROM iceberg.silver.postgres_oltp__customers WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
-UNION ALL SELECT 'orders', count(*) FROM iceberg.silver.postgres_oltp__orders WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
-UNION ALL SELECT 'order_items', count(*) FROM iceberg.silver.postgres_oltp__order_items WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
+SELECT 'sellers', count(*) FROM iceberg.silver.olist_synth_cdc__sellers WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
+UNION ALL SELECT 'customers', count(*) FROM iceberg.silver.olist_synth_cdc__customers WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
+UNION ALL SELECT 'orders', count(*) FROM iceberg.silver.olist_synth_cdc__orders WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
+UNION ALL SELECT 'order_items', count(*) FROM iceberg.silver.olist_synth_cdc__order_items WHERE updated_at >= from_iso8601_timestamp('${DAY_START}') AND updated_at < from_iso8601_timestamp('${DAY_END}')
 " | sort >"${OUT}/silver_window_${label}.tsv"
   log "silver ${label}: $(tr '\t\n' ' ;' <"${OUT}/silver_${label}.tsv")"
   log "silver window ${label}: $(tr '\t\n' ' ;' <"${OUT}/silver_window_${label}.tsv")"
@@ -140,7 +140,7 @@ postgres_window() {
 }
 
 bronze_sellers() {
-  trino "SELECT count(*) FROM iceberg.bronze.postgres_oltp__sellers WHERE try(from_iso8601_timestamp(updated_at)) >= from_iso8601_timestamp('${DAY_START}') AND try(from_iso8601_timestamp(updated_at)) < from_iso8601_timestamp('${DAY_END}')" \
+  trino "SELECT count(*) FROM iceberg.bronze.olist_synth_cdc__sellers WHERE try(from_iso8601_timestamp(updated_at)) >= from_iso8601_timestamp('${DAY_START}') AND try(from_iso8601_timestamp(updated_at)) < from_iso8601_timestamp('${DAY_END}')" \
     >"${OUT}/bronze_sellers_$1.tsv"
   log "bronze sellers window $1: $(cat "${OUT}/bronze_sellers_$1.tsv")"
 }

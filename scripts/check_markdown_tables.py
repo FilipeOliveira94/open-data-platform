@@ -31,7 +31,9 @@ def main() -> int:
             nxt = lines[i + 1] if i + 1 < len(lines) else ""
             if not fenced and EMPTY_ROW.match(line) and SEPARATOR.match(nxt):
                 failures.append(f"{path}:{i + 1}")
-    print(f"markdown tables: {len(files)} files, {len(failures)} with an empty header row")
+    print(
+        f"markdown tables: {len(files)} files, {len(failures)} with an empty header row"
+    )
     for failure in failures:
         print(f"  {failure}")
     return 1 if failures else 0

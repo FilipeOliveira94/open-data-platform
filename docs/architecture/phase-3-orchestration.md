@@ -10,11 +10,11 @@ All DAGs run on local Airflow 3.4.0 (LocalExecutor, D-006) in the runtime image 
 
 | DAG | Schedule | Window or grain | Catchup | Detail |
 | --- | --- | --- | --- | --- |
-| `ingest_postgres_oltp_daily` | Daily 00:00 UTC, explicit `CronDataIntervalTimetable` | `[D-1, D)` on `updated_at`, read after a 15 min settle lag in one `REPEATABLE READ` snapshot | `True` from 2026-11-19, one run at a time | [Daily schedule (P3-04)](airflow-local.md#daily-postgresql-schedule-p3-04), [watermark and snapshot (P3-16)](airflow-local.md#watermark-settle-lag-and-snapshot-p3-16) |
-| `ingest_postgres_oltp_weekly` | Monday 00:00 UTC | Re-extracts `[W-8, W-1)` (Sunday to Saturday) to pick up late commits the daily run missed | `True` from 2026-11-16, one run at a time | [Weekly re-extract (P3-05)](airflow-local.md#weekly-postgresql-re-extract-p3-05) |
+| `ingest_olist_synth_cdc_daily` | Daily 00:00 UTC, explicit `CronDataIntervalTimetable` | `[D-1, D)` on `updated_at`, read after a 15 min settle lag in one `REPEATABLE READ` snapshot | `True` from 2026-11-19, one run at a time | [Daily schedule (P3-04)](airflow-local.md#daily-postgresql-schedule-p3-04), [watermark and snapshot (P3-16)](airflow-local.md#watermark-settle-lag-and-snapshot-p3-16) |
+| `ingest_olist_synth_cdc_weekly` | Monday 00:00 UTC | Re-extracts `[W-8, W-1)` (Sunday to Saturday) to pick up late commits the daily run missed | `True` from 2026-11-16, one run at a time | [Weekly re-extract (P3-05)](airflow-local.md#weekly-postgresql-re-extract-p3-05) |
 | `ingest_dummyjson_products` | Monday 03:00 UTC | Full fetch, no window | `False`: the next fetch covers a missed week | [Source refresh matrix](../../ROADMAP.md#phase-3--orchestration-and-data-quality) |
 | `ingest_ibge_localidades` | Day 1 of the month, 03:00 UTC | Full fetch, no window | `False` | Same |
-| `ingest_olist`, `ingest_demo_storefront`, `ingest_postgres_oltp` | Manual | Fixed release, demo generator, ad hoc window | — | Same |
+| `ingest_olist`, `ingest_demo_storefront`, `ingest_olist_synth_cdc` | Manual | Fixed release, demo generator, ad hoc window | — | Same |
 | `transform_lakehouse` | Any raw Asset event (`AssetAny`), `max_active_runs=1`, events coalesced | Bronze → checks → Silver → checks → quarantine staging → `dbt_build`, only for new raw objects | — | [Refresh trigger (P3-13)](airflow-local.md#lakehouse-refresh-trigger-p3-13), [ADR-0024](../decisions/0024-incremental-lakehouse-refresh.md) |
 | `reconcile_gold` | Weekly | Gold reconciliation checks | — | [Transform DAGs (P3-03)](airflow-local.md#transform-dags-p3-03) |
 
@@ -61,7 +61,7 @@ The [2026-11-21 review](../reviews/2026-11-21-verified-issues-review.md) of the 
 | R13 Extract reads four snapshots | P3-16 | One `REPEATABLE READ, READ ONLY` transaction |
 | R14 Retry after midnight duplicates an execution | P3-16 | `dt=` from the run's `run_after` |
 | R16 Implicit Spark session time zone | P3-10 | `spark.sql.session.timeZone=UTC` in the Bronze and Silver Spark scripts |
-| R19 `purchase_city` label on OLTP orders | P3-17 | Documented as the current customer address (Type 1); history is P4-08 |
+| R19 `purchase_city` label on olist-synth orders | P3-17 | Documented as the current customer address (Type 1); history is P4-08 |
 | T7 No test of Gold metric logic | P3-17 | dbt unit tests from small fixtures |
 | T1, T2, T4, T6, T8 | The review itself | Test fixes listed in the review |
 

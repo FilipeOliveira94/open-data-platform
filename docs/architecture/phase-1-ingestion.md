@@ -11,7 +11,7 @@ Phase 1 lands auditable bytes in the object store. It does not build Bronze, Sil
 | Olist Brazilian e-commerce | `olist_brazilian_ecommerce` | P1-04 | [olist-brazilian-ecommerce.md](../sources/olist-brazilian-ecommerce.md) |
 | Olist marketing funnel | `olist_marketing_funnel` | P1-04 | [olist-marketing-funnel.md](../sources/olist-marketing-funnel.md) |
 | DummyJSON products | `dummyjson_products` | P1-05 | [dummyjson-products.md](../sources/dummyjson-products.md) |
-| PostgreSQL OLTP | `postgres_oltp` | P1-06 | [postgres-oltp.md](../sources/postgres-oltp.md) |
+| olist-synth-cdc | `olist_synth_cdc` | P1-06 | [olist-synth-cdc.md](../sources/olist-synth-cdc.md) |
 | Demo storefront clickstream | `demo_storefront` | P1-07 | [demo-storefront.md](../sources/demo-storefront.md) |
 | IBGE Localidades | `ibge_localidades` | P1-08 | [ibge-localidades.md](../sources/ibge-localidades.md) |
 | BrasilAPI CEP | — | P1-09 | Withdrawn ([ADR-0021](../decisions/0021-withdraw-brasilapi-cep.md)) |
@@ -44,8 +44,8 @@ CDC does not replace scheduled batch. Daily and weekly refreshes share the Postg
 
 | Use case | Phase 1 | Later |
 | --- | --- | --- |
-| Daily batch | `extract_postgres_oltp` with a one-day window. Both bounds are UTC midnight. The predicate is `updated_at >= start AND updated_at < end`. | Verified: `ingest_postgres_oltp_daily` reads `[D-1, D)` at 00:00Z with catchup (P3-04). ADR-0007 is `approved`. See [Local Airflow](airflow-local.md#daily-postgresql-schedule-p3-04). |
-| Weekly batch | The same function with a seven-day window. | Verified: `ingest_postgres_oltp_weekly` re-extracts `[W-8, W-1)` every Monday 00:00Z as the safety net for late commits (P3-05). See [Local Airflow](airflow-local.md#weekly-postgresql-re-extract-p3-05). |
+| Daily batch | `extract_olist_synth_cdc` with a one-day window. Both bounds are UTC midnight. The predicate is `updated_at >= start AND updated_at < end`. | Verified: `ingest_olist_synth_cdc_daily` reads `[D-1, D)` at 00:00Z with catchup (P3-04). ADR-0007 is `approved`. See [Local Airflow](airflow-local.md#daily-postgresql-schedule-p3-04). |
+| Weekly batch | The same function with a seven-day window. | Verified: `ingest_olist_synth_cdc_weekly` re-extracts `[W-8, W-1)` every Monday 00:00Z as the safety net for late commits (P3-05). See [Local Airflow](airflow-local.md#weekly-postgresql-re-extract-p3-05). |
 | Streaming | Not in this phase. | Logical replication, Debezium, Kafka, and Spark Structured Streaming (Phase 4). ADR-0008 and ADR-0014 stay `proposed`. |
 
 The clickstream, Olist snapshots, DummyJSON, and IBGE are batch landings. They are not the daily, weekly, or CDC paths.

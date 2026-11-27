@@ -40,7 +40,7 @@ def _records(
 ) -> list[CoverageRecord]:
     return [
         CoverageRecord(
-            source_id="postgres_oltp",
+            source_id="olist_synth_cdc",
             dataset=dataset,
             execution_id=execution_id,
             frequency=frequency,
@@ -196,14 +196,14 @@ def test_ddl_checks_frequency_against_the_window() -> None:
 def test_planted_values_stay_out_of_the_sql() -> None:
     planted = "planted-run-7f3a"
     record = CoverageRecord(
-        source_id="postgres_oltp",
+        source_id="olist_synth_cdc",
         dataset="sellers",
         execution_id=planted,
         frequency="daily",
         window_start=START,
         window_end=START + DAY,
         row_count=42,
-        dag_id="ingest_postgres_oltp_daily",
+        dag_id="ingest_olist_synth_cdc_daily",
         airflow_run_id=planted,
     )
 

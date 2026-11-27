@@ -25,7 +25,7 @@ def test_stage_log_reports_counts_and_hides_the_planted_value(
         dataset="orders",
         record_count=2,
         byte_count=40,
-        object_key="raw/postgres_oltp/orders/dt=2026-10-17/execution_id=run/orders.json",
+        object_key="raw/olist_synth_cdc/orders/dt=2026-10-17/execution_id=run/orders.json",
         finding_count=0,
     )
     captured = capsys.readouterr()

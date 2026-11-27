@@ -71,7 +71,7 @@ Every Silver table has both columns; in an exclude dataset `_quarantined` is alw
 
 | Source | `on_invalid` | Why |
 | --- | --- | --- |
-| `postgres_oltp` (4 datasets) | `quarantine_exclude` | Operational facts: an invalid order or item would change GMV and counts |
+| `olist_synth_cdc` (4 datasets) | `quarantine_exclude` | Operational facts: an invalid order or item would change GMV and counts |
 | `demo_storefront.clickstream` | `quarantine_exclude` | An invalid event should not become a session |
 | `olist_brazilian_ecommerce` (9) | `quarantine_flag` | A fixed historical release: excluding breaks joins and the published counts. In `order_reviews` the sidecar quarantines every row of a duplicate key group, so excluding would remove real reviews |
 | `olist_marketing_funnel` (2) | `quarantine_flag` | Same reason |
@@ -129,7 +129,7 @@ Bronze reads each marker and fills `_execution_completed_ts` on every row: the m
 | `incremental_window` | Every window, complete or not; latest `updated_at` per key (unchanged from P2-04) | Same key: no duplicate | Invisible on the batch path: a hard delete is never extracted, so the row stays in Silver and Gold. CDC (Phase 4) is the path that handles deletes | PostgreSQL |
 | `append_only` | Every complete execution; a repeated key keeps the first ingested row | A repeated event key is kept once | Not applicable: events are immutable | Storefront clickstream |
 
-`incremental_window` windows may overlap. Since P3-05 the weekly PostgreSQL re-extract (`ingest_postgres_oltp_weekly`, window `[W-8, W-1)`) lands each day a second time to pick up late commits; Silver keeps one row per key, and a hard delete stays invisible on this path ([Local Airflow](airflow-local.md#weekly-postgresql-re-extract-p3-05)).
+`incremental_window` windows may overlap. Since P3-05 the weekly PostgreSQL re-extract (`ingest_olist_synth_cdc_weekly`, window `[W-8, W-1)`) lands each day a second time to pick up late commits; Silver keeps one row per key, and a hard delete stays invisible on this path ([Local Airflow](airflow-local.md#weekly-postgresql-re-extract-p3-05)).
 
 For `snapshot`, `full_refresh`, and `append_only`, a Silver build with no complete execution in Bronze fails before the replace (`assert_true` ahead of `CREATE OR REPLACE TABLE`), so the table keeps its previous snapshot instead of becoming empty. `incremental_window` window completeness is left to the coverage manifest of P3-06.
 
@@ -148,7 +148,7 @@ A money field is `decimal`, never `number`. JSON readers (`contracts.decimals.js
 | `olist_brazilian_ecommerce` | `order_items` (v4) | `price`, `freight_value` | `decimal(12,2)` | BRL |
 | `olist_brazilian_ecommerce` | `order_payments` (v3) | `payment_value` | `decimal(12,2)` | BRL |
 | `olist_marketing_funnel` | `closed_deals` (v5) | `declared_monthly_revenue` | `decimal(12,2)` | BRL (declared by the seller) |
-| `postgres_oltp` | `order_items` (v3) | `price`, `freight_value` | `decimal(12,2)` (PostgreSQL `numeric(12,2)`) | BRL (the synthetic OLTP mirrors Olist) |
+| `olist_synth_cdc` | `order_items` (v3) | `price`, `freight_value` | `decimal(12,2)` (PostgreSQL `numeric(12,2)`) | BRL (the synthetic olist-synth mirrors Olist) |
 | `dummyjson_products` | `products` (v4) | `price` | `decimal(12,2)` | Not stated by the API |
 
 The local Olist files fit `decimal(12,2)`: at most two decimal places, largest values 6_735.00 (`price`), 409.68 (`freight_value`), 13_664.08 (`payment_value`), and 50_000_000.0 (`declared_monthly_revenue`), measured on 2026-11-22.
@@ -186,7 +186,7 @@ Raise `contract_version` and append a `changelog` note in the same change as any
 | `olist_brazilian_ecommerce` | 9 published CSV datasets | `snapshot` | `kaggle` |
 | `olist_marketing_funnel` | `qualified_leads`, `closed_deals` | `snapshot` | `kaggle` |
 | `dummyjson_products` | `products` (page envelope + item) | `full_refresh` | `dummyjson` |
-| `postgres_oltp` | `sellers`, `customers`, `orders`, `order_items` | `incremental_window` | `postgres` |
+| `olist_synth_cdc` | `sellers`, `customers`, `orders`, `order_items` | `incremental_window` | `postgres` |
 | `ibge_localidades` | `municipios` (`view=nivelado`) | `full_refresh` | `ibge` |
 | `demo_storefront` | `clickstream` (one user action per JSONL line) | `append_only` (contract version 3; `snapshot` before P3-12) | `generator` |
 

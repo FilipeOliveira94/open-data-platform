@@ -24,7 +24,7 @@ unit_tests:
   - input: source('gold_staging', 'quarantine_findings')
     rows:
     - {source_id: ibge_localidades, dataset: municipios, source_dataset: ibge_localidades.municipios, reason: null_violation, field_name: municipio-nome, business_key: '{"municipio-id":1}', record_index: 0, detail: 'null_violation at record_index=0', silver_action: flagged}
-    - {source_id: postgres_oltp, dataset: orders, source_dataset: postgres_oltp.orders, reason: type_mismatch, field_name: updated_at, business_key: '{"order_id":"o9"}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: excluded}
+    - {source_id: olist_synth_cdc, dataset: orders, source_dataset: olist_synth_cdc.orders, reason: type_mismatch, field_name: updated_at, business_key: '{"order_id":"o9"}', record_index: 0, detail: 'type_mismatch at record_index=0', silver_action: excluded}
   - input: ref('dim_zip_prefix')
     rows:
     - {zip_prefix: "01001", multi_state_flag: true}

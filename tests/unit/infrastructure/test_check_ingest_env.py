@@ -128,7 +128,7 @@ class _Cursor:
         if statement == module._DATABASE_SQL:
             self._row = (self.database,)
         elif statement == module._SCHEMA_SQL:
-            self._row = ("oltp",) if self.schema_present else None
+            self._row = ("olist_synth",) if self.schema_present else None
         else:
             raise AssertionError(statement)
 
@@ -233,22 +233,22 @@ def test_smoke_delete_error_hides_the_secret() -> None:
     _assert_secret_hidden(str(raised.value))
 
 
-def test_postgres_oltp_reads_the_oltp_database(
+def test_olist_synth_cdc_reads_the_olist_synth_database(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     module = _script()
     connection = _Connection("odp")
-    module.check_postgres_oltp(_env(), connect=lambda _env: connection)
+    module.check_olist_synth_cdc(_env(), connect=lambda _env: connection)
     assert connection.closed is True
     statements = connection.cursor_obj.statements
     assert statements[0][0] == module._DATABASE_SQL
-    assert statements[1] == (module._SCHEMA_SQL, ("oltp",))
+    assert statements[1] == (module._SCHEMA_SQL, ("olist_synth",))
     rendered = " ".join(statement for statement, _params in statements)
     _assert_secret_hidden(rendered)
     captured = capsys.readouterr()
     assert "postgres_host=postgres" in captured.out
     assert "database=odp" in captured.out
-    assert "oltp_schema=present" in captured.out
+    assert "olist_synth_schema=present" in captured.out
     _assert_secret_hidden(captured.out)
 
 
@@ -262,14 +262,14 @@ def test_postgres_host_must_be_the_compose_service() -> None:
         return _Connection("odp")
 
     with pytest.raises(module.EnvCheckError, match="POSTGRES_HOST"):
-        module.check_postgres_oltp(_env(POSTGRES_HOST="localhost"), connect=connect)
+        module.check_olist_synth_cdc(_env(POSTGRES_HOST="localhost"), connect=connect)
     assert called is False
 
 
 def test_published_port_is_rejected() -> None:
     module = _script()
     with pytest.raises(module.EnvCheckError, match="POSTGRES_PORT"):
-        module.check_postgres_oltp(
+        module.check_olist_synth_cdc(
             _env(POSTGRES_PORT="5433"),
             connect=lambda _env: _Connection("odp"),
         )
@@ -288,8 +288,8 @@ def test_metadata_and_catalog_databases_are_rejected() -> None:
             called = True
             return _Connection(database)
 
-        with pytest.raises(module.EnvCheckError, match="OLTP database"):
-            module.check_postgres_oltp(_env(POSTGRES_DB=database), connect=connect)
+        with pytest.raises(module.EnvCheckError, match="olist-synth database"):
+            module.check_olist_synth_cdc(_env(POSTGRES_DB=database), connect=connect)
         assert called is False
 
 
@@ -297,17 +297,17 @@ def test_current_database_must_match_postgres_db() -> None:
     module = _script()
     connection = _Connection("airflow")
     with pytest.raises(module.EnvCheckError, match="current_database") as raised:
-        module.check_postgres_oltp(_env(), connect=lambda _env: connection)
+        module.check_olist_synth_cdc(_env(), connect=lambda _env: connection)
     assert connection.closed is True
     _assert_secret_hidden(str(raised.value))
     assert "airflow" not in str(raised.value)
 
 
-def test_missing_oltp_schema_fails_without_seeding() -> None:
+def test_missing_olist_synth_schema_fails_without_seeding() -> None:
     module = _script()
     connection = _Connection("odp", schema_present=False)
-    with pytest.raises(module.EnvCheckError, match="oltp schema is absent"):
-        module.check_postgres_oltp(_env(), connect=lambda _env: connection)
+    with pytest.raises(module.EnvCheckError, match="olist_synth schema is absent"):
+        module.check_olist_synth_cdc(_env(), connect=lambda _env: connection)
     assert connection.closed is True
 
 
@@ -321,10 +321,10 @@ def test_main_postgres_failure_hides_the_secret(
 
     def connect(_env: Mapping[str, str]) -> _Connection:
         assert _env["POSTGRES_PASSWORD"] == PLANTED_SECRET
-        raise module.PostgresOltpError("PostgreSQL connection failed")
+        raise module.OlistSynthCdcError("PostgreSQL connection failed")
 
     monkeypatch.setattr(module, "connect_from_env", connect)
-    assert module.main(["postgres_oltp"]) == 1
+    assert module.main(["olist_synth_cdc"]) == 1
     captured = capsys.readouterr()
     assert "PostgreSQL connection failed" in captured.err
     _assert_secret_hidden(captured.out)

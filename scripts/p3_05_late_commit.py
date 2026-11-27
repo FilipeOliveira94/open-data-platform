@@ -1,4 +1,4 @@
-"""P3-05 live check helper: plant a late commit and count OLTP windows.
+"""P3-05 live check helper: plant a late commit and count olist-synth windows.
 
 Run from the repository root with the PostgreSQL settings in the
 environment (``.env`` or ``.env.example``):
@@ -11,7 +11,7 @@ instant, now, after the daily window that holds it was extracted: a late
 commit. The seller id is a new UUID on every call. Values go to PostgreSQL
 as bound parameters.
 
-``count`` prints ``<dataset>\\t<rows>`` for each OLTP table, counting rows
+``count`` prints ``<dataset>\\t<rows>`` for each olist-synth table, counting rows
 whose ``updated_at`` falls in ``[window_start, window_end)``.
 
 Prints counts only, never record values.
@@ -26,7 +26,7 @@ from datetime import datetime
 
 from psycopg import sql
 
-from open_data_platform.ingestion.postgres_oltp import connect_from_env
+from open_data_platform.ingestion.olist_synth_cdc import connect_from_env
 
 DATASETS = ("sellers", "customers", "orders", "order_items")
 
@@ -42,7 +42,7 @@ def _instant(value: str) -> datetime:
 def plant(updated_at: datetime) -> None:
     with connect_from_env(os.environ) as connection, connection.cursor() as cursor:
         cursor.execute(
-            "INSERT INTO oltp.sellers (seller_id, seller_zip_code_prefix, "
+            "INSERT INTO olist_synth.sellers (seller_id, seller_zip_code_prefix, "
             "seller_city, seller_state, updated_at) VALUES (%s, %s, %s, %s, %s)",
             (f"p3-05-late-{uuid.uuid4()}", 1000, "sao paulo", "SP", updated_at),
         )
@@ -54,7 +54,7 @@ def count(start: datetime, end: datetime) -> None:
     with connect_from_env(os.environ) as connection, connection.cursor() as cursor:
         for dataset in DATASETS:
             query = sql.SQL(
-                "SELECT count(*) FROM oltp.{} "
+                "SELECT count(*) FROM olist_synth.{} "
                 "WHERE updated_at >= %s AND updated_at < %s"
             ).format(sql.Identifier(dataset))
             cursor.execute(query, (start, end))

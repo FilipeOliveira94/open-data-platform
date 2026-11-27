@@ -6,7 +6,7 @@
 # Usage: scripts/p3_14_live_run.sh <step>...
 #   daily       Commit one synthetic on-time seller in a free day D, backfill the
 #               daily DAG for D, compare the landing to PostgreSQL, and count
-#               the four Silver postgres_oltp tables in Trino while the refresh
+#               the four Silver olist_synth_cdc tables in Trino while the refresh
 #               that follows runs (reader view). D is saved for `rerun`.
 #   rerun       Clear the daily run of D (same run id), then extract D again
 #               under a new execution id. Landings equal the first; Silver
@@ -50,7 +50,7 @@ FIRST_DAY="${P3_14_FIRST_DAY:-2026-10-24}"
 
 save() { grep -v "^$1=" "${STATE}" 2>/dev/null > "${STATE}.tmp"; echo "$1=$2" >> "${STATE}.tmp"; mv "${STATE}.tmp" "${STATE}"; }
 load() { grep "^$1=" "${STATE}" 2>/dev/null | tail -1 | cut -d= -f2-; }
-oltp() { uv run python scripts/p3_05_late_commit.py "$@"; }
+olist_synth() { uv run python scripts/p3_05_late_commit.py "$@"; }
 day_after() { date -u -d "$1 + 1 day" +%F; }
 
 # --- Landings -------------------------------------------------------------
@@ -66,11 +66,11 @@ window_of() {  # window_of <execution id>: "<start> <end>" as ISO instants
        FROM ingestion_state.extract_coverage WHERE execution_id='$1'"
 }
 source_counts() {  # source_counts <start> <end>: PostgreSQL rows by updated_at
-  oltp count "$1" "$2" | tr '\t' ' ' | sort
+  olist_synth count "$1" "$2" | tr '\t' ' ' | sort
 }
 
 # Logs the window and compares the landing of an execution to PostgreSQL. Run
-# right after the extract, with nothing else writing oltp.
+# right after the extract, with nothing else writing olist_synth.
 compare_to_source() {  # compare_to_source <execution id> <label>
   local exec_id="$1" what="$2" start end
   read -r start end <<<"$(window_of "${exec_id}")"
@@ -91,7 +91,7 @@ silver_matches_source() {  # silver_matches_source <start> <end> <label>
   local t n
   : > "${OUT}/.silver_window"
   for t in "${DATASETS[@]}"; do
-    n="$(trino "SELECT count(*) FROM iceberg.silver.postgres_oltp__${t}
+    n="$(trino "SELECT count(*) FROM iceberg.silver.olist_synth_cdc__${t}
          WHERE updated_at >= from_iso8601_timestamp('$1') AND updated_at < from_iso8601_timestamp('$2')" | tr -d '"')"
     echo "${t} ${n:-ERROR}" >> "${OUT}/.silver_window"
   done
@@ -104,8 +104,8 @@ silver_matches_source() {  # silver_matches_source <start> <end> <label>
 silver_dupes() {  # rows minus distinct keys, summed over the four tables
   local t total=0 n
   for t in "${DATASETS[@]}"; do
-    n="$(trino "SELECT count(*) - count(DISTINCT (${KEYS[$t]})) FROM iceberg.silver.postgres_oltp__${t}" | tr -d '"')"
-    log "    silver.postgres_oltp__${t} duplicate keys ${n:-ERROR}"
+    n="$(trino "SELECT count(*) - count(DISTINCT (${KEYS[$t]})) FROM iceberg.silver.olist_synth_cdc__${t}" | tr -d '"')"
+    log "    silver.olist_synth_cdc__${t} duplicate keys ${n:-ERROR}"
     total=$((total + ${n:-1}))
   done
   echo "${total}" > "${OUT}/.dupes"
@@ -164,7 +164,7 @@ step_daily() {
   require "a free backfill day" "${day}" || return
   [[ "${day}" != "$(date -u +%F)" ]] || { log "FAIL D must not be today (the window pause leaves missed)"; FAILURES=$((FAILURES + 1)); return; }
   log "  D = ${day}"
-  oltp plant "${day}T06:00:00+00:00" | while read -r l; do log "  on-time seller ${l}"; done
+  olist_synth plant "${day}T06:00:00+00:00" | while read -r l; do log "  on-time seller ${l}"; done
   silver_counts > "${OUT}/daily-silver-before.txt"
   since="$(now)"
   run="$(backfill_daily "${day}")"
@@ -222,11 +222,11 @@ step_late() {
   end="$(day_after "${LATE_DAY}")T00:00:00+00:00"
   local daily_exec
   daily_exec="$(pgq "${CATALOG_DB}" "SELECT execution_id FROM ingestion_state.extract_coverage
-       WHERE source_id='postgres_oltp' AND frequency='daily' AND window_start='${start}' ORDER BY recorded_at DESC LIMIT 1")"
+       WHERE source_id='olist_synth_cdc' AND frequency='daily' AND window_start='${start}' ORDER BY recorded_at DESC LIMIT 1")"
   require "a daily landing of ${LATE_DAY}" "${daily_exec}" || return
   log "  ${LATE_DAY} was landed by ${daily_exec}"
   silver_counts > "${OUT}/late-silver-before.txt"
-  oltp plant "${LATE_DAY}T12:00:00+00:00" | while read -r l; do log "  late seller ${l}"; done
+  olist_synth plant "${LATE_DAY}T12:00:00+00:00" | while read -r l; do log "  late seller ${l}"; done
   source_counts "${start}" "${end}" > "${OUT}/late-source.txt"
   landed "${daily_exec}" | sort > "${OUT}/late-daily-landing.txt"
   join "${OUT}/late-daily-landing.txt" "${OUT}/late-source.txt" | while read -r d l s; do log "    ${d} daily landed ${l} source now ${s}"; done
@@ -249,7 +249,7 @@ step_weekly() {
   read -r start end <<<"$(window_of "${exec_id}")"
 
   prev="$(pgq "${CATALOG_DB}" "SELECT execution_id FROM ingestion_state.extract_coverage
-       WHERE source_id='postgres_oltp' AND frequency='weekly' AND window_start='${start}' AND execution_id <> '${exec_id}'
+       WHERE source_id='olist_synth_cdc' AND frequency='weekly' AND window_start='${start}' AND execution_id <> '${exec_id}'
        ORDER BY recorded_at DESC LIMIT 1")"
   landed "${exec_id}" | sort > "${OUT}/weekly-landing.txt"
   if [[ -n "${prev}" ]]; then
@@ -261,9 +261,9 @@ step_weekly() {
   # Latest daily landing of each daily window inside the weekly window.
   pgq "${CATALOG_DB}" "SELECT dataset, sum(row_count) FROM (
        SELECT DISTINCT ON (dataset, window_start) dataset, row_count FROM ingestion_state.extract_coverage
-       WHERE source_id='postgres_oltp' AND frequency='daily' AND window_start >= '${start}' AND window_end <= '${end}'
+       WHERE source_id='olist_synth_cdc' AND frequency='daily' AND window_start >= '${start}' AND window_end <= '${end}'
        ORDER BY dataset, window_start, recorded_at DESC) x GROUP BY dataset ORDER BY dataset" | sort > "${OUT}/weekly-daily-sum.txt"
-  log "  daily windows inside: $(pgq "${CATALOG_DB}" "SELECT count(DISTINCT window_start) FROM ingestion_state.extract_coverage WHERE source_id='postgres_oltp' AND frequency='daily' AND window_start >= '${start}' AND window_end <= '${end}'") of 7"
+  log "  daily windows inside: $(pgq "${CATALOG_DB}" "SELECT count(DISTINCT window_start) FROM ingestion_state.extract_coverage WHERE source_id='olist_synth_cdc' AND frequency='daily' AND window_start >= '${start}' AND window_end <= '${end}'") of 7"
   join "${OUT}/weekly-daily-sum.txt" "${OUT}/weekly-landing.txt" | while read -r d s l; do log "    ${d} daily sum ${s} weekly ${l} difference $((l - s))"; done
 
   local late_day late_ts; late_day="$(load late_day)"; late_ts="${late_day}T00:00:00+00:00"

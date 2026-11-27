@@ -18,7 +18,7 @@ The JDBC catalog stores table pointers in PostgreSQL.
 | Transitive runtime | `org.wildfly.openssl:wildfly-openssl:1.0.7.Final` (from `hadoop-aws` 3.3.4); `org.checkerframework:checker-qual:3.55.1` (from the PostgreSQL driver). Neither was chosen separately |
 | Trino image | `trinodb/trino:484` (Iceberg 1.12.0 in that release's build) |
 | Catalog | Iceberg JDBC, schema version `V1`, catalog name `local` |
-| Catalog database | PostgreSQL database `iceberg` on the Compose server. Not `POSTGRES_DB` and not schema `oltp` |
+| Catalog database | PostgreSQL database `iceberg` on the Compose server. Not `POSTGRES_DB` and not schema `olist_synth` |
 | Warehouse | `s3a://odp-warehouse/catalog` |
 | Table | `catalog_probe.probe` (`id INT`, `label STRING`, `format-version` 2) |
 

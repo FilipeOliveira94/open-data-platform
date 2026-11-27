@@ -31,12 +31,12 @@ EXPECTED_DAGS = {
     "ingest_dummyjson_products",
     "ingest_ibge_localidades",
     "ingest_demo_storefront",
-    "ingest_postgres_oltp",
-    "seed_postgres_oltp",
+    "ingest_olist_synth_cdc",
+    "seed_olist_synth_cdc",
     "transform_lakehouse",
     "reconcile_gold",
-    "ingest_postgres_oltp_daily",
-    "ingest_postgres_oltp_weekly",
+    "ingest_olist_synth_cdc_daily",
+    "ingest_olist_synth_cdc_weekly",
 }
 
 POOL = "lakehouse_gold"
@@ -62,16 +62,19 @@ TRANSFORM_ORDER = (
     ("dbt_build", "dbt-build"),
 )
 
-DAILY = "ingest_postgres_oltp_daily"
-WEEKLY = "ingest_postgres_oltp_weekly"
+DAILY = "ingest_olist_synth_cdc_daily"
+WEEKLY = "ingest_olist_synth_cdc_weekly"
 
 INGEST_ENTRYPOINTS = {
     "ingest_olist": ("open_data_platform.ingestion.olist",),
     "ingest_dummyjson_products": ("open_data_platform.ingestion.dummyjson_products",),
     "ingest_ibge_localidades": ("open_data_platform.ingestion.ibge_localidades",),
     "ingest_demo_storefront": ("open_data_platform.ingestion.demo_storefront",),
-    "ingest_postgres_oltp": ("open_data_platform.ingestion.postgres_oltp", "extract"),
-    "seed_postgres_oltp": ("open_data_platform.ingestion.postgres_oltp", "seed"),
+    "ingest_olist_synth_cdc": (
+        "open_data_platform.ingestion.olist_synth_cdc",
+        "extract",
+    ),
+    "seed_olist_synth_cdc": ("open_data_platform.ingestion.olist_synth_cdc", "seed"),
 }
 
 
@@ -206,7 +209,7 @@ def test_every_dag_is_paused_at_creation(dagbag) -> None:
 
 def test_platform_env_runs_the_service_checks_after_imports(dagbag) -> None:
     dag = dagbag.dags["platform_env"]
-    checks = {"contracts", "minio_raw", "minio_write", "postgres_oltp"}
+    checks = {"contracts", "minio_raw", "minio_write", "olist_synth_cdc"}
     assert {task.task_id for task in dag.tasks} == {"imports", *checks}
     assert dag.get_task("imports").upstream_task_ids == set()
     for task_id in checks:
@@ -254,7 +257,11 @@ def test_daily_dag_runs_at_utc_midnight_with_catchup(dagbag) -> None:
     assert sorted(dag.task_ids) == ["extract", "settle"]
     assert dag.get_task("extract").upstream_task_ids == {"settle"}
     vector = _vector(dag.get_task("extract"))
-    assert vector[:3] == ["-m", "open_data_platform.ingestion.postgres_oltp", "extract"]
+    assert vector[:3] == [
+        "-m",
+        "open_data_platform.ingestion.olist_synth_cdc",
+        "extract",
+    ]
 
 
 def test_daily_intervals_are_one_utc_day(dagbag) -> None:
@@ -331,7 +338,7 @@ def _render_extract(dag, context: dict[str, object]) -> list[str]:
 
 def test_manual_extract_renders_its_own_frequency(dagbag) -> None:
     # A manual backfill must not land in the daily or weekly coverage ledger.
-    dag = dagbag.dags["ingest_postgres_oltp"]
+    dag = dagbag.dags["ingest_olist_synth_cdc"]
     run_id = "manual__2026-10-18T00:00:00+00:00"
     vector = _render_extract(
         dag,
@@ -348,14 +355,14 @@ def test_manual_extract_renders_its_own_frequency(dagbag) -> None:
     assert flags["--window-start"] == "2026-10-17T00:00:00+00:00"
     assert flags["--window-end"] == "2026-10-18T00:00:00+00:00"
     assert flags["--frequency"] == "manual"
-    assert flags["--dag-id"] == "ingest_postgres_oltp"
+    assert flags["--dag-id"] == "ingest_olist_synth_cdc"
     assert flags["--airflow-run-id"] == run_id
 
 
 def test_daily_window_renders_into_a_valid_extract_window(dagbag) -> None:
     import pendulum
 
-    from open_data_platform.ingestion.postgres_oltp import (
+    from open_data_platform.ingestion.olist_synth_cdc import (
         validate_window,
         window_object_name,
     )
@@ -395,7 +402,7 @@ def test_daily_window_renders_into_a_valid_extract_window(dagbag) -> None:
 
 
 def test_daily_window_without_interval_renders_empty_bounds(dagbag) -> None:
-    from open_data_platform.ingestion.postgres_oltp import main
+    from open_data_platform.ingestion.olist_synth_cdc import main
 
     vector = _render_extract(
         dagbag.dags[DAILY],
@@ -437,7 +444,11 @@ def test_weekly_dag_runs_monday_utc_midnight_with_catchup(dagbag) -> None:
     assert set(dag.params.keys()) == {"execution_id"}
     assert dag.task_ids == ["extract"]
     vector = _vector(dag.get_task("extract"))
-    assert vector[:3] == ["-m", "open_data_platform.ingestion.postgres_oltp", "extract"]
+    assert vector[:3] == [
+        "-m",
+        "open_data_platform.ingestion.olist_synth_cdc",
+        "extract",
+    ]
 
 
 def test_weekly_intervals_are_monday_to_monday_in_order(dagbag) -> None:
@@ -473,7 +484,7 @@ def test_weekly_intervals_are_monday_to_monday_in_order(dagbag) -> None:
 def test_weekly_window_lags_the_interval_by_one_day(dagbag) -> None:
     import pendulum
 
-    from open_data_platform.ingestion.postgres_oltp import (
+    from open_data_platform.ingestion.olist_synth_cdc import (
         validate_window,
         window_object_name,
     )
@@ -553,9 +564,9 @@ RAW_OUTLETS = {
     "ingest_dummyjson_products": {"dummyjson_products"},
     "ingest_ibge_localidades": {"ibge_localidades"},
     "ingest_demo_storefront": {"demo_storefront"},
-    "ingest_postgres_oltp": {"postgres_oltp"},
-    DAILY: {"postgres_oltp"},
-    WEEKLY: {"postgres_oltp"},
+    "ingest_olist_synth_cdc": {"olist_synth_cdc"},
+    DAILY: {"olist_synth_cdc"},
+    WEEKLY: {"olist_synth_cdc"},
 }
 
 
@@ -603,7 +614,7 @@ SCHEDULED_FULL_REFRESH = {
     "ingest_dummyjson_products": "0 3 * * 1",
     "ingest_ibge_localidades": "0 3 1 * *",
 }
-MANUAL_ONLY = ("ingest_olist", "ingest_demo_storefront", "ingest_postgres_oltp")
+MANUAL_ONLY = ("ingest_olist", "ingest_demo_storefront", "ingest_olist_synth_cdc")
 
 
 def test_full_refresh_sources_follow_the_refresh_matrix(dagbag) -> None:

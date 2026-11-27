@@ -20,13 +20,13 @@ DAG_FILES = {
     "ingest_dummyjson_products.py",
     "ingest_ibge_localidades.py",
     "ingest_olist.py",
-    "ingest_postgres_oltp.py",
-    "ingest_postgres_oltp_daily.py",
-    "ingest_postgres_oltp_weekly.py",
+    "ingest_olist_synth_cdc.py",
+    "ingest_olist_synth_cdc_daily.py",
+    "ingest_olist_synth_cdc_weekly.py",
     "platform_env.py",
     "platform_health.py",
     "reconcile_gold.py",
-    "seed_postgres_oltp.py",
+    "seed_olist_synth_cdc.py",
     "transform_lakehouse.py",
 }
 

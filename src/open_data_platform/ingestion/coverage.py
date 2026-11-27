@@ -120,14 +120,14 @@ class Cadence:
 
 # The daily run reads [D-1, D) only after D + SETTLE_LAG (P3-16), so a
 # transaction that wrote just before midnight has committed. The trigger on
-# ``oltp`` keeps ``updated_at`` at the statement time; a transaction still
+# ``olist_synth`` keeps ``updated_at`` at the statement time; a transaction still
 # open past the lag lands in the weekly re-extract.
 SETTLE_LAG = timedelta(minutes=15)
 
 # Must match the DAG files (a unit test reads their START_DATE):
-# - ``ingest_postgres_oltp_daily``: START_DATE 2026-11-19, window = interval,
+# - ``ingest_olist_synth_cdc_daily``: START_DATE 2026-11-19, window = interval,
 #   read after the settle lag.
-# - ``ingest_postgres_oltp_weekly``: START_DATE 2026-11-16 (a Monday), window
+# - ``ingest_olist_synth_cdc_weekly``: START_DATE 2026-11-16 (a Monday), window
 #   = interval shifted back one day, so the first is [2026-11-15, 2026-11-22),
 #   read one day after its end.
 CADENCES: dict[str, Cadence] = {
@@ -399,7 +399,7 @@ def main(argv: list[str] | None = None) -> int:
 
     The report is as of now: every window due by now counts.
     """
-    from open_data_platform.ingestion.postgres_oltp import DATASETS, SOURCE_ID
+    from open_data_platform.ingestion.olist_synth_cdc import DATASETS, SOURCE_ID
 
     parser = argparse.ArgumentParser(description="Window coverage gap report.")
     commands = parser.add_subparsers(dest="command", required=True)

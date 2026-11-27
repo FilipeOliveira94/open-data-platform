@@ -122,7 +122,7 @@ def test_silver_checks_compare_bronze_keys_and_do_not_pin_sizes() -> None:
     geolocation = _sql_with(checks, "olist_brazilian_ecommerce__geolocation")
     assert "geolocation_zip_code_prefix" in geolocation
     assert "GROUP BY geolocation_zip_code_prefix, geolocation_lat" in geolocation
-    postgres = _sql_with(checks, "postgres_oltp__customers", grouped=True)
+    postgres = _sql_with(checks, "olist_synth_cdc__customers", grouped=True)
     assert "GROUP BY customer_id" in postgres
     assert "updated_at" not in postgres.split("GROUP BY", maxsplit=1)[1]
     municipios = _sql_with(checks, "ibge_localidades__municipios", grouped=True)

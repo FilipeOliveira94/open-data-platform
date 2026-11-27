@@ -12,7 +12,7 @@ Bronze uses one generic promotion path. Silver is **one module per `source_id`**
 | --- | --- |
 | `olist_brazilian_ecommerce` | Olist e-commerce CSVs |
 | `olist_marketing_funnel` | Olist funnel CSVs |
-| `postgres_oltp` | Windowed PostgreSQL extracts |
+| `olist_synth_cdc` | Windowed PostgreSQL extracts |
 | `dummyjson_products` | DummyJSON product pages (JSON expanded) |
 | `demo_storefront` | Generated clickstream |
 | `ibge_localidades` | IBGE municipalities |
@@ -73,7 +73,7 @@ Before deduplication, Silver selects Bronze rows by the contract `update_pattern
 | Contract `primary_key` | `ROW_NUMBER` partitioned by those columns |
 | `order_reviews` | Key is `(review_id, order_id)` (contract v2) |
 | `geolocation` | No primary key. Collapse **identical payload rows** only; do not collapse by ZIP prefix |
-| `postgres_oltp.*` | Order by `updated_at` first (overlapping extract windows) |
+| `olist_synth_cdc.*` | Order by `updated_at` first (overlapping extract windows) |
 | `demo_storefront.clickstream` | `append_only` (P3-12): partition by `event_id`; the first ingested row wins (ascending order), because events are immutable |
 
 The write is a full-table overwrite. There is no `MERGE` and no exactly-once claim.
@@ -135,7 +135,7 @@ uv run python -m open_data_platform.lakehouse.silver \
 
 ## Result (2026-11-05 full-data live)
 
-`make live-silver` after the full Bronze live (`WriteMode.FULL_OVERWRITE`). Trino matched 22/22 checks for that run: geolocation 738_332 after identical-row dedup; DummyJSON 194 with expanded `dimensions_width` / `meta_barcode` / `tags`; postgres_oltp survivors 2/2/2/3; clickstream null `product_id` 16. Those figures describe the 2026-11-05 snapshot. Chronological note: [status log](../status-log.md).
+`make live-silver` after the full Bronze live (`WriteMode.FULL_OVERWRITE`). Trino matched 22/22 checks for that run: geolocation 738_332 after identical-row dedup; DummyJSON 194 with expanded `dimensions_width` / `meta_barcode` / `tags`; olist_synth_cdc survivors 2/2/2/3; clickstream null `product_id` 16. Those figures describe the 2026-11-05 snapshot. Chronological note: [status log](../status-log.md).
 
 ## Pins
 
