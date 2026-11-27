@@ -27,7 +27,7 @@
     <div class="diagram-container">
 <svg viewBox="0 0 792 612" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="orchestration-dark-title orchestration-dark-desc">
 <title id="orchestration-dark-title">Airflow orchestration of the batch path</title>
-<desc id="orchestration-dark-desc">Four groups of ingestion DAGs emit a raw Asset only after a successful extract; the Asset triggers transform_lakehouse, which promotes Bronze, Silver and Gold behind layer checks, and a weekly DAG reconciles Gold.</desc>
+<desc id="orchestration-dark-desc">Four groups of ingestion DAGs emit a raw Asset only after a successful extract; the Asset triggers transform_lakehouse, which promotes Bronze, Silver and Gold in order; a failed Bronze or Silver check blocks the next layer, and a weekly DAG reconciles Gold.</desc>
 <defs><marker id="orchestration-dark-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#B3A8C9"/></marker><marker id="orchestration-dark-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#FF6FA6"/></marker></defs>
 <rect width="792" height="612" fill="#120B20"/>
 <text x="20" y="44" fill="#B3A8C9" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.18em">INGESTION DAGS · AIRFLOW 3.4.0</text>

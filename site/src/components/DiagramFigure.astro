@@ -45,11 +45,15 @@ const width = Math.round(light.width / 2);
 		min-width: 40rem;
 		height: auto;
 	}
-	/* Show the export that matches the site theme. Starlight's sl-hidden
-	   utilities sit in a cascade layer and lose to the display rule above. */
-	:global([data-theme='light']) .diagram__dark,
-	:global([data-theme='dark']) .diagram__light {
+	/* Show the export that matches the site theme; light when no theme is set
+	   (no JS). Starlight's sl-hidden utilities sit in a cascade layer and lose
+	   to the display rule above. */
+	.diagram__scroll .diagram__dark,
+	:global([data-theme='dark']) .diagram__scroll .diagram__light {
 		display: none;
+	}
+	:global([data-theme='dark']) .diagram__scroll .diagram__dark {
+		display: block;
 	}
 	figcaption {
 		margin-top: 0.5rem;

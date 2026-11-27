@@ -7,8 +7,10 @@ elsewhere. These tests fail when a page drifts from its source, so a wrong
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import re
+import struct
 import sys
 from pathlib import Path
 
@@ -91,12 +93,20 @@ def test_architecture_versions_match_recorded_pins() -> None:
     decisions = (ROOT / "DECISIONS.md").read_text(encoding="utf-8")
     recorded = _section(lakehouse, "## Versions") + decisions
 
+    # What the stack is built and run from today.
+    build = (ROOT / "docker-compose.yml").read_text(encoding="utf-8") + "".join(
+        f.read_text(encoding="utf-8", errors="ignore")
+        for f in sorted((ROOT / "docker").rglob("*"))
+        if f.is_file()
+    )
+
     stack = _table_rows(ARCHITECTURE.read_text(encoding="utf-8"), "| Component |")
     assert stack, "Architecture stack table is empty"
     for row in stack:
         version = row[1]
         for pin in re.findall(r"`([^`]+)`", version):
             assert pin in recorded, f"{row[0]}: pin {pin!r} is not recorded"
+            assert pin in build, f"{row[0]}: pin {pin!r} is not in compose or docker/"
 
 
 def test_site_repo_links_point_to_existing_paths() -> None:
@@ -107,6 +117,15 @@ def test_site_repo_links_point_to_existing_paths() -> None:
             assert (ROOT / rel).exists(), f"{page.name} links to missing {rel}"
             seen += 1
     assert seen > 0
+
+
+def test_diagram_figure_sources_exist() -> None:
+    page = ARCHITECTURE.read_text(encoding="utf-8")
+    assert f"export const repo = '{REPO_URL}blob/main/';" in page
+    sources = re.findall(r"source=\{`\$\{repo\}([^`]+)`\}", page)
+    assert len(sources) == page.count("<DiagramFigure")
+    for rel in sources:
+        assert (ROOT / rel).is_file(), f"diagram source {rel} is missing"
 
 
 def _load_builder():
@@ -135,7 +154,21 @@ def test_diagram_sources_match_generator(name: str, tmp_path: Path) -> None:
         assert committed == generated, (
             f"{name}{suffix}.html is stale: rerun build_diagrams.py"
         )
-        assert (DIAGRAMS / f"{name}{suffix}.png").is_file()
+        png = (DIAGRAMS / f"{name}{suffix}.png").read_bytes()
+        width, height = struct.unpack(">II", png[16:24])
+        view_w, view_h = re.search(r'viewBox="0 0 (\d+) (\d+)"', committed).groups()
+        assert (width, height) == (2 * int(view_w), 2 * int(view_h))
+
+    recorded = {}
+    for line in (DIAGRAMS / "exports.sha256").read_text(encoding="utf-8").splitlines():
+        digest, png_name = line.split()
+        recorded[png_name] = digest
+    for suffix in ("", "-dark"):
+        html = (DIAGRAMS / f"{name}{suffix}.html").read_bytes()
+        assert recorded[f"{name}{suffix}.png"] == hashlib.sha256(html).hexdigest(), (
+            f"{name}{suffix}.png was exported from another HTML: re-export, then "
+            "run build_diagrams.py --record-exports"
+        )
 
 
 def test_architecture_diagrams_come_from_docs() -> None:

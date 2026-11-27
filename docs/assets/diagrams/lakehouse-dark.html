@@ -27,7 +27,7 @@
     <div class="diagram-container">
 <svg viewBox="0 0 792 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lakehouse-dark-title lakehouse-dark-desc">
 <title id="lakehouse-dark-title">Medallion lakehouse: Raw, Bronze, Silver, Gold</title>
-<desc id="lakehouse-dark-desc">Python ingestion writes raw objects to MinIO; Spark appends them to string-typed Bronze Iceberg tables and rebuilds typed, deduplicated Silver tables; dbt-trino builds the Gold marts; layer checks gate each promotion and Trino reads every layer through the Iceberg JDBC catalog.</desc>
+<desc id="lakehouse-dark-desc">Python ingestion writes raw objects to MinIO; Spark appends them to string-typed Bronze Iceberg tables and rebuilds typed, deduplicated Silver tables; dbt-trino builds the Gold marts; a failed Bronze or Silver check blocks the next layer, and Trino reads every layer through the Iceberg JDBC catalog.</desc>
 <defs><marker id="lakehouse-dark-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#B3A8C9"/></marker><marker id="lakehouse-dark-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#FF6FA6"/></marker></defs>
 <rect width="792" height="540" fill="#120B20"/>
 <path d="M 108,80 C 108,0 300,0 300,80" fill="none" stroke="#B3A8C9" stroke-width="1.4" marker-end="url(#lakehouse-dark-arrow)"/>

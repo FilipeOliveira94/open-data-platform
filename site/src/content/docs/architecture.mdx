@@ -22,8 +22,8 @@ Versions observed on the verified runs and pinned in the repository ([Phase 2 la
 | PostgreSQL | `postgres:16.15-bookworm` | olist-synth-cdc source, Iceberg catalog, Airflow metadata, run ledgers | D-001 |
 | MinIO | `coollabsio/minio:RELEASE.2025-10-15T17-29-55Z` | Raw objects, quarantine sidecars, Iceberg warehouse, Airflow logs (S3 API) | D-002 |
 | Apache Iceberg | `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0` | Table format, version 2, over Parquet files | D-003 |
-| Iceberg JDBC catalog | schema `V1`, driver `org.postgresql:postgresql:42.7.14` | Catalog in the PostgreSQL database `iceberg`, shared by Spark and Trino | D-004 |
-| Apache Spark | `spark:3.5.8-java17` | Writes Bronze and Silver | D-005 |
+| Iceberg JDBC catalog | Schema V1, driver `org.postgresql:postgresql:42.7.14` | Catalog in the PostgreSQL database `iceberg`, shared by Spark and Trino | D-004 |
+| Apache Spark | `3.5.8`, copied with its JRE from `spark:3.5.8-java17` into the runtime image | Writes Bronze and Silver; runs only in the runtime image | D-005 |
 | Trino | `trinodb/trino:484` | Reads every layer; dbt runs on it | D-004 |
 | dbt | `1.12.6` with dbt-trino `1.11.0` | Builds and tests the Gold models | D-005 |
 | Apache Airflow | `apache/airflow:3.4.0-python3.12` | LocalExecutor scheduler, profile `orchestration` | D-006 |
@@ -34,7 +34,7 @@ Versions observed on the verified runs and pinned in the repository ([Phase 2 la
 <DiagramFigure
 	light={lakehouseLight}
 	dark={lakehouseDark}
-	alt="Four tiers from left to right. Raw: Python ingestion writes CSV, JSON and JSONL objects to MinIO. Bronze: Spark appends new complete objects to string-typed Iceberg tables that keep history, duplicates and lineage. Silver: Spark rebuilds typed tables with one row per key. Gold, highlighted: dbt-trino builds facts, dimensions and marts. Layer checks gate each promotion, and Trino reads every layer through the Iceberg JDBC catalog."
+	alt="Four tiers from left to right. Raw: Python ingestion writes CSV, JSON and JSONL objects to MinIO. Bronze: Spark appends new complete objects to string-typed Iceberg tables that keep history, duplicates and lineage. Silver: Spark rebuilds typed tables with one row per key. Gold, highlighted: dbt-trino builds facts, dimensions and marts. A failed Bronze or Silver check blocks the next layer, and Trino reads every layer through the Iceberg JDBC catalog."
 	caption="Medallion lakehouse, verified in Phase 2 and scheduled in Phase 3."
 	source={`${repo}docs/architecture/phase-2-lakehouse.md`}
 />
@@ -61,7 +61,7 @@ Table contracts in the ODCS format, checked by the Data Contract CLI, are planne
 <DiagramFigure
 	light={orchestrationLight}
 	dark={orchestrationDark}
-	alt="Four groups of ingestion DAGs at the top: the daily olist-synth-cdc extract, the weekly re-extract, the DummyJSON and IBGE refreshes, and the manual Olist and storefront loads. Each emits a raw Asset only on success. The Asset, highlighted, triggers transform_lakehouse, which runs Bronze, Silver and Gold in order; each step passes only after its layer check. A weekly reconcile_gold DAG checks Gold."
+	alt="Four groups of ingestion DAGs at the top: the daily olist-synth-cdc extract, the weekly re-extract, the DummyJSON and IBGE refreshes, and the manual Olist and storefront loads. Each emits a raw Asset only on success. The Asset, highlighted, triggers transform_lakehouse, which runs Bronze, Silver and Gold in order; a failed Bronze or Silver check blocks the next layer. A weekly reconcile_gold DAG checks Gold."
 	caption="Airflow orchestration, verified in Phase 3."
 	source={`${repo}docs/architecture/phase-3-orchestration.md`}
 />
@@ -78,12 +78,12 @@ Airflow 3.4 runs locally with the LocalExecutor. The DAGs call package entry poi
 | `reconcile_gold` | Weekly | Gold reconciliation checks |
 
 - **Catch-up and backfill.** The daily and weekly DAGs create one run per missed interval. Each successful extract records its window in a coverage ledger, and a gap report lists gaps and overlaps. A cleared run rewrites its own raw keys, so a backfill does not duplicate rows.
-- **Quality gate.** A failed Bronze or Silver check blocks the next layer, also on a later refresh with no new raw objects.
+- **Quality gate.** A failed Bronze or Silver check blocks the next layer, also on a later refresh with no new raw objects. Silver and Gold tables are visible to readers before their checks run; write-audit-publish is planned (P6-09).
 - **One writer at a time.** `transform_lakehouse` runs one at a time and shares a pool with `reconcile_gold`. Manual `make live-*` targets must not run while the DAGs do.
 
 ## Batch and streaming
 
-The platform keeps three update paths apart; streaming does not replace batch ([ADR-0014](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0014-batch-vs-streaming-coexistence.md)).
+The proposed design keeps three update paths apart, so streaming does not replace batch ([ADR-0014](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0014-batch-vs-streaming-coexistence.md)).
 
 | Path | How | Status |
 | --- | --- | --- |

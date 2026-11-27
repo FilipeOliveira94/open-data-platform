@@ -10,12 +10,16 @@ Urbanist for names and Geist Mono for technical labels. Every fact drawn here
 comes from ``docs/architecture/phase-2-lakehouse.md``, the layer notes, and
 ``docs/architecture/phase-3-orchestration.md``; change those first.
 
-Run: ``python3 docs/assets/diagrams/build_diagrams.py``
+Run: ``python3 docs/assets/diagrams/build_diagrams.py``. After exporting the PNGs,
+run it again with ``--record-exports`` so ``exports.sha256`` names the HTML each
+PNG was exported from; the site tests fail when the two drift.
 """
 
 # ruff: noqa: E501  (SVG and CSS template strings read better unwrapped)
 from __future__ import annotations
 
+import hashlib
+import sys
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
@@ -246,8 +250,8 @@ def lakehouse_svg(s: Skin) -> tuple[str, int]:
         f'<title id="{slug}-title">Medallion lakehouse: Raw, Bronze, Silver, Gold</title>',
         f'<desc id="{slug}-desc">Python ingestion writes raw objects to MinIO; Spark appends them '
         "to string-typed Bronze Iceberg tables and rebuilds typed, deduplicated Silver tables; "
-        "dbt-trino builds the Gold marts; layer checks gate each promotion and Trino reads every "
-        "layer through the Iceberg JDBC catalog.</desc>",
+        "dbt-trino builds the Gold marts; a failed Bronze or Silver check blocks the next "
+        "layer, and Trino reads every layer through the Iceberg JDBC catalog.</desc>",
         markers(s, slug),
         f'<rect width="{width}" height="{height}" fill="{s.paper}"/>',
     ]
@@ -523,7 +527,7 @@ def orchestration_svg(s: Skin) -> tuple[str, int]:
         f'<title id="{slug}-title">Airflow orchestration of the batch path</title>',
         f'<desc id="{slug}-desc">Four groups of ingestion DAGs emit a raw Asset only after a '
         "successful extract; the Asset triggers transform_lakehouse, which promotes Bronze, "
-        "Silver and Gold behind layer checks, and a weekly DAG reconciles Gold.</desc>",
+        "Silver and Gold in order; a failed Bronze or Silver check blocks the next layer, and a weekly DAG reconciles Gold.</desc>",
         markers(s, slug),
         f'<rect width="{width}" height="{height}" fill="{s.paper}"/>',
         text(
@@ -691,5 +695,20 @@ def main() -> None:
         )
 
 
+NAMES = ("lakehouse", "lakehouse-dark", "orchestration", "orchestration-dark")
+
+
+def record_exports() -> None:
+    """Write the SHA-256 of each HTML source next to the name of its PNG export."""
+    lines = []
+    for name in NAMES:
+        digest = hashlib.sha256((HERE / f"{name}.html").read_bytes()).hexdigest()
+        lines.append(f"{digest}  {name}.png\n")
+    (HERE / "exports.sha256").write_text("".join(lines), encoding="utf-8")
+
+
 if __name__ == "__main__":
-    main()
+    if "--record-exports" in sys.argv[1:]:
+        record_exports()
+    else:
+        main()
