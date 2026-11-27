@@ -7,7 +7,7 @@
 | Date decided | — |
 | Owner | Platform architect |
 | Index ID | D-017 |
-| Related issues | P8-01–P8-07; Phase 9 may cite the verified result |
+| Related issues | P8-01–P8-08; the report site cites the verified result |
 | Supersedes | — |
 | Superseded by | — |
 
@@ -39,9 +39,9 @@ JupyterLab runs as a host `uv` process against the published Trino port, the sam
 
 ## Consequences and trade-offs
 
-- Four surfaces stay distinct: JupyterLab explores, Superset saves charts, Grafana (Phase 5) is operations, and the Phase 9 site publishes the static images from those tools.
+- Four surfaces stay distinct: JupyterLab explores, Superset saves charts, Grafana (Phase 5) is operations, and the report site publishes the static images from those tools.
 - Superset SQL Lab is not a second notebook product. P8-05 writes that boundary.
-- The site figure table in `ROADMAP.md` is the chart set. P8-06 exports the images. Phase 9 places them on the pages. `.ipynb` files stay free of outputs.
+- The site figure table in `ROADMAP.md` is the chart set. P8-08 exports the images and places them on the pages; P8-06 checks every value (amended by R1-02). `.ipynb` files stay free of outputs.
 - Charts use metrics already defined for Gold. They do not invent a figure.
 - Notebook outputs and row extracts stay out of git. Olist data is CC BY-NC-SA 4.0: local aggregates only.
 - Operational cost is one Compose app plus one PostgreSQL database, and a host Jupyter process. Redis or a Celery worker is in scope only when P8-01 shows the pinned image requires it.

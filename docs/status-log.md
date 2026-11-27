@@ -4,6 +4,17 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-27 — R1-02 Site update at the end of each phase
+
+Owner request: the report site starts now and is updated after each phase from Phase 4 on. Phase 9 becomes Site v1: the five pages from verified Phase 0–3 material, hosted on GitHub Pages (owner decision), depending on Phase 3 only and running before Phase 4. P9-02 and P9-03 fix the stale status lines the scaffold still shows (Phase 2 in progress). Phases 4, 5, 6, 8, 10, and 11 each get a site update issue before the close pair (P4-11, P5-10, P6-10, P8-08, P10-13, P11-19) that publishes only results of that phase's verified issues; each live run compares the site to its result, and each documentation issue fixes and redeploys a mismatch. P8-08 now exports figures 1–10 and the caption manifest, and P8-06 checks every value. The site figure table gains a Published by column and figure 11 (Grafana refresh time per layer, P5-10; owner decision). ADR-0017 and `site/README.md` point to the new issues. Docs only: no `site/src/` change.
+
+| Check | Result |
+| --- | --- |
+| `make lint` | Clean; markdown tables: 72 files, 0 with an empty header row |
+| Leftover `grep` for "Phase 9 publishes", "finalized in Phase 9", "P8-06 exports", "Phase 9 site", "Phase 9 places" outside the status log and changelog | None |
+
+---
+
 ### 2026-11-27 — R1-01 Remove the AWS deployment path
 
 Owner decision: the platform core is open source only ([ADR-0029](decisions/0029-open-source-only-platform.md), D-029 approved). Phase 7 (P7-01 to P7-09) and P6-03 are withdrawn; phase numbers are kept. P5-05 becomes the local resource footprint and cost to run (measured CPU, memory, disk and storage per service, run time per layer, a machine cost from stated assumptions, and a performance analysis). ADR-0011 is superseded, ADR-0001 keeps its Compose half, and the other ADRs, `DECISIONS.md`, `AGENTS.md`, the README, architecture docs, cover images, and site no longer name AWS counterparts. A Refactor R1 table in `ROADMAP.md` lists R1-01 to R1-03.

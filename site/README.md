@@ -4,7 +4,7 @@ Astro [Starlight](https://starlight.astro.build/) site themed with
 [Catppuccin for Starlight](https://starlight-themes.netlify.app/catppuccin/)
 (`@catppuccin/starlight`).
 
-**Purpose:** multi-page platform report (Home, Architecture, Pipeline, Operations, Reference). Content uses only facts verified in `PROJECT_STATUS.md`. Public hosting remains Phase 9.
+**Purpose:** multi-page platform report (Home, Architecture, Pipeline, Operations, Reference). Content uses only facts verified in `PROJECT_STATUS.md`. Site v1 (Phase 9, P9-05) hosts it on GitHub Pages; from Phase 4 on, each phase's site update issue adds that phase's verified results (`ROADMAP.md` → growth scheme).
 
 ## Prerequisites
 
@@ -62,6 +62,6 @@ Theme options live in `astro.config.mjs`: mocha/latte with mauve accent (same as
 ## Content rules
 
 - Only facts recorded as **verified** in `PROJECT_STATUS.md` are stated as delivered.
-- Design polish, the figure gallery, and public hosting are **Phase 9**.
-- Phase 8 exports the images after the live run checks them. This scaffold does not invent charts. The figure list is the site figure table in `ROADMAP.md`.
+- Site v1 content and GitHub Pages hosting are **Phase 9**. Later results arrive through each phase's site update issue (P4-11, P5-10, P6-10, P8-08, P10-13, P11-19).
+- P8-08 exports figures 1–10 and P5-10 adds figure 11; the phase's live run checks them. This scaffold does not invent charts. The figure list is the site figure table in `ROADMAP.md`.
 - This tree does not replace repository docs as the source of truth.
