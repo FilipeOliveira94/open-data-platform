@@ -4,6 +4,25 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-27 — P3-14 live run, result, and consistency check
+
+`scripts/p3_14_live_run.sh` drove the shipped daily and weekly PostgreSQL DAGs on local Airflow 3.4.0 from 2026-11-26 05:52Z to 2026-11-27 00:26Z, with no fault injected. The Airflow, catalog, and Trino helpers of the P3-09 script moved to `scripts/lib/live_check.sh`, which both scripts source. P3-09 `no-new-raw` and `happy` passed on the moved helpers. Each landing (`extract_coverage.row_count`) was compared to the PostgreSQL rows with `updated_at` in its window, counted right after the extract.
+
+| Check | Result |
+| --- | --- |
+| Daily backfill of 2026-10-22, one planted on-time seller | Landed sellers 1, source 1, other datasets 0 and 0. The refresh took 120 s. Silver rows in the window equal the source |
+| Rerun of the 2026-10-24 daily run (cleared, same run id) | Landing equal to the first and to the source. The refresh read 0 raw objects because the ETags were unchanged (1.3 s) |
+| New execution of `[10-24, 10-25)` | Landing equal to the first. Silver counts unchanged, no duplicate key, daily gap report clean |
+| Late seller in 2026-11-18, then the weekly run, window `[11-15, 11-22)` | Weekly landed sellers 1 against 0 in the previous weekly landing and in the daily sum. Silver sellers +1, other tables unchanged, no duplicate key |
+| Refresh with no new raw objects | 2.6 s. Every write step skipped and no Iceberg table got a new version |
+| Silver reads during the daily and weekly refreshes | 152 Trino counts, 0 failed, 0 empty |
+| Daily DAG paused 11-26 06:20Z, unpaused 11-27 00:22Z | One scheduled run for `[11-26, 11-27)`, 0 rows landed and 0 in the source. One refresh (126 s). Gap report: 8 windows, clean |
+| Raw objects read per refresh | 4 new objects out of 245 to 273 promoted; 0 to 2 rows out of about 1.57 M |
+| Quarantine and cast counts | All 0 for the four `postgres_oltp` datasets |
+| `make lint`, `make test` | Clean; 617 passed |
+
+The first daily attempt on 2026-10-24 logged one FAIL: the script expected Silver sellers to grow by exactly the planted seller. That day held one more source seller that no earlier window had extracted, and landing, source, and Silver all agreed on 2. The check now compares the window's Silver rows to the source. Observations: an empty window still rebuilds Silver and Gold, and Silver scans the `postgres_oltp` Bronze tables twice. Detail: [`docs/architecture/phase-3-live-run.md`](architecture/phase-3-live-run.md).
+
 ### 2026-11-26 — P3-10 orchestration runtime hardening
 
 Spark local mode in the runtime image is capped. `run_bronze.sh` and `run_silver.sh` take `local[${ODP_SPARK_CORES}]` and `--driver-memory ${ODP_SPARK_DRIVER_MEMORY}` (Compose defaults 2 and `2g`; before: `local[*]` and Spark's 1g default) and exit 1 on a malformed value. Every script under `docker/spark` that starts Spark sets `spark.sql.session.timeZone=UTC` (review R16). The runtime container's JVM default was already UTC (`date +%Z`, `TZ` unset). The Airflow pins moved from the uv `dev` group to a non-default `airflow` group; `test_dagbag.py` and `test_run_python_args.py` skip without it, and `make test` and CI sync it. `medallion_build prune-work` deletes run folders under `/opt/odp/work` whose newest file is older than `ODP_WORK_RETENTION_DAYS` (default 7). It never deletes the current run's folder and touches no Airflow run, task log, table, or raw object. `transform_lakehouse` runs it as `prune_work`, a task with no edges; `make live-prune-work` runs it from Make. `.env.example` replaces `TRINO_HOST`, `TRINO_PORT`, and `TRINO_USER` with `ODP_TRINO_HOST_PORT` (the published host port) and `ODP_TRINO_USER`; `dbt/profiles.yml` stays versioned and reads the user from `ODP_TRINO_USER`; `dbt/profiles.yml.example` was removed.

@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-26 (P3-10 verified) |
+| Last updated | 2026-11-27 (P3-14 verified) |
 | Current phase | Phase 3 — Orchestration and data quality |
 | Phase status | In progress |
 
@@ -22,9 +22,9 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-**P3-14** — Live run, result, and consistency check. Not started.
+**P3-15** — Phase 3 documentation and status. Not started.
 
-P3-10 is verified. Spark in the runtime image is capped by `ODP_SPARK_CORES` and `ODP_SPARK_DRIVER_MEMORY` (defaults 2 and `2g`) and every Spark script sets the UTC session time zone. Airflow is the uv `airflow` group. The `prune_work` task deletes run scratch folders in `odp_lakehouse_work` older than seven days. On 2026-11-26, `make live-rebuild` with the caps exited 0 in 603.7 s with unchanged Silver and Gold row counts, and a `transform_lakehouse` run removed the six folders older than seven days. Detail: [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#spark-resource-caps-p3-10), the [ADR-0005](docs/decisions/0005-compute-and-transform.md) addendum, and [`docs/status-log.md`](docs/status-log.md).
+P3-14 is verified. A scripted live run (`scripts/p3_14_live_run.sh`) on 2026-11-26 and 2026-11-27 drove the shipped daily and weekly DAGs. Every landing matched the PostgreSQL rows of its window and the previous landing of that window. A rerun of the same run and of the same window left Silver unchanged. The weekly run landed one late seller once. A refresh with no new raw objects wrote no table, and 152 Silver reads during refreshes all succeeded. After one missed midnight the daily DAG made one catch-up run and the gap report was clean. Each refresh read 4 new raw objects out of 245 to 273. No mismatch was found. Detail and observations: [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) and [`docs/status-log.md`](docs/status-log.md).
 
 The 2026-11-21 [review](docs/reviews/2026-11-21-verified-issues-review.md) added P3-16 to P3-18 (all verified) and P6-09 (write-audit-publish). Its other findings are folded into P3-15 and later phases.
 
@@ -32,8 +32,7 @@ Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](doc
 
 ## Next work
 
-1. **P3-14** — Live run, result, and consistency check. Acceptance: `ROADMAP.md` → P3-14.
-2. **P3-15** — Phase 3 documentation and status (after P3-14).
+1. **P3-15** — Phase 3 documentation and status. Acceptance: `ROADMAP.md` → P3-15.
 
 ---
 
@@ -57,7 +56,7 @@ Earlier Phase 3 results: the progress table below and [`docs/status-log.md`](doc
 | P3-16 | Quality gate state and extract-window corrections | Verified | [`docs/architecture/airflow-local.md`](docs/architecture/airflow-local.md#quality-gate-p3-16) |
 | P3-17 | Gold metric grain corrections | Verified | [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md#p3-17-metric-corrections-2026-11-22) |
 | P3-18 | Exact decimal type for money fields | Verified | [`docs/architecture/data-contracts.md`](docs/architecture/data-contracts.md#money-p3-18) |
-| P3-14 | Live run, result, and consistency check | Not started | — |
+| P3-14 | Live run, result, and consistency check | Verified | [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) |
 | P3-15 | Phase 3 documentation and status | Not started | — |
 
 Acceptance detail: `ROADMAP.md` → Phase 3.
@@ -76,7 +75,7 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 - [x] A lakehouse refresh reads new raw objects and, for snapshot sources, the latest complete execution only. Its work does not grow with total raw history (P3-13). Raw object reads do not; the raw key listing, Silver rebuilds of `incremental_window`/`append_only` datasets (ADR-0024), still do. The Bronze `MERGE` scans only the `dt` partitions it writes since P3-08.
 - [x] Invalid records are identified and handled per documented rules (P3-07).
 - [x] Success and failure scenarios have tests or reproducible evidence (P3-09).
-- [ ] A live run result is recorded and compared to the source windows (P3-14).
+- [x] A live run result is recorded and compared to the source windows (P3-14).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P3-15).
 
 ---
@@ -85,6 +84,12 @@ Acceptance detail: `ROADMAP.md` → Phase 3.
 
 | Validation | Detail |
 | --- | --- |
+| Date | 2026-11-26 to 2026-11-27 |
+| Environment | Local Compose: PostgreSQL, MinIO, Trino, and Airflow 3.4.0 (LocalExecutor) on `odp-runtime:airflow3.4.0-spark3.5.8` |
+| Checks | `make lint`; `make test`; `scripts/p3_14_live_run.sh all-day`, `pause`, `catchup report`; `scripts/p3_09_orchestration_check.sh no-new-raw happy` on the moved helpers |
+| Result | PASS. 617 unit tests passed. Every P3-14 step passed after one script check was corrected (see the live-run doc). The P3-09 scenarios passed, 10 of 10 |
+
+--- | --- |
 | Date | 2026-11-26 |
 | Environment | Local Compose: PostgreSQL, MinIO, Trino, and Airflow 3.4.0 (LocalExecutor) on `odp-runtime:airflow3.4.0-spark3.5.8` |
 | Checks | `make lint`; `make test`; unit tests in a venv without the `airflow` group; `make live-rebuild`; Silver and Gold row counts before and after; `transform_lakehouse` run `manual__2026-11-26T05:27:14.456317+00:00`; `make live-prune-work` |
