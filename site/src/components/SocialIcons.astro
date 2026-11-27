@@ -1,0 +1,19 @@
+---
+// Header links: a visible link to the author's portfolio, then Starlight's social icons.
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+---
+
+<a class="portfolio" href="https://filipeoliveira-hub.com.br">Portfolio</a>
+<Default />
+
+<style>
+	.portfolio {
+		color: var(--sl-color-text-accent);
+		font-weight: 700;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.portfolio:hover {
+		color: var(--sl-color-white);
+	}
+</style>

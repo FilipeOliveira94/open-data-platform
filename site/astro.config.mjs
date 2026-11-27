@@ -1,7 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import starlightCatppuccin from '@catppuccin/starlight';
 
 // https://astro.build/config
 export default defineConfig({
@@ -10,6 +9,14 @@ export default defineConfig({
 			title: 'Open Data Platform',
 			description:
 				'Reproducible open-source data platform on a local Docker Compose stack.',
+			logo: {
+				light: './src/assets/brand/fi-mark-light.svg',
+				dark: './src/assets/brand/fi-mark-dark.svg',
+			},
+			customCss: ['./src/styles/brand.css'],
+			components: {
+				SocialIcons: './src/components/SocialIcons.astro',
+			},
 			social: [
 				{
 					icon: 'github',
@@ -27,13 +34,6 @@ export default defineConfig({
 				{ label: 'Pipeline', slug: 'pipeline' },
 				{ label: 'Operations', slug: 'operations' },
 				{ label: 'Reference', slug: 'reference' },
-			],
-			plugins: [
-				// Matches https://starlight-themes.netlify.app/catppuccin/
-				starlightCatppuccin({
-					dark: { flavor: 'mocha', accent: 'mauve' },
-					light: { flavor: 'latte', accent: 'mauve' },
-				}),
 			],
 		}),
 	],

@@ -16,4 +16,4 @@ Repository documents remain the source of truth. This site summarizes verified f
 | [docs/decisions/](https://github.com/FilipeOliveira94/open-data-platform/tree/main/docs/decisions) | ADR detail (D-001 and D-002 approved) |
 | [site/README.md](https://github.com/FilipeOliveira94/open-data-platform/blob/main/site/README.md) | How to preview this report locally |
 
-Theme: [Catppuccin for Starlight](https://starlight-themes.netlify.app/catppuccin/) (`@catppuccin/starlight`).
+Theme: the author's brand palette and the Urbanist font on Starlight. Author: [Filipe Oliveira's portfolio](https://filipeoliveira-hub.com.br).

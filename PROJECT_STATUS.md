@@ -189,7 +189,7 @@ None.
 
 ## Platform report site
 
-Early Astro Starlight + Catppuccin scaffold under `site/` (verified facts only). Site v1 (Phase 9) fills the pages from verified Phase 0–3 material and hosts them on GitHub Pages; its pages still show Phase 2 in progress until P9-02 and P9-03. From Phase 4 on, each phase has a site update issue before its close pair. Preview: `cd site && npm run dev` — see `site/README.md`. The site figure table in `ROADMAP.md` names each figure and the issue that publishes it (P8-08, P5-10).
+Astro Starlight scaffold with the brand theme (violet and pink, Urbanist) and a header link to the portfolio, under `site/` (verified facts only). Site v1 (Phase 9) fills the pages from verified Phase 0–3 material and hosts them on GitHub Pages; its pages still show Phase 2 in progress until P9-02 and P9-03. From Phase 4 on, each phase has a site update issue before its close pair. Preview: `cd site && npm run dev` — see `site/README.md`. The site figure table in `ROADMAP.md` names each figure and the issue that publishes it (P8-08, P5-10).
 
 | Page | Status |
 | --- | --- |

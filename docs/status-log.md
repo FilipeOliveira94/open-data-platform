@@ -6,13 +6,14 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ### 2026-11-27 — P9-01 Site scaffold and page map
 
-The `site/` scaffold from 2026-10-16 meets the P9-01 acceptance: Astro Starlight with `@catppuccin/starlight` (mocha/latte, mauve accent), a sidebar with the five pages, and a local preview through `npm run dev`. `site/package.json` now pins the locked versions instead of caret ranges: `astro` 7.3.8, `@astrojs/starlight` 0.42.6, `@catppuccin/starlight` 2.1.0, `sharp` 0.35.5. Page content is unchanged; P9-02 and P9-03 replace the stale status lines.
+The `site/` scaffold from 2026-10-16 had Starlight, a sidebar with the five pages, and a local preview through `npm run dev`. Owner decision: replace the Catppuccin theme with the brand palette, and link to the portfolio; the P9-01 acceptance was reworded to match. `src/styles/brand.css` maps the `--fi-*` tokens of `filipeoliveira-hub-assets/brand/tokens.css` onto Starlight's color variables for light and dark and loads Urbanist site-wide. The Fi mark is the header logo, and the brand favicon replaces Starlight's. A `SocialIcons` override adds a visible Portfolio link (`https://filipeoliveira-hub.com.br`) before the GitHub icon. `@catppuccin/starlight` is removed, and `site/package.json` pins the locked versions instead of caret ranges: `astro` 7.3.8, `@astrojs/starlight` 0.42.6, `sharp` 0.35.5. Body, muted and accent text pass WCAG AA in both themes; body and accent text on the page background measure at least 7:1. Page content is unchanged; P9-02 and P9-03 replace the stale status lines.
 
 | Check | Result |
 | --- | --- |
 | `npm ci` (Node 22.23.4) | Installed from the lockfile |
 | `npm run build` | Complete; `dist/` holds `index.html`, `architecture/`, `pipeline/`, `operations/`, `reference/`, and `404.html`. Warnings: no `i18n` collection, and the sitemap skipped because `site` is unset (P9-05 sets it) |
 | `npm run dev`, then `curl` each route | `/`, `/architecture/`, `/pipeline/`, `/operations/`, `/reference/` return 200 with their page titles |
+| Playwright on `npm run dev`, 1440 and 390 px, dark and light | All five routes render with the brand background, accent, Urbanist, and Fi mark; the Portfolio link shows in the header at 1440 px and in the mobile menu at 390 px; no horizontal scroll, console errors, failed requests, or third-party requests. Evidence outside the repo (`~/evidence/open-data-platform/P9-01/`) |
 | `npm audit` | 2 moderate: `astro` (fixed in 7.4.13; dynamic tag names and the `@astrojs/node` image endpoint, neither used by this static site) and `postcss-selector-parser` (CPU on crafted selectors, build-time only). Not upgraded here |
 
 ---

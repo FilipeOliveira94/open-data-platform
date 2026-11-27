@@ -104,7 +104,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 ### 🚧 Report site
 
 - **Pages:** Home, architecture, pipeline, operations, and reference.
-- **Stack:** Astro Starlight with the Catppuccin theme.
+- **Stack:** Astro Starlight with the author's brand theme (violet and pink, Urbanist); the header links to the [portfolio](https://filipeoliveira-hub.com.br).
 - **Content:** Verified facts only.
 - **Preview:** `cd site && npm ci && npm run dev`
 - **Hosting:** Public hosting is Phase 9. The URL then goes on the repository About → Website field.
