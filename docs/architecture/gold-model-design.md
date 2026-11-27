@@ -241,7 +241,7 @@ A late delivery is not a quality finding. It is `mart_late_orders`. An allowed n
 
 ### SCD Type 2
 
-P4-08 is the only implementation issue.
+P4-08 is the only CDC-based implementation issue. P11-07 builds Type 2 from daily snapshots for the BioGuardia Atlantic dimensions ([domain model](bioguardia-domain.md#scd-type-2)); the table below covers the existing sources only.
 
 Today's raw bucket has one execution per dataset. Silver overwrites and keeps the latest `updated_at`, which removes the previous version. Type 2 needs those versions kept.
 

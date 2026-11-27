@@ -211,6 +211,6 @@ BrasilAPI CEP is not a contracted source ([ADR-0021](../decisions/0021-withdraw-
 ## Out of scope
 
 - OpenLineage events, discovery catalogs, retention periods, SLAs, and cost tags
-- Masking or tokenization of `pii` fields
+- Masking or tokenization of `pii` fields. P11-08 builds it for the BioGuardia Atlantic sources ([domain model](bioguardia-domain.md#pii-masking))
 
 Silver typing and survivor rules: [silver layer](silver-layer.md).

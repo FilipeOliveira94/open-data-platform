@@ -40,3 +40,7 @@ None yet — Phase 4 acceptance and P4-05 semantics doc.
 ## Revisit when
 
 Version incompatibility or resource limits force a smaller CDC path; record reduced scope here.
+
+## Addendum (2026-11-26): shared broker
+
+The Kafka broker now arrives with P11-03 for the BioGuardia telemetry stream. [ADR-0028](0028-telemetry-message-broker.md) governs its deployment (image, KRaft mode, listeners, retention, topics). This ADR keeps the CDC decision: logical replication, Debezium, and Spark Structured Streaming. P4-02 adds Debezium Connect on that broker instead of a second Kafka, and P4-04 reuses the Spark–Kafka–Iceberg proof of P11-04. State stays `proposed`.
