@@ -9,7 +9,7 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 	<div class="arch3d__stage">
 		<canvas
 			role="img"
-			aria-label="3D architecture map: six sources feed batch ingestion and a CDC stream into an Iceberg lakehouse with Bronze, Silver and Gold layers, queried by Trino for notebooks, dashboards and the report site, orchestrated by Airflow, observed by Prometheus, Grafana and OpenLineage, with GitHub Actions checking every change."
+			aria-label="3D target architecture map, not a status view: six sources feed batch ingestion and a CDC stream into an Iceberg lakehouse with Bronze, Silver and Gold layers, queried by Trino for notebooks, dashboards and the report site, orchestrated by Airflow, observed by Prometheus, Grafana and OpenLineage, with GitHub Actions checking every change."
 		></canvas>
 
 		<span class="arch3d__corner arch3d__corner--tl" aria-hidden="true"></span>
@@ -18,11 +18,11 @@ const flowLabel = new Map(FLOWS.map((f) => [f.kind, f.label]));
 		<span class="arch3d__corner arch3d__corner--br" aria-hidden="true"></span>
 
 		<header class="arch3d__head">
-			<p class="arch3d__eyebrow">Platform architecture</p>
+			<p class="arch3d__eyebrow">Target architecture</p>
 			<h2 id="arch3d-title" class="arch3d__title">
 				Sources to insight<span class="arch3d__dot">.</span>
 			</h2>
-			<p class="arch3d__sub">Batch and streaming into one Iceberg lakehouse, orchestrated, tested and observed end to end.</p>
+			<p class="arch3d__sub">Where the platform is heading: batch and streaming into one Iceberg lakehouse, orchestrated, tested and observed. The status table below says what runs today.</p>
 		</header>
 
 		<p class="arch3d__hint" aria-hidden="true">

@@ -1,6 +1,6 @@
 ---
 title: Open Data Platform
-description: Reproducible open-source data platform with verified local ingestion, built from open-source components.
+description: Reproducible open-source data platform on a local Docker Compose stack, with batch ingestion, an Iceberg lakehouse and Airflow orchestration verified through Phase 3.
 tableOfContents: false
 ---
 
@@ -8,39 +8,35 @@ import ArchitectureScene from '../../components/ArchitectureScene.astro';
 
 <ArchitectureScene />
 
-A reproducible open-source data platform for local development on Windows 11 + WSL2 + Docker Compose. Every component is open source and runs on the local stack.
+A number in a report should have a path you can follow, from the source to the person who uses it. The Open Data Platform builds that path with open-source parts only: raw files and API responses land in object storage, Spark and dbt refine them through Bronze, Silver and Gold Iceberg tables, Trino reads them, and Airflow runs the schedule. Everything runs locally on Windows 11, WSL2 and Docker Compose. There is no cloud deployment path ([ADR-0029](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0029-open-source-only-platform.md)).
+
+The map above is the target. The table below is what the repository has verified.
 
 ## Current status
 
-| Status | Scope |
-| --- | --- |
-| **Verified** | Phase 0 — repository, Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, CI |
-| **Verified** | Phase 1 — raw ingestion from Olist, DummyJSON, PostgreSQL, the demo storefront clickstream, and IBGE |
-| **In progress** | Phase 2 — lakehouse and analytics (see the repository status ledger) |
-| **Not started** | Phases 3–6 — orchestration, CDC, observability, CI expansion |
-| **Not started** | Phase 8 — JupyterLab exploration and Superset charts over Gold |
-| **Not started** | Phase 9 — report polish and public hosting |
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 0 | Repository, Python toolchain, PostgreSQL 16, MinIO, CI | Verified |
+| 1 | Multi-source ingestion: Olist files, DummyJSON and IBGE APIs, PostgreSQL windowed extract, demo storefront clickstream | Verified (P1-09 withdrawn) |
+| 2 | Lakehouse: Bronze and Silver on Iceberg with Spark, Gold with dbt-trino, Trino reads | Verified |
+| 3 | Airflow daily and weekly schedules, backfills, quality gate and quarantine | Verified |
+| 4 | Streaming CDC: logical replication, Debezium, Kafka, Spark Structured Streaming | Not started |
+| 5 | Observability, lineage, resource footprint and cost to run | Not started |
+| 6 | CI/CD expansion, resilience tests, security checks | Not started |
+| 7 | AWS deployment path, removed in favour of an open-source-only core | Withdrawn |
+| 8 | JupyterLab exploration and Superset charts over Gold | Not started |
+| 9 | This report site, hosted on GitHub Pages | In progress |
+| 10 | Table contracts and quality observability, BCB SGS source | Not started |
+| 11 | BioGuardia Atlantic operational sources at scale | In progress (P11-01 to P11-03) |
 
-## Baseline sketch
+The phase numbers are identifiers, not an order. The ledger for the current phase is [`PROJECT_STATUS.md`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/PROJECT_STATUS.md); scope and acceptance are in [`ROADMAP.md`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/ROADMAP.md).
 
-```text
-Phase 0–1 (verified)            Later (not started)
-────────────────────            ───────────────────
-Python + uv + Ruff + pytest
-        │
-        ├── PostgreSQL 16  (Compose)
-        └── MinIO          (Compose)
-                ▲
-                │ raw objects
-        ingestion writers
-        │
-GitHub Actions: lint + unit tests
+## What runs today
 
-                                Lakehouse → CDC → observability
-```
+- **Five sources, one raw layout.** Olist CSV files, the DummyJSON and IBGE APIs, a windowed extract of the olist-synth-cdc PostgreSQL database, and a generated storefront clickstream land in MinIO under `raw/{source}/{dataset}/dt=…/execution_id=…/`.
+- **Contracts before the load.** Each dataset has a YAML contract. Invalid rows stay in the raw object, and their findings go to a quarantine sidecar.
+- **A medallion lakehouse.** Spark writes Bronze and Silver Iceberg tables, dbt-trino builds the Gold marts, and Trino reads every layer. See [Architecture](./architecture/).
+- **Scheduled batch.** Airflow runs a daily extract and a weekly re-extract of late commits, refreshes the API sources, and starts the lakehouse refresh from a raw Asset. A failed layer check blocks the next layer.
+- **CI on every change.** GitHub Actions runs Ruff, the Markdown table check and the unit tests, with no cloud credentials.
 
-Source of truth for delivered work: [`PROJECT_STATUS.md`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/PROJECT_STATUS.md) in the [repository](https://github.com/FilipeOliveira94/open-data-platform).
-
-:::note
-This site summarizes **verified** facts only. The chart gallery and public hosting are Phase 9.
-:::
+Streaming CDC, observability, lineage, the notebooks and dashboards, and the figures on this site are planned. Each arrives with its phase.

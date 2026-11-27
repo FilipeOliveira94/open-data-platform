@@ -67,7 +67,7 @@ Every issue that adds or changes a pipeline step (ingestion, Bronze, Silver, Gol
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
 | 7 | Withdrawn: AWS deployment path ([R1-01](#refactor-r1--project-level-adjustments), [ADR-0029](docs/decisions/0029-open-source-only-platform.md)) | — | — | Withdrawn |
 | 8 | JupyterLab exploration and Superset charts over Gold, read-only via Trino | After Phase 2 (parallel with 3–6) | Phase 2 verified | Not started |
-| 9 | Platform report site v1: multi-page static report on GitHub Pages from verified Phase 0–3 material; later phases add theirs through site update issues | Now, after Refactor R1 and before Phase 4 | Phase 3 verified | Not started |
+| 9 | Platform report site v1: multi-page static report on GitHub Pages from verified Phase 0–3 material; later phases add theirs through site update issues | Now, after Refactor R1 and before Phase 4 | Phase 3 verified | In progress |
 | 10 | Table contracts and quality observability (ODCS contracts, Data Contract CLI, BCB SGS source) | Position not fixed; toward the end, decided by Filipe during execution | Phase 3 verified | Not started |
 | 11 | BioGuardia Atlantic operational sources at scale: daily export (about 24M rows a day), telemetry stream (1M events an hour), PII masking, data skew, SCD Type 2, reconciliation | Position not fixed, decided by Filipe; P11-01 to P11-03 run now under a waiver | P11-01 to P11-03: none (waiver, `DECISIONS.md` 2026-11-26); P11-04 onward: Phase 3 verified; P11-08 and P11-15: P5-07 | In progress (P11-01 to P11-03) |
 
