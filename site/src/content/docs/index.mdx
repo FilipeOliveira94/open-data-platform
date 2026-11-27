@@ -1,6 +1,6 @@
 ---
 title: Open Data Platform
-description: Reproducible open-source data platform with verified local ingestion and a planned AWS Terraform path.
+description: Reproducible open-source data platform with verified local ingestion, built from open-source components.
 tableOfContents: false
 ---
 
@@ -8,7 +8,7 @@ import ArchitectureScene from '../../components/ArchitectureScene.astro';
 
 <ArchitectureScene />
 
-A reproducible open-source data platform for local development on Windows 11 + WSL2 + Docker Compose, with an AWS deployment path expressed later as Terraform Infrastructure as Code.
+A reproducible open-source data platform for local development on Windows 11 + WSL2 + Docker Compose. Every component is open source and runs on the local stack.
 
 ## Current status
 
@@ -17,7 +17,7 @@ A reproducible open-source data platform for local development on Windows 11 + W
 | **Verified** | Phase 0 — repository, Python 3.12 toolchain, PostgreSQL 16, MinIO, lint/tests, CI |
 | **Verified** | Phase 1 — raw ingestion from Olist, DummyJSON, PostgreSQL, the demo storefront clickstream, and IBGE |
 | **In progress** | Phase 2 — lakehouse and analytics (see the repository status ledger) |
-| **Not started** | Phases 3–7 — orchestration, CDC, observability, CI expansion, AWS IaC |
+| **Not started** | Phases 3–6 — orchestration, CDC, observability, CI expansion |
 | **Not started** | Phase 8 — JupyterLab exploration and Superset charts over Gold |
 | **Not started** | Phase 9 — report polish and public hosting |
 
@@ -36,7 +36,7 @@ Python + uv + Ruff + pytest
         │
 GitHub Actions: lint + unit tests
 
-                                Lakehouse → AWS Terraform
+                                Lakehouse → CDC → observability
 ```
 
 Source of truth for delivered work: [`PROJECT_STATUS.md`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/PROJECT_STATUS.md) in the [repository](https://github.com/FilipeOliveira94/open-data-platform).

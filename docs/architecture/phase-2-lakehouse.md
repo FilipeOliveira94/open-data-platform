@@ -2,7 +2,7 @@
 
 Index of the verified Bronze, Silver, and Gold path. Grain, columns, and mart definitions stay in the layer notes. This page records component versions, partitioning, file sizing, the incremental strategy, known limitations, and the citation of the live result.
 
-Phase 2 does not schedule Airflow, capture CDC, expire Iceberg snapshots, or apply Terraform.
+Phase 2 does not schedule Airflow, capture CDC, or expire Iceberg snapshots.
 
 ## Path
 
@@ -123,13 +123,13 @@ Headline anchors match the 2026-11-05 / 2026-11-06 baseline, including Silver ge
 - Bronze and Silver implement full overwrite only. The other write modes fail if selected.
 - Silver and Gold tables are unpartitioned; Bronze is partitioned by `dt` (P3-08). File size is the engine default. A per-table partition spec for Silver and Gold is listed under Candidates, not issues, in [`ROADMAP.md`](../../ROADMAP.md). It is not scheduled. `INSERT OVERWRITE` and Gold table replace leave previous Parquet files in the bucket until P5-07.
 - Exactly-once end-to-end is not claimed.
-- The JDBC catalog is not the Glue protocol. Both sides are pinned to schema `V1`.
+- Spark and Trino are both pinned to JDBC catalog schema `V1`.
 - The Hadoop catalog is a single-writer probe. Bronze, Silver, and Gold do not use it.
 - `chmod` on `.local/spark-ivy` can print `Permission denied` for jars owned by the Spark user. The recipe continues. The 2026-11-11 submits reported 6 jars already retrieved.
 - CI does not start Compose.
 - Olist files are CC BY-NC-SA 4.0 and are not vendored.
-- Airflow schedules, CDC, and AWS apply are later work. D-006 was approved in P3-01. D-007 stays `proposed`.
+- Airflow schedules and CDC are later work. D-006 was approved in P3-01. D-007 stays `proposed`.
 
 ## Out of scope
 
-Daily and weekly schedules (Phase 3). Streaming CDC (Phase 4). Snapshot expiration (P5-07). JupyterLab and Superset (Phase 8). Terraform apply (Phase 7).
+Daily and weekly schedules (Phase 3). Streaming CDC (Phase 4). Snapshot expiration (P5-07). JupyterLab and Superset (Phase 8).

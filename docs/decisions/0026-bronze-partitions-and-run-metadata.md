@@ -72,5 +72,5 @@ Unit tests: `tests/unit/lakehouse/test_run_metadata.py`, `tests/unit/lakehouse/t
 ## Revisit when
 
 - A Silver or Gold table gains incremental writes; it would then need its own spec.
-- The AWS path (Phase 7) moves the catalog off PostgreSQL or Spark off the local event log.
+- The catalog moves off PostgreSQL or Spark off the local event log.
 - Iceberg sends Spark scan reports to the configured reporter.

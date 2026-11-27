@@ -9,7 +9,7 @@ export default defineConfig({
 		starlight({
 			title: 'Open Data Platform',
 			description:
-				'Reproducible open-source data platform: local Compose baseline and planned AWS path as Terraform IaC.',
+				'Reproducible open-source data platform on a local Docker Compose stack.',
 			social: [
 				{
 					icon: 'github',

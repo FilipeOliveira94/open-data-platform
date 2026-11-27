@@ -226,7 +226,3 @@ flowchart LR
   silver -- P11-12 --> recon[Reconciliation]
   tsilver --> recon
 ```
-
-## AWS counterparts
-
-The drop bucket maps to an S3 bucket the agency writes to, Kafka maps to Amazon MSK (or Kinesis Data Streams), and the gateway maps to AWS IoT Core rules that publish to it. Phase 7 records the mapping; nothing here provisions cloud resources.

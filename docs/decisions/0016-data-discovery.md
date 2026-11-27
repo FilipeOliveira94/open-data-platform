@@ -13,11 +13,11 @@
 
 ## Context / problem
 
-Engineers and analysts need search, ownership and glossary-style metadata. That is **not** the same problem as a table catalog for Iceberg/Spark/Athena ([ADR-0004](0004-table-catalog-and-sql-engines.md)).
+Engineers and analysts need search, ownership and glossary-style metadata. That is **not** the same problem as a table catalog for Iceberg/Spark/Trino ([ADR-0004](0004-table-catalog-and-sql-engines.md)).
 
 ## Decision
 
-**Defer** selecting a discovery platform until lakehouse tables and some lineage/dbt docs exist. Then evaluate open-source discovery tools. Discovery UIs are optional and **must not** replace Glue/Hive-style table catalogs.
+**Defer** selecting a discovery platform until lakehouse tables and some lineage/dbt docs exist. Then evaluate open-source discovery tools. Discovery UIs are optional and **must not** replace the Iceberg table catalog.
 
 ## Alternatives considered
 
@@ -27,7 +27,7 @@ Engineers and analysts need search, ownership and glossary-style metadata. That 
 | DataHub | Rich metadata + lineage overlap | Heavy ops | Strong candidate later |
 | Amundsen | Search/ownership focus | Lineage depth varies; maintenance | Candidate later |
 | OpenMetadata | All-in-one metadata | Ops cost | Candidate later |
-| Glue console as only discovery UX | Native AWS | Weak local story; limited glossary/search | Insufficient alone |
+| Trino `information_schema` as only discovery UX | Already running | Limited glossary/search; no ownership | Insufficient alone |
 | Skip dedicated discovery UI | Less ops | Harder navigation as table count grows | Acceptable interim |
 
 ## Consequences and trade-offs

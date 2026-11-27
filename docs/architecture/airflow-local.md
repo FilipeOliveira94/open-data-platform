@@ -12,7 +12,7 @@ P3-01 runs Apache Airflow on the Compose `orchestration` profile. `docker compos
 
 The host port is 8081 because Trino already publishes 8080. Inside the network the API server listens on 8080.
 
-Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-scheduler`, and `airflow-dag-processor`. There is no Redis, Celery worker, Flower, or triggerer. Celery and Flower are not a later issue. The revisit condition is a written requirement for self-hosted multi-node workers. Amazon MWAA stays the optional AWS counterpart and is not built here.
+Services: `airflow-db-create`, `airflow-init`, `airflow-apiserver`, `airflow-scheduler`, and `airflow-dag-processor`. There is no Redis, Celery worker, Flower, or triggerer. Celery and Flower are not a later issue. The revisit condition is a written requirement for self-hosted multi-node workers.
 
 `platform_health` is the P3-01 smoke DAG: one `BashOperator` that prints `platform_health ready`, with no schedule. `EmptyOperator` is not used. Airflow 3.4 evaluates that operator in the scheduler and does not send it to the executor, so it never writes a task log.
 

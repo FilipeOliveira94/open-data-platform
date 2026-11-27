@@ -38,13 +38,13 @@ Retention is 72 hours so that a weekend with Airflow or the consumer stopped is 
 | Redpanda | Kafka API; lighter | Community edition is BSL 1.1, not open source; a second implementation next to the Debezium path | Rejected |
 | RabbitMQ Streams | Light; open source | No first-party Spark source; a different API from the CDC path | Rejected |
 | NATS JetStream | Light; open source | No first-party Spark source | Rejected |
-| Amazon MSK or Kinesis | Managed | Cloud cost; local development must not need AWS (AGENTS.md section 7) | Recorded as the AWS counterpart for Phase 7 |
+| Amazon MSK or Kinesis | Managed | Managed cloud service; the platform is local and open source | Rejected (ADR-0029) |
 
 ## Consequences and trade-offs
 
 - Phase 4 depends on P11-01 to P11-04: P4-02 runs on this broker and P4-04 reuses the P11-04 proof.
 - At about 1M events per hour the log grows by 1.24 GB per day (measured, P11-03); 72 hours of retention is about 3.7 GB.
-- PLAINTEXT without authentication is acceptable on the local Compose network only. Phase 7 maps the broker to MSK with IAM authentication.
+- PLAINTEXT without authentication is acceptable on the local Compose network only.
 
 ## Evidence / validation
 

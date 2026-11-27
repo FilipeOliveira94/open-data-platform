@@ -4,7 +4,7 @@ Issue-level plan for the Open Data Platform. This file is the source of truth fo
 
 **Estimated window:** ~16 weeks / 240–320 hours at 15+ h/week, set before Phase 8 existed. Windows are planning guides, not delivery promises.
 
-**Status values:** `not started` · `in progress` · `delivered` · `verified` · `blocked`
+**Status values:** `not started` · `in progress` · `delivered` · `verified` · `blocked` · `withdrawn`
 
 **Expected/Seen Risk and Size:** each cell is `expected/seen`. Risk is `Lo`, `Med` or `Hi`; Size is `Sm`, `Md` or `Lg` (scale in `~/.agents/claude/workflow.md`, repo `FilipeOliveira94/agent-config`; Hi risk here is listed in `AGENTS.md` §3). An open issue has only the expected half (`Med/-`, `Md/-`); the seen half is filled when it closes. Issues closed before 2026-11-24 have only the seen half (`-/Hi`, `-/Lg`), rated afterwards from the hand-written lines of the commits that cite the issue (docs and lockfiles excluded), or from the scope when no commit cites it. A withdrawn issue has `-/-`.
 
@@ -63,11 +63,11 @@ Every issue that adds or changes a pipeline step (ingestion, Bronze, Silver, Gol
 | 2 | Lakehouse PoC, Bronze / Silver / Gold, initial dbt | Sprint 3 (weeks 3–4) | Phase 1 verified; stack PoC | Verified |
 | 3 | Airflow: daily + weekly batch schedules, backfills, quality and quarantine | Sprint 4 (weeks 5–6) | Phase 2 verified | Verified |
 | 4 | Streaming CDC (logical replication, Debezium, Kafka, Spark SS) | Sprint 5 (weeks 7–9) | Phase 3 verified; P11-01 to P11-04 (shared Kafka broker, Spark–Kafka proof) | Not started |
-| 5 | Observability, lineage, cost visibility | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
+| 5 | Observability, lineage, resource footprint and cost to run | Sprint 6 (weeks 10–11) | Phase 3 verified (Phase 4 optional for stream metrics) | Not started |
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
-| 7 | AWS deployment path as IaC (Terraform, local→AWS mapping), case-study docs | Sprint 6 (weeks 14–16) | Phase 6 verified | Not started |
-| 8 | JupyterLab exploration and Superset charts over Gold, read-only via Trino | After Phase 2 (parallel with 3–7) | Phase 2 verified | Not started |
-| 9 | Platform report site: multi-page static report | After Phases 7 and 8 | Phase 7 and Phase 8 verified | Not started |
+| 7 | Withdrawn: AWS deployment path ([R1-01](#refactor-r1--project-level-adjustments), [ADR-0029](docs/decisions/0029-open-source-only-platform.md)) | — | — | Withdrawn |
+| 8 | JupyterLab exploration and Superset charts over Gold, read-only via Trino | After Phase 2 (parallel with 3–6) | Phase 2 verified | Not started |
+| 9 | Platform report site: multi-page static report | After Phases 3 and 8 | Phase 3 and Phase 8 verified | Not started |
 | 10 | Table contracts and quality observability (ODCS contracts, Data Contract CLI, BCB SGS source) | Position not fixed; toward the end, decided by Filipe during execution | Phase 3 verified | Not started |
 | 11 | BioGuardia Atlantic operational sources at scale: daily export (about 24M rows a day), telemetry stream (1M events an hour), PII masking, data skew, SCD Type 2, reconciliation | Position not fixed, decided by Filipe; P11-01 to P11-03 run now under a waiver | P11-01 to P11-03: none (waiver, `DECISIONS.md` 2026-11-26); P11-04 onward: Phase 3 verified; P11-08 and P11-15: P5-07 | In progress (P11-01 to P11-03) |
 
@@ -80,7 +80,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | **Home** | What the platform is, current status, and the on-time delivery chart | `README.md`, `PROJECT_STATUS.md`, figure 1 |
 | **Architecture** | Stack, medallion, contracts, batch vs stream, and the read path through Trino to JupyterLab and Superset | `docs/architecture/`, ADRs, figure 10 |
 | **Pipeline** | Ingestion → Bronze / Silver / Gold, one chart per Gold domain, orchestration and CDC when those phases are verified | Phase 1–4 docs; figures 2–9 |
-| **Operations** | Quality, lineage, CI, local→AWS path; a Grafana image when Phase 5 is verified | Phases 5–7 docs; P7 case study |
+| **Operations** | Quality, lineage, CI, resource footprint; a Grafana image when Phase 5 is verified | Phases 5–6 docs |
 | **Reference** | Links to the repository, ADRs, roadmap, setup, and the figure manifest | Repo root docs |
 
 **Figure caption.** Each caption records the question, the value, the grain, what the rate excludes, the Gold table, the tool, the version, and the run id. The number in the caption is the number in the image and the number recorded for that run.
@@ -102,7 +102,18 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Incremental rule (Phases 1–8):** a scaffold under `site/` may exist early (Astro Starlight + Catppuccin theme). Content updates must use only facts already **verified** in `PROJECT_STATUS.md`. Do **not** complete public hosting, the figure gallery, or final copy polish until Phase 9. Phase 8 may add the exported images and the manifest once P8-06 has checked them. It does not publish the hosted report.
 
-**Phase 7 vs Phase 9:** P7-07 delivers the **in-repo case study** (markdown, diagrams, reproduction steps). P7-08 checks that case study against a recorded IaC result, and P7-09 records status. Phase 9 turns that material, plus verified Phase 8 exploration notes, into the **deployed multi-page report** and sets the GitHub repository Website URL.
+
+---
+
+## Refactor R1 — project-level adjustments
+
+Changes that cut across phases, requested by Filipe on 2026-11-27. Each runs as its own issue and PR, in this order, because each edits this file.
+
+| ID | Title | Depends on | Expected/Seen Risk | Expected/Seen Size | Status | Acceptance |
+| --- | --- | --- | --- | --- | --- | --- |
+| R1-01 | Remove the AWS deployment path | — | Med/Med | Md/Md | Verified | Phase 7 and P6-03 withdrawn; Phase 5 FinOps becomes the local resource footprint with machine cost to run and a performance analysis (P5-05); [ADR-0029](docs/decisions/0029-open-source-only-platform.md) supersedes ADR-0011 and the AWS half of ADR-0001; AGENTS.md, README, DECISIONS.md, ADRs, architecture docs, and the site no longer present an AWS path. S3 client libraries that MinIO needs and historical records stay |
+| R1-02 | Site update at the end of each phase | R1-01 | Lo/- | Sm/- | Not started | Site v1 starts now from verified Phase 0–3 material. From Phase 4 on, every phase gets a site update issue before its closing pair that publishes only that phase's verified results. Phase 9 and the site figure table are restructured to match |
+| R1-03 | Rename the PostgreSQL OLTP source to olist-synth-cdc | R1-01, R1-02 | Hi/- | Md/- | Not started | `postgres_oltp` becomes `olist_synth_cdc` (prose: olist-synth-cdc) in code, DAGs, dbt models and schemas, contracts, storage paths, tests and docs. The source is re-ingested under the new paths, row counts match the pre-rename run, and the old prefixes and tables are deleted after that check |
 
 ---
 
@@ -321,9 +332,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 ---
 
-## Phase 5 — Observability, lineage and FinOps
+## Phase 5 — Observability, lineage and resource footprint
 
-**Goal:** Diagnose failures/latency with real metrics; show lineage from real runs; document a FinOps cost model for the AWS target architecture with explicit assumptions, including the Iceberg snapshot retention the local warehouse applies.
+**Goal:** Diagnose failures/latency with real metrics; show lineage from real runs; measure the local resource footprint of the stack and derive the machine cost to run it and a performance analysis, including the Iceberg snapshot retention the local warehouse applies.
 
 **Depends on:** Phase 3 verified. Stream-specific metrics may wait for Phase 4.
 
@@ -334,8 +345,8 @@ Public-facing **platform report** (not a separate product): a small static hub t
 - [ ] Relevant failures and delays can be diagnosed from logs/metrics.
 - [ ] Demonstrated lineage matches actual executions.
 - [ ] Metrics are measured, not invented.
-- [ ] Cost model documents assumptions, unit drivers and estimated monthly ranges for the AWS target design.
-- [ ] Iceberg snapshots past the retention named in that model are expired and orphan Parquet files are removed, with counts recorded (P5-07).
+- [ ] The resource footprint records measured CPU, memory, disk, and MinIO/Iceberg storage per service and run duration per layer for a documented run. The machine cost to run states its hardware and electricity assumptions and is labeled an estimate. The performance analysis cites those measurements.
+- [ ] Iceberg snapshots past the retention named in the footprint document are expired and orphan Parquet files are removed, with counts recorded (P5-07).
 - [ ] A live run result is recorded and compared to that run's logs, metrics, lineage, and the snapshot-expiration counts (P5-08).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P5-09).
 
@@ -347,11 +358,11 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P5-02 | Prometheus and Grafana local stack | P5-01 | Med/- | Md/- | Not started | Services in Compose; pinned images; documented access |
 | P5-03 | Pipeline metrics and dashboards | P5-02 | Med/- | Md/- | Not started | Useful dashboards for lag, failures, throughput where instrumented. One panel charts refresh duration and rows read per layer over time from the P3-08 records, so work that grows with history is visible |
 | P5-04 | OpenLineage where supported | Phase 3 (and 4 if streaming) | Med/- | Md/- | Not started | Lineage emitted only for components with verified support; demo from a real run |
-| P5-05 | Cost model for AWS target architecture | — | Med/- | Sm/- | Not started | Documented cost model with assumptions, drivers and estimated ranges aligned to the Phase 7 AWS design |
+| P5-05 | Local resource footprint and cost to run | Phase 3 | Med/- | Md/- | Not started | For one documented pipeline run on a stated machine, measure CPU, memory, and disk per Compose service (for example sampled `docker stats`), MinIO and Iceberg storage bytes, and run duration per layer. Derive the machine cost to run from stated hardware-amortization and electricity assumptions, labeled an estimate. Write a performance analysis from those measurements: where time and resources go, and what grows with history. Name the Iceberg snapshot retention P5-07 applies and its storage effect. No figure without a measurement or a stated assumption. Rescoped from the AWS cost model by R1-01 (expected size raised from Sm: it now measures) |
 | P5-06 | Alerts and runbooks | P5-03 | Med/- | Sm/- | Not started | Alert thresholds and at least one failure runbook under `docs/runbooks/` |
-| P5-07 | Expire Iceberg snapshots and delete orphan Parquet | P2-03, P5-05 | Hi/- | Md/- | Not started | A maintenance command expires snapshots older than the retention named in the P5-05 cost model and deletes orphan data files. It keeps the current snapshot. A recorded run for one table lists the snapshots and files removed as counts. It does not run on `docker compose up` and does not invent a spend figure. The same command compacts the tables the daily refresh appends to (`rewrite_data_files`, `rewrite_manifests`) and records file counts before and after ([review](docs/reviews/2026-11-21-verified-issues-review.md) R15). The command is shared: P11-08 and P11-15 run it on the BioGuardia tables (amended 2026-11-26) |
-| P5-08 | Live run, result, and consistency check | P5-03, P5-04, P5-05, P5-06, P5-07 | Med/- | Md/- | Not started | Run one real local pipeline execution that emits logs, metrics, and lineage. Record the dashboard values and the lineage edges. Compare them to that run's execution id, counts, and failure state. Check the cost model against its own drivers and assumptions. Record the P5-07 before/after object counts. It is not a measured cloud bill. Record mismatches. Do not invent metrics or spend figures |
-| P5-09 | Phase 5 documentation and status | P5-08 | Med/- | Sm/- | Not started | Document the dashboards, lineage demo, cost-model assumptions, snapshot retention, and the P5-08 result. `PROJECT_STATUS.md` cites that evidence |
+| P5-07 | Expire Iceberg snapshots and delete orphan Parquet | P2-03, P5-05 | Hi/- | Md/- | Not started | A maintenance command expires snapshots older than the retention named in the P5-05 footprint document and deletes orphan data files. It keeps the current snapshot. A recorded run for one table lists the snapshots and files removed as counts. It does not run on `docker compose up` and does not invent a spend figure. The same command compacts the tables the daily refresh appends to (`rewrite_data_files`, `rewrite_manifests`) and records file counts before and after ([review](docs/reviews/2026-11-21-verified-issues-review.md) R15). The command is shared: P11-08 and P11-15 run it on the BioGuardia tables (amended 2026-11-26) |
+| P5-08 | Live run, result, and consistency check | P5-03, P5-04, P5-05, P5-06, P5-07 | Med/- | Md/- | Not started | Run one real local pipeline execution that emits logs, metrics, and lineage. Record the dashboard values and the lineage edges. Compare them to that run's execution id, counts, and failure state. Check the footprint figures against the measurements and the stated cost assumptions. Record the P5-07 before/after object counts. It is not a measured cloud bill. Record mismatches. Do not invent metrics or spend figures |
+| P5-09 | Phase 5 documentation and status | P5-08 | Med/- | Sm/- | Not started | Document the dashboards, lineage demo, footprint measurements and cost assumptions, snapshot retention, and the P5-08 result. `PROJECT_STATUS.md` cites that evidence |
 
 **Suggested order:** P5-01 → P5-02 → P5-03 → P5-04 ∥ P5-05 → P5-06 → P5-07 → P5-08 → P5-09.
 
@@ -363,7 +374,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Depends on:** Phases 1–3 verified; include Phase 4/5 checks when those components exist.
 
-**Out of scope:** Cloud provisioning workflows (Phase 7 focuses on Terraform IaC and CI validation); weakening tests to force green CI.
+**Out of scope:** Cloud provisioning or deploy workflows ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)); weakening tests to force green CI.
 
 **Phase acceptance (all required):**
 
@@ -380,53 +391,35 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | --- | --- | --- | --- | --- | --- | --- |
 | P6-01 | CI: Python lint/tests hardening | P0-12, Phase 1+ | Med/- | Sm/- | Not started | Required checks fail the workflow on regression |
 | P6-02 | CI: dbt checks | P2-06, P6-01 | Med/- | Md/- | Not started | dbt parse/build/test (or agreed subset) runs in CI |
-| P6-03 | CI: Terraform validate/fmt | Phase 7 scaffold or early `infrastructure/` | Med/- | Sm/- | Not started | `terraform fmt -check` and `validate` in CI without apply |
+| P6-03 | CI: Terraform validate/fmt | — | -/- | -/- | Withdrawn | Withdrawn by R1-01: no IaC tree ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) |
 | P6-04 | Isolated integration test job | P0-10, Phase 1+ | Med/- | Md/- | Not started | Integration tests run in CI or documented Compose profile; deterministic fixtures. A skipped integration test fails the CI job, so a broken test cannot sit unseen ([review](docs/reviews/2026-11-21-verified-issues-review.md) T1) |
 | P6-05 | Resilience test evidence | P3-09; P4-06 if present | Med/- | Md/- | Not started | Failure/retry/recovery scenarios executed and linked from `PROJECT_STATUS.md` |
 | P6-06 | Security checks | P6-01 | Hi/- | Md/- | Not started | Appropriate secret scanning / dependency audit; no credential leakage in CI logs. The Olist download checks a recorded SHA-256 per file and fails on a mismatch (review R18) |
 | P6-09 | Write-audit-publish for Silver and Gold | P3-11, P3-16 | Hi/- | Lg/- | Not started | From the [2026-11-21 review](docs/reviews/2026-11-21-verified-issues-review.md) (R6). Silver writes to an Iceberg branch or staging table and is published only after its checks pass; Gold builds into a staging schema and readers switch only after `dbt build` tests pass. A failed check leaves readers on the previous version of every table in the set. The plan proves Spark, the JDBC catalog, Trino 484, and dbt-trino support the chosen mechanism before adopting it. Scripted evidence: a planted check failure leaves the published Silver and Gold counts unchanged, and a Trino loop during a publish never joins a new fact to an old mart |
-| P6-07 | Live run, result, and consistency check | P6-01, P6-02, P6-04, P6-05, P6-06, P6-09 | Med/- | Sm/- | Not started | Run the documented CI workflow and one recovery scenario. Record pass/fail. Compare CI results to the local results for the same checks. Confirm logs and artifacts from that run do not contain credentials. Record mismatches. Include P6-03 when that issue is verified; do not block this issue on Terraform that does not exist yet |
-| P6-08 | Phase 6 documentation and status | P6-07 | Med/- | Sm/- | Not started | Document the CI and recovery evidence, including any check still waiting on P6-03, and cite the P6-07 result in `PROJECT_STATUS.md` |
+| P6-07 | Live run, result, and consistency check | P6-01, P6-02, P6-04, P6-05, P6-06, P6-09 | Med/- | Sm/- | Not started | Run the documented CI workflow and one recovery scenario. Record pass/fail. Compare CI results to the local results for the same checks. Confirm logs and artifacts from that run do not contain credentials. Record mismatches |
+| P6-08 | Phase 6 documentation and status | P6-07 | Med/- | Sm/- | Not started | Document the CI and recovery evidence, and cite the P6-07 result in `PROJECT_STATUS.md` |
 
-**Suggested order:** P6-01 → P6-02 ∥ P6-04 → P6-03 (when Terraform exists) → P6-05 → P6-06 → P6-09 → P6-07 → P6-08. P6-09 comes from the 2026-11-21 review and runs before the close pair.
+**Suggested order:** P6-01 → P6-02 ∥ P6-04 → P6-05 → P6-06 → P6-09 → P6-07 → P6-08. P6-09 comes from the 2026-11-21 review and runs before the close pair.
 
 ---
 
-## Phase 7 — AWS deployment path as Infrastructure as Code
+## Phase 7 — Withdrawn (AWS deployment path)
 
-**Goal:** Deliver a clear AWS target architecture and Terraform modules that show how the verified local lakehouse maps to cloud services (S3, Glue Catalog, Athena, IAM/OIDC)—reproducible Infrastructure as Code for provisioning.
-
-**Depends on:** Phase 6 verified. Cloud `apply`/`destroy` require explicit user approval (see `AGENTS.md`); CI validates Terraform with `fmt` / `validate`.
-
-**Out of scope:** Multi-account enterprise landing zones; Kubernetes unless a later approved requirement; embedding managed EMR/MWAA/MSK as required core modules (document as optional AWS counterparts to local Spark/Airflow/Kafka).
-
-**Phase acceptance (all required):**
-
-- [ ] Local→AWS service mapping is documented (MinIO→S3, local catalog→Glue, Trino→Athena; compute/orchestration counterparts noted).
-- [ ] Terraform modules are modular, readable and aligned with the target architecture.
-- [ ] IAM follows least privilege in code and documentation.
-- [ ] GitHub Actions OIDC to AWS is defined as Terraform and documented.
-- [ ] CI runs `terraform fmt -check` and `validate`.
-- [ ] Cost model states assumptions and estimated ranges for the AWS design.
-- [ ] Case study presents the local platform and the AWS IaC path with diagrams and reproduction steps.
-- [ ] A live IaC check result is recorded and compared to the mapping and the cost model (P7-08).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P7-09).
+Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the platform core is open source only and has no cloud deployment path ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)). The phase number is kept so later phase and issue IDs stay stable. The original scope is in git history.
 
 ### Issues
 
 | ID | Title | Depends on | Expected/Seen Risk | Expected/Seen Size | Status | Acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| P7-01 | Local→AWS architecture and service mapping | Phase 6 | Lo/- | Sm/- | Not started | Written mapping: MinIO→S3, local catalog→Glue, Trino→Athena; optional AWS counterparts for Airflow/Spark/Kafka documented; diagrams under `docs/architecture/` |
-| P7-02 | Terraform scaffold under `infrastructure/terraform/` | P7-01 | Med/- | Md/- | Not started | Module layout, variables, outputs, README; backend configuration documented (local for CI; remote S3+DynamoDB lock as the recommended production pattern) |
-| P7-03 | Core AWS resources as code (S3, Glue, Athena, IAM) | P7-02 | Hi/- | Lg/- | Not started | Modules for lakehouse buckets, Glue catalog/database, Athena workgroup, least-privilege IAM; `terraform validate` succeeds in CI |
-| P7-04 | GitHub Actions OIDC to AWS | P7-03 | Hi/- | Md/- | Not started | OIDC provider and deploy role as Terraform + docs; no long-lived access keys in the repository |
-| P7-05 | CI: Terraform fmt and validate | P7-02, P6-03 | Med/- | Sm/- | Not started | Workflow runs `terraform fmt -check` and `validate` on the IaC tree |
-| P7-06 | AWS cost model | P7-01 | Med/- | Sm/- | Not started | Cost model with assumptions, drivers and monthly estimate ranges for the documented AWS design |
-| P7-07 | Case study: README, diagrams, demo path | P7-03, P7-04, P7-05, P7-06 | Med/- | Md/- | Not started | In-repo case study: local platform + AWS IaC path, architecture diagrams, setup and provisioning guidance; content ready for Phase 9 site consumption |
-| P7-08 | Live run, result, and consistency check | P7-03, P7-04, P7-05, P7-06, P7-07 | Med/- | Sm/- | Not started | Run `terraform fmt -check` and `terraform validate` on the IaC tree. Record the result. Compare module resources to the local→AWS mapping and to the cost-model drivers. `terraform plan` only with explicit approval. `apply` and `destroy` are outside this issue. Record mismatches. Do not invent spend figures |
-| P7-09 | Phase 7 documentation and status | P7-08 | Med/- | Sm/- | Not started | README, the case study, and `PROJECT_STATUS.md` cite the P7-08 result. P7-07 remains the case-study content issue |
-
-**Suggested order:** P7-01 → P7-02 → P7-03 → P7-04 ∥ P7-05 ∥ P7-06 → P7-07 → P7-08 → P7-09.
+| P7-01 | Local→AWS architecture and service mapping | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-02 | Terraform scaffold under `infrastructure/terraform/` | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-03 | Core AWS resources as code (S3, Glue, Athena, IAM) | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-04 | GitHub Actions OIDC to AWS | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-05 | CI: Terraform fmt and validate | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-06 | AWS cost model | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-07 | Case study: README, diagrams, demo path | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-08 | Live run, result, and consistency check | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
+| P7-09 | Phase 7 documentation and status | — | -/- | -/- | Withdrawn | Withdrawn by R1-01 |
 
 ---
 
@@ -434,9 +427,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Goal:** Give two read-only surfaces over verified Gold marts, both through Trino. JupyterLab is for iterative exploration. Apache Superset is for saved business charts. Spark stays the Bronze/Silver writer. dbt-trino stays the Gold writer.
 
-**Depends on:** Phase 2 verified. This phase may run in parallel with Phases 3–7. It does not wait for Airflow, CDC, or the AWS path.
+**Depends on:** Phase 2 verified. This phase may run in parallel with Phases 3–6. It does not wait for Airflow or CDC.
 
-**Out of scope:** Writing Iceberg or PostgreSQL from notebooks or Superset. Using Superset SQL Lab as the exploration product. Using Grafana as business BI (Phase 5 keeps Grafana for operations). Replacing the static site or embedding a live BI session in it. SSO, public embedding, and row-level security as a product. Building Amazon QuickSight (document it as the AWS counterpart only). Kubernetes. New business metrics. Committing `.ipynb` cell outputs, row extracts, or Olist source rows. Creating `notebooks/` before this phase starts. The reviewed aggregate images for the site figure table are in scope at P8-06.
+**Out of scope:** Writing Iceberg or PostgreSQL from notebooks or Superset. Using Superset SQL Lab as the exploration product. Using Grafana as business BI (Phase 5 keeps Grafana for operations). Replacing the static site or embedding a live BI session in it. SSO, public embedding, and row-level security as a product. Kubernetes. New business metrics. Committing `.ipynb` cell outputs, row extracts, or Olist source rows. Creating `notebooks/` before this phase starts. The reviewed aggregate images for the site figure table are in scope at P8-06.
 
 **Phase acceptance (all required):**
 
@@ -458,9 +451,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 | P8-02 | JupyterLab exploration notebooks | P8-01 | Med/- | Md/- | Not started | Notebooks live under `notebooks/` and start with a documented host command against the published Trino port, same pattern as dbt. Cover at least two verified marts, including on-time rate and late orders. Connection secrets, if any, come from the environment or a mode-600 file, not from argv. A test fails if a code cell contains `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `DROP`, or `ALTER`. A test fails if a committed notebook has non-empty outputs. Cells do not print record values |
 | P8-03 | Superset in local Compose | P8-01 | Med/- | Md/- | Not started | Pinned image, health check, and a documented UI URL. Metadata database on the existing PostgreSQL, separate from `odp` and `iceberg`. Admin and database passwords come from the environment, not argv. Compose adds only the services named in P8-01. The saved Trino connection is read-only: a repo check rejects DDL and DML in the committed Superset assets |
 | P8-04 | Dashboards as code on verified Gold marts | P8-03 | Hi/- | Md/- | Not started | Commit a re-importable Superset export with the nine Superset charts in the site figure table (growth scheme). Each chart uses that row's mart and a measure already named in [`docs/architecture/gold-model-design.md`](docs/architecture/gold-model-design.md). No new metric. Charts read Gold through Trino. Re-import does not duplicate the dashboard. A chart does not render an order id, review text, email, or a single-customer location |
-| P8-05 | Exploration, BI, ops, and site boundaries | P8-02, P8-04 | Lo/- | Sm/- | Not started | Document the four surfaces and the AWS counterpart: JupyterLab explores, Superset saves business charts, Grafana (Phase 5) is operations, the Phase 9 site publishes the static figures from those tools. QuickSight on Athena is the unbuilt AWS counterpart of Superset. State that SQL Lab is not a second notebook product. State the Olist CC BY-NC-SA limit: aggregate figures may be published with the caption; row extracts stay out of git and off the site |
+| P8-05 | Exploration, BI, ops, and site boundaries | P8-02, P8-04 | Lo/- | Sm/- | Not started | Document the four surfaces: JupyterLab explores, Superset saves business charts, Grafana (Phase 5) is operations, the Phase 9 site publishes the static figures from those tools. State that SQL Lab is not a second notebook product. State the Olist CC BY-NC-SA limit: aggregate figures may be published with the caption; row extracts stay out of git and off the site |
 | P8-06 | Live run, result, and consistency check | P8-02, P8-04, P8-05 | Med/- | Md/- | Not started | On the local stack, run the documented notebooks and open the Superset charts. Record component versions, the Gold tables queried, and the chart values. Compare those values to the same metrics from Trino, or to the Phase 2 result for that run. Export one static image per row of the site figure table, including the Jupyter image of the same on-time query, and a caption manifest (question, value, grain, Gold table, tool, version, run id). The image shows the caption value. Images are aggregates only. Confirm committed notebooks have empty outputs and that logs from this run do not contain credentials or row values. Record mismatches. Unit tests alone do not close this issue. Persist evidence in architecture docs / `docs/status-log.md` (not only `PROJECT_STATUS.md`) |
-| P8-07 | Phase 8 documentation and status | P8-06 | Med/- | Sm/- | Not started | Document versions, start commands, the four surfaces, the QuickSight counterpart, licenses, known limitations, and the P8-06 result. `PROJECT_STATUS.md` cites that evidence |
+| P8-07 | Phase 8 documentation and status | P8-06 | Med/- | Sm/- | Not started | Document versions, start commands, the four surfaces, licenses, known limitations, and the P8-06 result. `PROJECT_STATUS.md` cites that evidence |
 
 **Suggested order:** P8-01 → P8-02 ∥ P8-03 → P8-04 → P8-05 → P8-06 → P8-07. Phase close is P8-06 then P8-07.
 
@@ -470,7 +463,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Goal:** Publish a small, polished **multi-page static report** of the verified platform, including the site figures. Host it and link it from the repository Website field and the README.
 
-**Depends on:** Phase 7 verified (in-repo case study and AWS IaC path available as source material) and Phase 8 verified (exploration and Superset evidence available to cite).
+**Depends on:** Phase 3 verified (verified platform material to publish) and Phase 8 verified (exploration and Superset evidence available to cite).
 
 **Out of scope:** Backend, CMS, authentication, analytics pixels, interactive demos that require a live cluster, duplicating the full `ROADMAP.md` issue backlog on the site, embedding a live Superset or Jupyter service.
 
@@ -489,9 +482,9 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 | ID | Title | Depends on | Expected/Seen Risk | Expected/Seen Size | Status | Acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| P9-01 | Site scaffold and page map | Phase 7 | Lo/- | Sm/- | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev`. Early scaffold allowed before Phase 7 and Phase 8; Phase 9 completes content depth and hosting |
-| P9-02 | Home and Architecture pages | P9-01, P7-07, Phase 8 | Hi/- | Md/- | Not started | Home states platform purpose, verified status, and figure 1 (on-time Superset chart) with its caption. Architecture covers stack, medallion, contracts, batch vs stream, and the read path Gold → Trino → JupyterLab and Superset, with figure 10 beside figure 1's value. Diagrams come from `docs/` and from the P8-06 export |
-| P9-03 | Pipeline and Operations pages | P9-01, P7-07, Phase 8 | Hi/- | Md/- | Not started | Pipeline covers ingestion through Gold, orchestration and CDC, and places figures 2–9 on the domain each question belongs to. Operations covers quality, observability, lineage, CI, and the local→AWS IaC path. It includes a Grafana image only when Phase 5 is verified, and it says so when that image is absent |
+| P9-01 | Site scaffold and page map | Phase 3 | Lo/- | Sm/- | In progress | `site/` as Astro Starlight + `@catppuccin/starlight`; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev`. Early scaffold allowed before Phase 8; Phase 9 completes content depth and hosting |
+| P9-02 | Home and Architecture pages | P9-01, Phase 8 | Hi/- | Md/- | Not started | Home states platform purpose, verified status, and figure 1 (on-time Superset chart) with its caption. Architecture covers stack, medallion, contracts, batch vs stream, and the read path Gold → Trino → JupyterLab and Superset, with figure 10 beside figure 1's value. Diagrams come from `docs/` and from the P8-06 export |
+| P9-03 | Pipeline and Operations pages | P9-01, Phase 8 | Hi/- | Md/- | Not started | Pipeline covers ingestion through Gold, orchestration and CDC, and places figures 2–9 on the domain each question belongs to. Operations covers quality, observability, lineage, CI, and the local resource footprint. It includes a Grafana image only when Phase 5 is verified, and it says so when that image is absent |
 | P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/- | Sm/- | Not started | Reference links to GitHub, ADRs, roadmap, setup, and the figure manifest; README Platform report block points to the live URL (or staging URL if deploy is gated) |
 | P9-05 | Static hosting and GitHub Website field | P9-04 | Hi/- | Sm/- | Not started | Hosting documented (e.g. GitHub Pages or equivalent); CI build green; repository About → Website set to the report URL |
 | P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Med/- | Sm/- | Not started | Build the site and open the published URL, or the production build when the URL is not up yet. Walk Home, Architecture, Pipeline, Operations, and Reference. Open each figure. Compare status, counts, caption values, and any metric or cost claim to `PROJECT_STATUS.md`, the phase docs, and the P8-06 manifest. Figure 1 and figure 10 match. Record broken links, missing images, and mismatches. Do not treat a single screenshot of the site as this check |
@@ -554,7 +547,7 @@ Public-facing **platform report** (not a separate product): a small static hub t
 
 **Position:** not fixed, like Phase 10. Filipe decides the order of Phases 4, 5, and 11 during execution.
 
-**Out of scope:** binary media (audio, images, rasters, LiDAR point clouds; see Candidates); Schema Registry and Avro; Kafka authentication, TLS, and multi-broker replication; real personal data; real species or IUCN data; AWS resources (Phase 7 maps them); an exactly-once claim without a written proof.
+**Out of scope:** binary media (audio, images, rasters, LiDAR point clouds; see Candidates); Schema Registry and Avro; Kafka authentication, TLS, and multi-broker replication; real personal data; real species or IUCN data; cloud resources ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)); an exactly-once claim without a written proof.
 
 **Rules for every pipeline issue of this phase (P11-05 to P11-16):** its acceptance answers every row of the [pipeline design checklist](#pipeline-design-checklist), each with its evidence, or "not applicable" with a reason. The answers below are the minimum; the issue's plan completes them before code. Ingestion never reads the `odp-evaluation` bucket; tests and evidence compare findings to it.
 
@@ -622,7 +615,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | New technology | State purpose and operational cost; prefer proving compatibility before expanding |
 | Kubernetes | Out of scope unless an explicit approved requirement |
 | Secrets | Never commit credentials, tokens, live `.env`, or private datasets |
-| Cloud / AWS IaC | Phase 7 delivers the AWS path as Terraform IaC and local→AWS mapping. CI validates with `fmt`/`validate`. Cost models must state assumptions. Never invent metrics or spend figures. Do not run `terraform apply`/`destroy` without explicit user approval |
+| Open source only | The platform runs on open-source components on the local stack; there is no cloud deployment path ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)). Footprint and cost-to-run figures come from measurements and state their assumptions. Never invent metrics or cost figures |
 | Phase close | From Phase 2 on, every phase ends with a live run, result, and consistency check, then a phase documentation and status issue. The next phase waits until both are verified. Phases 0 and 1 stay verified on results already in `docs/status-log.md` |
 | Exploration vs BI | JupyterLab explores iteratively and is read-only. Superset holds saved charts over verified Gold metrics. Grafana (Phase 5) is operations. The static site (Phase 9) publishes the checked images from those tools and does not embed them |
 | Platform report site | Scaffold may land early; figures, full content, design, and hosting are finalized in Phase 9. Earlier phases may add verified facts only. Phase 8 may add the exported images once P8-06 has checked them. The site summarizes the platform; it does not replace `PROJECT_STATUS.md` / ADRs as source of truth |
@@ -646,7 +639,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-27 (P3-15; Phase 3 verified) |
+| Last updated | 2026-11-27 (R1-01; AWS path removed) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -655,6 +648,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-27: R1-01 verified. Refactor R1 table added (R1-01 to R1-03). Phase 7 and P6-03 withdrawn; Phase 5 FinOps becomes the local resource footprint and cost to run (P5-05 rescoped, expected size Md); Phase 9 depends on Phases 3 and 8; ADR-0029 approved (open source only).
 - 2026-11-27: P3-15 verified. Phase 3 verified. Phase documentation issues are rated at least Med risk (P3-15 raised from Lo; P4-10 to P11-18 expected Med). Phase index `docs/architecture/phase-3-orchestration.md` (schedules, catchup, backfill, quarantine, one writer at a time, review findings closed, P3-14 result).
 - 2026-11-27: P3-14 verified. The live-run Phase 3 acceptance item is checked.
 - 2026-11-27: P11-03 verified. Kafka 4.3.2 (KRaft, one node) on the `streaming` profile with four topics, and the `bioguardia-telemetry` producer with checkpoint, replay, and gateway records; `telemetry model` and `telemetry verify`. Seen size Lg: the restart, replay, and verify paths grew past the estimate.

@@ -14,7 +14,7 @@ A number in a report should have a path you can follow, from the source to the p
 - **Modeling.** Gold is organized by business domain, with an explicit grain and keys.
 - **Reconciliation.** A published figure is checked against the source it claims to represent.
 
-Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
+Local work uses Windows 11, WSL2, and Docker Compose. Every component is open source and runs on the local stack.
 
 ---
 
@@ -41,7 +41,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 | Report site | Scaffold | 9 | Astro |
 | Dataviz | Proposed | 8 | Jupyter · Superset |
 | Lineage | Proposed | 5 | OpenLineage · dbt |
-| FinOps | Proposed | 5 | — |
+| Resource footprint | Proposed | 5 | — |
 
 ### ✅ Ingestion
 
@@ -116,7 +116,6 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 - **Charts:** Superset in Compose.
 - **Access:** Both read Gold through Trino.
 - **Writes:** Neither tool writes tables.
-- **AWS:** QuickSight is the counterpart.
 - **Gate:** Stays proposed until one query and one chart run against Trino.
 - **Docs:** [ADR-0017](docs/decisions/0017-dataviz.md)
 
@@ -128,12 +127,12 @@ Local work uses Windows 11, WSL2, and Docker Compose. The AWS path is Terraform.
 - **Diagrams:** A drawn picture is not a substitute.
 - **Docs:** [ADR-0010](docs/decisions/0010-lineage.md)
 
-### 📋 FinOps
+### 📋 Resource footprint
 
-- **Model:** A cost model for the AWS design.
-- **Assumptions:** Drivers and assumptions are part of the model.
-- **Limit:** It is not a measured cloud bill.
-- **Maintenance:** Iceberg snapshot expiration uses the retention named in that model.
+- **Measure:** CPU, memory, disk, and storage per service, and run time per layer, for one documented run.
+- **Cost to run:** Machine cost from stated hardware and electricity assumptions, labeled an estimate.
+- **Analysis:** Where time and resources go, and what grows with history.
+- **Maintenance:** Iceberg snapshot expiration uses the retention named in the footprint document.
 - **Stack:** No cost product is selected.
 - **Docs:** [Phase 5](ROADMAP.md)
 

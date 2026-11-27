@@ -88,7 +88,7 @@ export const NODES: SceneNode[] = [
 	{ id: 'prometheus', label: 'Prometheus', detail: 'Pipeline metrics: lag, throughput, failures and refresh duration.', group: 'observability', pos: [-3.0, 0, -7.4], glyph: 'MET' },
 	{ id: 'grafana', label: 'Grafana', detail: 'Operations dashboards, alerts and runbooks.', group: 'observability', pos: [0.6, 0, -7.8], glyph: 'OPS' },
 	{ id: 'openlineage', label: 'OpenLineage', detail: 'Run-level lineage from orchestration, Spark and dbt.', group: 'observability', pos: [4.2, 0, -7.8], glyph: 'LIN' },
-	{ id: 'finops', label: 'FinOps model', detail: 'Cost drivers, unit costs and Iceberg snapshot retention.', group: 'observability', pos: [7.8, 0, -7.4], glyph: 'FIN' },
+	{ id: 'footprint', label: 'Resource footprint', detail: 'Measured resource use, machine cost to run and Iceberg snapshot retention.', group: 'observability', pos: [7.8, 0, -7.4], glyph: 'RES' },
 
 	// CI
 	{ id: 'actions', label: 'GitHub Actions', detail: 'Lint, unit tests and security checks on every change.', group: 'orchestration', pos: [-7.2, 0, -5.6], glyph: 'CI' },
@@ -131,7 +131,7 @@ export const EDGES: SceneEdge[] = [
 	{ from: 'prometheus', to: 'grafana', kind: 'telemetry' },
 	{ from: 'airflow', to: 'openlineage', kind: 'telemetry' },
 	{ from: 'dbt', to: 'openlineage', kind: 'telemetry' },
-	{ from: 'lakehouse', to: 'finops', kind: 'telemetry' },
+	{ from: 'lakehouse', to: 'footprint', kind: 'telemetry' },
 ];
 
 /**
@@ -163,5 +163,5 @@ export const MOBILE_POS: Record<string, Vec3> = {
 	prometheus: [-1.7, 0, 10.0],
 	grafana: [0, 0, 8.6],
 	openlineage: [1.7, 0, 10.0],
-	finops: [3.4, 0, 8.6],
+	footprint: [3.4, 0, 8.6],
 };

@@ -2,7 +2,7 @@
 
 Index of the verified Phase 3 path: Airflow schedules, catchup, backfill, the quality gate, quarantine, the review findings closed in this phase, and the citation of the live result. Settings, commands, and per-issue evidence stay in the linked notes; this page does not repeat them.
 
-Phase 3 does not capture CDC, stream, compact Iceberg files, or apply Terraform.
+Phase 3 does not capture CDC, stream, or compact Iceberg files.
 
 ## Schedules
 

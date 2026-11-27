@@ -17,7 +17,7 @@ Conventions for Phase 1 auditable landing in object storage. Decision record: [A
 | `ODP_RAW_BUCKET` | Bucket for auditable raw objects | `odp-raw` |
 | MinIO endpoint / creds | Same as Phase 0 (`MINIO_*`) | See `.env.example` |
 
-Local MinIO and AWS S3 share the same key layout; only endpoint and credentials change.
+MinIO serves this layout over the S3 API; only the endpoint and credentials are configuration.
 
 ## Object key layout
 

@@ -23,9 +23,9 @@ Target **Parquet** files managed with **Apache Iceberg**, but only **after** a m
 
 | Option | Pros | Cons | Why not (if rejected) |
 | --- | --- | --- | --- |
-| Parquet + Iceberg after PoC (chosen) | ACID/time-travel; multi-engine story; Glue/Athena path | Compatibility PoC required | — |
+| Parquet + Iceberg after PoC (chosen) | ACID/time-travel; multi-engine story | Compatibility PoC required | — |
 | Hive-style Parquet only | Simpler | Weaker ACID / time-travel story | Fallback if Iceberg PoC fails |
-| Delta Lake | Strong Spark story | Different AWS catalog story; pick one primary format | Deferred unless PoC favors it |
+| Delta Lake | Strong Spark story | Pick one primary format | Deferred unless PoC favors it |
 | Apache Hudi | Incremental upserts / CDC-friendly | Another ecosystem to operate; overlaps Iceberg goals | Deferred |
 | ORC as primary format | Efficient columnar | Weaker lakehouse multi-engine narrative here vs Parquet+Iceberg | Rejected as primary |
 | Avro as primary tabular format | Good for streaming schemas | Not ideal as primary lakehouse analytics format | Rejected as primary (may still appear in streams) |

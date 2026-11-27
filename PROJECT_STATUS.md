@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-27 (P3-15 verified; Phase 3 verified) |
+| Last updated | 2026-11-27 (R1-01 verified; AWS path removed) |
 | Current phase | Phase 4 — Streaming CDC |
 | Phase status | Not started |
 
@@ -22,12 +22,14 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)).
+Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn.
 
 ## Next work
 
-1. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
-2. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
+1. **R1-02** — Site update at the end of each phase; Site v1 from verified Phase 0–3 material. Acceptance: `ROADMAP.md` → Refactor R1.
+2. **R1-03** — Rename the PostgreSQL OLTP source to olist-synth-cdc, re-ingest, delete old prefixes. Acceptance: `ROADMAP.md` → Refactor R1.
+3. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
+4. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
 
 ---
 
@@ -119,6 +121,7 @@ Full index: [`DECISIONS.md`](DECISIONS.md). List here only gates for current/nea
 | D-008 | Streaming CDC: logical replication, Debezium, Kafka, Spark Structured Streaming | `proposed` |
 | D-014 | CDC does not replace daily or weekly batch | `proposed` |
 | D-028 | Kafka 4.3.2 broker shared by telemetry and the Phase 4 CDC path | `approved` |
+| D-029 | Open source only; no cloud deployment path; FinOps is the local resource footprint (R1-01) | `approved` |
 | D-005 | DAGs call Spark Bronze/Silver and dbt-trino Gold. They do not reimplement them. Addendum: one runtime image runs Airflow, Spark, and dbt | Approved (addendum 2026-11-13) |
 | D-013 | Invalid rows stay visible. Reprocessing quarantined source rows is P3-07 | Approved |
 
@@ -147,10 +150,10 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 2 | Lakehouse PoC, medallion, dbt | Verified |
 | 3 | Airflow daily/weekly, backfills, quality | Verified |
 | 4 | Streaming CDC | Not started |
-| 5 | Observability, lineage, FinOps model | Not started |
+| 5 | Observability, lineage, resource footprint | Not started |
 | 6 | CI/CD expansion, resilience, security | Not started |
-| 7 | AWS path as Terraform IaC | Not started |
-| 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–7) |
+| 7 | Withdrawn: AWS path (R1-01, ADR-0029) | Withdrawn |
+| 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–6) |
 | 9 | Platform report site (hosting + polish) | Not started (early `site/` scaffold exists) |
 | 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3) |
 | 11 | BioGuardia Atlantic sources at scale: daily export, telemetry stream, PII, skew, SCD2, reconciliation | In progress (waiver): P11-01 to P11-03 verified; drops 2026-11-26 to 2026-12-31 in MinIO; stream running. Processing (P11-04 on) waits for Phase 3 |
@@ -176,7 +179,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 - Spark JDBC and S3 secrets are a mode-600 properties file (`--properties-file`), not `--conf` arguments. The driver redacts `password`, `secret`, and `access.key` in the configuration log.
 - Olist e-commerce + marketing funnel are **CC BY-NC-SA 4.0**: do not vendor; fetch locally (ADR-0018). MIT covers software/docs only.
 - Exactly-once end-to-end will not be claimed without a written proof.
-- `terraform apply` / `destroy` and destructive volume ops need explicit approval.
+- Destructive volume ops need explicit approval.
 - Keep daily batch, weekly batch, and streaming CDC distinguishable in design and demos.
 - Community MinIO remains AGPLv3; pin documented in ADR-0002.
 - Agent shells may lack Docker socket access; host terminal Compose path is source of truth for local ops.

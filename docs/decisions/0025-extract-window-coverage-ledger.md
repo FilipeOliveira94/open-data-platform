@@ -46,4 +46,4 @@ Unit tests: `tests/unit/ingestion/test_coverage.py` (planted gap, planted overla
 
 - CDC (Phase 4) replaces the window extract for PostgreSQL.
 - Another source gains an incremental window.
-- The AWS path (Phase 7) moves the catalog off PostgreSQL. The ledger would then need its own store.
+- The catalog moves off PostgreSQL. The ledger would then need its own store.
