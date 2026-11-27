@@ -71,7 +71,7 @@ Still open after Phase 3: R6 (P6-09), R11 and T5 (P4-04), R12 (P4-01), R15 (P5-0
 
 [P3-14 live run](phase-3-live-run.md), 2026-11-26 to 2026-11-27, with `scripts/p3_14_live_run.sh` on the shipped DAGs:
 
-- Every daily and weekly landing matched the PostgreSQL rows of its window and the previous landing of that window. The weekly run landed the one late seller the daily runs had missed.
+- Every daily and weekly landing matched the PostgreSQL rows of its window and the previous landing of that window. The weekly run landed the one late seller the daily runs had missed. The weekly Silver check compared only the sellers of the late day; the script's newer all-four-dataset weekly comparison has not run live.
 - A rerun of the same run and of the same window left Silver unchanged, with no duplicate key.
 - A refresh with no new raw objects wrote no table; 152 Silver reads during refreshes all succeeded, none empty.
 - One missed midnight gave one catch-up run and a clean gap report.
