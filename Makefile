@@ -195,6 +195,15 @@ bioguardia-export: ## Publish BioGuardia drops: START=YYYY-MM-DD END=YYYY-MM-DD 
 	@test -n "$(START)" && test -n "$(END)" || (echo "START and END are required" >&2; exit 2)
 	docker compose --profile sources run --rm bioguardia-ops-export export generate --start $(START) --end $(END) --workers $(or $(WORKERS),4) $(ARGS)
 
+stream-up: ## Start Kafka, create the telemetry topics, and start the BioGuardia producer (profile streaming)
+	docker compose --profile streaming up -d kafka kafka-init bioguardia-telemetry
+
+stream-stop: ## Stop the BioGuardia producer and Kafka (keeps the log volume and checkpoint)
+	docker compose --profile streaming stop bioguardia-telemetry kafka
+
+stream-check: ## Measure the stream for MINUTES (default 60): end-offset deltas per topic, CPU, memory, disk
+	bash scripts/p11_03_stream_check.sh $(or $(MINUTES),60)
+
 runtime-build: ## Build the shared runtime image (Airflow + Spark + dbt)
 	$(COMPOSE) --profile lakehouse build spark
 

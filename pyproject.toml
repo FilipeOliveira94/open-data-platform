@@ -31,10 +31,12 @@ dbt = [
     "dbt-core==1.12.6",
     "dbt-trino==1.11.0",
 ]
-# BioGuardia source simulators (P11-02): the odp-sources image only.
+# BioGuardia source simulators (P11-02, P11-03): the odp-sources image only.
 # docker/sources/requirements.txt is exported from this lock with the project
 # dependencies. Not a default group; the unit tests do not import it.
-sources = []
+sources = [
+    "confluent-kafka==2.16.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14.0"]

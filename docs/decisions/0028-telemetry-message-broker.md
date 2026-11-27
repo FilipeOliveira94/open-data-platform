@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `proposed` |
+| Status | `approved` |
 | Date opened | 2026-11-26 |
-| Date decided | — |
+| Date decided | 2026-11-27 |
 | Owner | Platform architect |
 | Index ID | D-028 |
 | Related issues | P11-03, P11-04, P11-09; P4-02, P4-04 |
@@ -55,6 +55,8 @@ Versions checked on 2026-11-26:
 | Kafka image | `apache/kafka:4.3.2` | Docker Hub tags of `apache/kafka` | 2026-10-20 |
 | Python base image for the producer | `python:3.12.15-slim-bookworm` | Docker Hub tags of `python` | 2026-10-21 |
 | Producer client | `confluent-kafka` 2.16.1 | PyPI release history | 2026-10-28 (2.16.2 of 2026-11-18 was under two weeks old) |
+
+P11-03 (2026-11-26): the topics were created with the documented partitions, `retention.ms=259200000` and `retention.bytes` caps; over a measured hour the broker took 1,019,332 messages (99.97% of the model) at 23.9% CPU and 1.03 GiB, and the segment files grew about 52 MB per hour (about 51 bytes per message with zstd), so 72 hours of retention is about 3.7 GB. Detail: [`docs/sources/bioguardia-telemetry.md`](../sources/bioguardia-telemetry.md#measured-volume). P11-04 adds the Spark compatibility result.
 
 ## Revisit when
 

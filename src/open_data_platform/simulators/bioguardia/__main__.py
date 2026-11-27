@@ -4,6 +4,8 @@ Subcommands:
 
 - ``export generate``: publish the drops of a date range.
 - ``export serve``: the daily release loop (the Compose service).
+- ``telemetry run``: the gateway producer (P11-03).
+- ``telemetry verify``: count a Kafka time range against the model (P11-03).
 - ``columns``: print the column tables of the source notes.
 """
 
@@ -60,6 +62,26 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument(
         "--heartbeat", type=Path, default=Path("/tmp/bioguardia-export.heartbeat")
     )
+
+    telemetry = commands.add_parser("telemetry", help="gateway producer (P11-03)")
+    telemetry_commands = telemetry.add_subparsers(dest="action", required=True)
+    telemetry_commands.add_parser(
+        "run", help="publish events to Kafka on the wall clock"
+    )
+    model = telemetry_commands.add_parser(
+        "model", help="messages the model delivers in a time range"
+    )
+    model.add_argument(
+        "--from", dest="start", required=True, help="UTC start, ISO-8601"
+    )
+    model.add_argument("--to", dest="end", required=True, help="UTC end, ISO-8601")
+    verify = telemetry_commands.add_parser(
+        "verify", help="count a Kafka time range against the model"
+    )
+    verify.add_argument(
+        "--from", dest="start", required=True, help="UTC start, ISO-8601"
+    )
+    verify.add_argument("--to", dest="end", required=True, help="UTC end, ISO-8601")
 
     commands.add_parser("columns", help="print the source-note column tables")
     return parser
@@ -118,7 +140,13 @@ def main(argv: list[str] | None = None) -> int:
             once=args.once,
         )
         return 0
-    return 2
+    from open_data_platform.simulators.bioguardia import telemetry
+
+    if args.action == "run":
+        return telemetry.run(config, env)
+    if args.action == "model":
+        return telemetry.model(config, args.start, args.end)
+    return telemetry.verify(config, env, args.start, args.end)
 
 
 if __name__ == "__main__":
