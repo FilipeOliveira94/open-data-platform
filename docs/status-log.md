@@ -10,12 +10,14 @@ Home states the platform purpose, a status table with one row per phase-overview
 
 | Check | Result |
 | --- | --- |
-| `uv run pytest tests/unit/site` (new) | 7 passed: Home status equals the phase overview; ADR statuses on Home and Architecture equal `DECISIONS.md` (D-008, D-014 `proposed`); stack pins appear in the recorded versions; every repo link on the site points to an existing path; diagram HTML equals the generator output and each PNG exists; Architecture imports its diagrams from `docs/assets/diagrams/`, which the owning docs embed. The status test failed before the change (Phase 2 shown In progress) |
+| `uv run pytest tests/unit/site` (new) | 8 passed: Home status equals the phase overview; ADR statuses on Home and Architecture equal `DECISIONS.md` (D-008, D-014 `proposed`); stack pins appear in the recorded versions and in `docker-compose.yml` or `docker/`; every repo link and `DiagramFigure` source on the site points to an existing path; diagram HTML equals the generator output, and each PNG matches the HTML it was exported from (`exports.sha256`, 2× viewBox); Architecture imports its diagrams from `docs/assets/diagrams/`, which the owning docs embed. The status test failed before the change (Phase 2 shown In progress) |
 | `make lint` | Ruff clean; 71 Markdown files, 0 with an empty table header |
-| `make test` | 675 passed |
+| `make test` | 676 passed |
 | diagram-design `verify_geometry.py`, `self_check.py` | 0 findings, OK for all four diagram files |
 | `npm run build` | Complete. Same warnings as P9-01 (no `i18n` collection; sitemap skipped until P9-05 sets `site`) |
-| Playwright on `astro preview`, 1440 and 390 px, light and dark | Home status rows, target-architecture label, the Architecture link, every Architecture section, CDC Planned (Phase 4), the theme-matching diagram export, no page-level horizontal scroll (diagrams scroll inside their figure at 390 px), no console errors, failed requests, or third-party requests. The header theme selector and the external GitHub links were not exercised. Evidence outside the repo (`~/evidence/open-data-platform/P9-02/`) |
+| Playwright on `astro preview`, 1440 and 390 px, light and dark | Home status rows, target-architecture label, the Architecture link, every Architecture section, CDC Planned (Phase 4), the theme-matching diagram export, no page-level horizontal scroll (diagrams scroll inside their figure at 390 px), the header theme selector swapping the exports, no console errors, failed requests, or third-party requests. The external GitHub links were not fetched. Evidence outside the repo (`~/evidence/open-data-platform/P9-02/`) |
+| `code-reviewer` | Round 1 BLOCK: the stack listed the build-stage image `spark:3.5.8-java17` as the running Spark, and the tests could not catch stale pins, stale PNGs, or diagram source links; fixed with tighter tests, and the gate wording now names the R6 limit. Round 2 PASS |
+| `po-reviewer` | Plan: NEEDS FILIPE (scene scope, diagram format, effort), decided by the owner. Acceptance round 1 CHANGES NEEDED: this entry recorded the check results from before the review fixes; corrected |
 
 ---
 
