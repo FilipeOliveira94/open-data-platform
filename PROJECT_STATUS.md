@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-27 (P9-02 verified; Home and Architecture pages) |
+| Last updated | 2026-11-28 (P9-03 verified; Pipeline and Operations pages) |
 | Current phase | Phase 4 — Streaming CDC |
 | Phase status | Not started |
 
@@ -22,11 +22,11 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue. R1-03 renamed the PostgreSQL source to olist-synth-cdc (`olist_synth_cdc`, schema `olist_synth`, Gold `olist_synth_operations`); Silver and Gold counts match the pre-rename run and the old objects are deleted. Refactor R1 is complete. Site v1 (Phase 9) is in progress: P9-01 verified the `site/` scaffold and its five routes, and P9-02 filled Home and Architecture.
+Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue. R1-03 renamed the PostgreSQL source to olist-synth-cdc (`olist_synth_cdc`, schema `olist_synth`, Gold `olist_synth_operations`); Silver and Gold counts match the pre-rename run and the old objects are deleted. Refactor R1 is complete. Site v1 (Phase 9) is in progress: P9-01 verified the `site/` scaffold and its five routes, P9-02 filled Home and Architecture, and P9-03 filled Pipeline and Operations.
 
 ## Next work
 
-1. **Phase 9 (Site v1)** — P9-03, then P9-04 to P9-07: pages from verified Phase 0–3 material, GitHub Pages hosting. Acceptance: `ROADMAP.md` → Phase 9.
+1. **Phase 9 (Site v1)** — P9-04, then P9-05 to P9-07: pages from verified Phase 0–3 material, GitHub Pages hosting. Acceptance: `ROADMAP.md` → Phase 9.
 2. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
 3. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
 

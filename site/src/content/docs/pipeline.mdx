@@ -1,0 +1,123 @@
+---
+title: Pipeline
+description: Verified ingestion through Gold, the Airflow schedules, backfills, the quality gate and quarantine; streaming CDC is planned for Phase 4.
+---
+
+import DiagramFigure from '../../components/DiagramFigure.astro';
+import qualityLight from '../../../../docs/assets/diagrams/quality-gate.png';
+import qualityDark from '../../../../docs/assets/diagrams/quality-gate-dark.png';
+
+export const repo = 'https://github.com/FilipeOliveira94/open-data-platform/blob/main/';
+
+The batch path is **verified** from ingestion through Gold. Airflow schedules it, with catchup, backfills, a quality gate, and quarantine. Streaming CDC is **planned (Phase 4)**. The [Architecture](../architecture/) page draws the lakehouse and the DAGs. Domain charts arrive with P8-08.
+
+## Sources and raw landing
+
+Each source writes objects to MinIO under one key layout ([Phase 1 ingestion](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-1-ingestion.md), [raw storage layout](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/raw-storage-layout.md)):
+
+```text
+raw/{source_id}/{dataset}/dt={YYYY-MM-DD}/execution_id={execution_id}/{object_name}
+```
+
+`dt=` is the UTC date of `_ingestion_ts`, not an event-time partition. The object metadata carries `source_id`, `execution_id`, and `_ingestion_ts`. The same execution overwrites its own objects; a new `execution_id` keeps the previous ones. Every run deletes the prefix's `_COMPLETE` marker before its first object and writes it after its last, so a run that stops halfway is visibly incomplete ([completion marker](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/data-contracts.md#completion-marker)).
+
+| Source | Landing | Update pattern |
+| --- | --- | --- |
+| Olist e-commerce and marketing funnel | One raw CSV per published file | `snapshot` |
+| DummyJSON `/products` | One JSON page per object | `full_refresh` |
+| IBGE Localidades | One `municipios.json` array | `full_refresh` |
+| olist-synth-cdc (PostgreSQL) | One JSON array per table for a half-open `updated_at` window | `incremental_window` |
+| Demo storefront clickstream | One `events.jsonl` per execution | `append_only` |
+
+BrasilAPI CEP is withdrawn ([ADR-0021](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0021-withdraw-brasilapi-cep.md)). Olist files are CC BY-NC-SA and are not vendored.
+
+## Update patterns
+
+The contract's `update_pattern` decides which Bronze rows Silver reads and what happens when a record leaves the source ([data contracts](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/data-contracts.md#update-patterns-p3-12)).
+
+| Pattern | Silver reads | A record removed at the source |
+| --- | --- | --- |
+| `snapshot` | Only the latest complete execution | Leaves Silver (a static release has none) |
+| `full_refresh` | Only the latest complete execution | Leaves Silver, and Gold on its next build |
+| `incremental_window` | Every window; the latest `updated_at` per key | Stays: the batch path never extracts a hard delete |
+| `append_only` | Every complete execution; a repeated event key is kept once | Not applicable: events are immutable |
+
+## Bronze, Silver, and Gold
+
+- **Bronze.** Spark lists each raw prefix and promotes only new or changed objects of a complete execution. One `MERGE INTO` per changed dataset touches only the `dt` partitions it writes, and a promotion registry records each object, so a repeated promotion inserts nothing. Values stay strings, with lineage columns ([Bronze layer](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/bronze-layer.md)).
+- **Silver.** One module per source selects Bronze rows by update pattern, casts them to the contract types, keeps one survivor per key, and replaces the table in one Iceberg commit. Money fields are exact `decimal` ([Silver layer](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/silver-layer.md), [money](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/data-contracts.md#money-p3-18)).
+- **Gold.** dbt-trino builds facts, dimensions, and marts in seven business schemas plus `gold_shared`. Every model is a full refresh, replaced in one commit, so a reader sees the previous table or the new one ([Gold layer](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/gold-layer.md), [atomic table replace](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-2-lakehouse.md#atomic-table-replace-p3-11)).
+
+## Airflow schedules
+
+Every DAG runs on local Airflow with the LocalExecutor and calls package entry points; the business logic stays out of the DAG files ([Phase 3 orchestration](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-orchestration.md#schedules), [Local Airflow](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/airflow-local.md)).
+
+| DAG | Schedule | Window or grain | Catchup |
+| --- | --- | --- | --- |
+| `ingest_olist_synth_cdc_daily` | Daily 00:00 UTC, explicit `CronDataIntervalTimetable` | `[D-1, D)` on `updated_at`, read after a 15 min settle lag in one `REPEATABLE READ` snapshot | `True` from 2026-11-19, one run at a time |
+| `ingest_olist_synth_cdc_weekly` | Monday 00:00 UTC | Re-extracts `[W-8, W-1)` (Sunday to Saturday) to pick up late commits the daily run missed | `True` from 2026-11-16, one run at a time |
+| `ingest_dummyjson_products` | Monday 03:00 UTC | Full fetch, no window | `False`: the next fetch covers a missed week |
+| `ingest_ibge_localidades` | Day 1 of the month, 03:00 UTC | Full fetch, no window | `False` |
+| `ingest_olist`, `ingest_demo_storefront`, `ingest_olist_synth_cdc` | Manual | Fixed release, demo generator, ad hoc window | — |
+| `transform_lakehouse` | Any raw Asset event (`AssetAny`), `max_active_runs=1`, events coalesced | Bronze → checks → Silver → checks → quarantine staging → `dbt_build`, only for new raw objects | — |
+| `reconcile_gold` | Weekly | Gold reconciliation checks | — |
+
+Only a successful extract emits the raw Asset, so a failed extract never starts a refresh.
+
+## Catchup, backfill, and reruns
+
+Detail: [catchup, gaps, and backfill](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-orchestration.md#catchup-gaps-and-backfill), [ADR-0025](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0025-extract-window-coverage-ledger.md).
+
+- **Catchup.** The daily and weekly DAGs create one run per missed interval, oldest first.
+- **Coverage ledger.** Each successful PostgreSQL extract records its window, execution id, Airflow run id, and row count per dataset in `ingestion_state.extract_coverage`.
+- **Gap report.** `make coverage-report FREQUENCY=daily` (or `weekly`) lists gaps and overlaps up to the last window due at report time, so a stopped DAG shows its trailing gaps. It exits 1 on a gap or an overlap.
+- **Backfill.** `airflow backfill create --dag-id <dag> --from-date A --to-date B --max-active-runs 1`. With `--reprocess-behavior completed`, a covered run is cleared and keeps its run id.
+- **No duplication.** A cleared run rewrites the same raw keys, and unchanged content keeps its ETag, so Bronze does not promote it again. A new run of the same window adds an execution that Silver deduplicates by key.
+
+## Quality gate and quarantine
+
+<DiagramFigure
+	light={qualityLight}
+	dark={qualityDark}
+	alt="Quality gate and quarantine: at ingestion each record is classified against its contract; the raw object is stored whole and findings go to a quarantine sidecar. Bronze copies the finding reasons onto each record, Silver drops or flags the record by the contract policy and records quality counts, and stage_quarantine loads the findings for the Gold quality facts. An open Bronze or Silver check blocks the next layer; the volume guard fails Silver when a snapshot shrinks."
+	caption="The record path of an invalid row, from the contract check at ingestion to the Gold quality facts."
+	source={`${repo}docs/assets/diagrams/build_diagrams.py`}
+/>
+
+Detail: [quality gate and quarantine](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-orchestration.md#quality-gate-and-quarantine), [invalid records](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/data-contracts.md#invalid-records).
+
+- **At ingestion.** A structural error, such as a CSV row of the wrong width, fails the batch before that object is written. Otherwise each record is classified (`null_violation`, `type_mismatch`, `duplicate_primary_key`), the raw object is stored whole, and the findings go to a `quarantine/…/{object_name}.jsonl` sidecar next to it.
+- **In Bronze.** Each promoted record carries its finding reasons in `_quarantine_reasons`; the record values in the sidecar are not copied.
+- **In Silver.** The contract's `on_invalid` decides: `quarantine_exclude` drops the record before deduplication (olist-synth-cdc, the storefront clickstream); `quarantine_flag` keeps it with `_quarantined = true` (the Olist releases, DummyJSON, IBGE), because excluding rows from a fixed release would break its joins and published counts.
+- **Gate.** The result of `bronze_checks` and `silver_checks` is stored per dataset. A failed check blocks the next layer until it passes, also on a later refresh with no new raw objects.
+- **Volume guard.** A `snapshot` or `full_refresh` execution that shrinks below the contract's `min_row_ratio` fails the Silver step; an operator accepts a real shrink for one run with `--allow-volume-drop`.
+- **In Gold.** `stage_quarantine` loads the findings into `gold_staging.quarantine_findings`, and the Gold quality facts record each one as `excluded` or `flagged`.
+- **Reprocessing.** Fix the source and ingest the window again; a clean rerun deletes the sidecar, and the finding leaves Gold on the next refresh.
+
+## Phase 3 live result
+
+The [P3-14 live run](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-live-run.md), 2026-11-26 to 2026-11-27, ran the shipped DAGs ([summary](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-orchestration.md#live-result)):
+
+- Every daily and weekly landing matched the PostgreSQL rows of its window and the previous landing of that window. The weekly run landed the one late seller the daily runs had missed. The weekly Silver check compared only the sellers of the late day; the newer all-four-dataset weekly comparison has not run live.
+- A rerun of the same run and of the same window left Silver unchanged, with no duplicate key.
+- A refresh with no new raw objects wrote no table; 152 Silver reads during refreshes all succeeded, none empty.
+- One missed midnight gave one catch-up run and a clean gap report.
+- Each refresh triggered by a new extract read 4 new raw objects out of the 245 to 273 promoted so far.
+
+The failure paths (a missed day, retries, a failed `reconcile_gold`, a killed Silver write that leaves the previous table readable, coalescing, and a failed check that stays blocked) are the [P3-09 scenarios](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09), run on 2026-11-24.
+
+## Streaming CDC
+
+Streaming CDC is **planned (Phase 4)**: PostgreSQL logical replication, Debezium, Kafka, and Spark Structured Streaming ([D-008](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0008-streaming-cdc.md) `proposed`). It runs beside the daily and weekly batch and does not replace it ([D-014](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/decisions/0014-batch-vs-streaming-coexistence.md) `proposed`). Capturing hard deletes is its job. No exactly-once claim is made for any path.
+
+## Limitations
+
+From [Phase 3 orchestration](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-orchestration.md#limitations):
+
+- A hard delete at the source is invisible on the batch path; the row stays in Silver and Gold.
+- A row committed after the weekly run that covers its `updated_at` is missed until a backfill of that window.
+- A refresh still lists every raw key, and a pending `incremental_window` or `append_only` Silver dataset re-reads its whole Bronze table.
+- An empty window still promotes empty raw objects and rebuilds Silver and Gold.
+- Daily `MERGE`s add small files; nothing compacts them yet (P5-07).
+- Spark runs `local[*]` inside the Airflow scheduler container, capped by environment variables.
+- `make live-*` targets and the DAGs must not run at the same time; nothing serializes them.

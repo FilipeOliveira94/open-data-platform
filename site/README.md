@@ -43,13 +43,13 @@ Static output is written to `dist/`.
 | --- | --- |
 | `src/content/docs/index.mdx` | Home |
 | `src/content/docs/architecture.mdx` | Architecture |
-| `src/content/docs/pipeline.md` | Pipeline |
+| `src/content/docs/pipeline.mdx` | Pipeline |
 | `src/content/docs/operations.md` | Operations |
 | `src/content/docs/reference.md` | Reference |
 
 ## Diagrams
 
-Architecture shows two diagrams through `src/components/DiagramFigure.astro`, which imports the light and dark PNGs from `docs/assets/diagrams/` so docs and site share one copy. To change a diagram, edit the facts in `docs/architecture/` first, then `docs/assets/diagrams/build_diagrams.py`, run it, and export the PNGs with the diagram-design skill's `export_png.py` (scale 2). `tests/unit/site/` fails when the HTML is stale or a page stops importing from `docs/`.
+Architecture shows two diagrams and Pipeline one (quality gate and quarantine) through `src/components/DiagramFigure.astro`, which imports the light and dark PNGs from `docs/assets/diagrams/` so docs and site share one copy. To change a diagram, edit the facts in `docs/architecture/` first, then `docs/assets/diagrams/build_diagrams.py`, run it, and export the PNGs with the diagram-design skill's `export_png.py` (scale 2). `tests/unit/site/` fails when the HTML is stale or a page stops importing from `docs/`.
 
 ## Architecture map
 
