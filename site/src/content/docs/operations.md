@@ -16,7 +16,7 @@ GitHub Actions runs one job, `lint-and-test`, on every push to `main` or `master
 | Markdown tables | `python scripts/check_markdown_tables.py` |
 | Pytest (unit) | `uv run --frozen --group airflow pytest tests/unit` |
 
-The unit tests use fixtures and fakes, not public APIs. They include the DAG import checks and the [site consistency tests](https://github.com/FilipeOliveira94/open-data-platform/blob/main/tests/unit/site/test_site_content.py), which compare these pages with the repository docs. CI starts no Compose service, needs no cloud credentials, and deploys nothing.
+The unit tests use fixtures and fakes, not public APIs. They include the DAG import checks and the [site consistency tests](https://github.com/FilipeOliveira94/open-data-platform/blob/main/tests/unit/site/test_site_content.py), which compare these pages with the repository docs. CI starts no Compose service, needs no cloud credentials, and deploys nothing. A separate workflow, [`pages.yml`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/.github/workflows/pages.yml), builds this site on every pull request and push to `main`, checks its links under the GitHub Pages base, and deploys it to GitHub Pages only from `main`.
 
 ## Secrets and runtime data
 
