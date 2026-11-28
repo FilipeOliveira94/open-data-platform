@@ -4,6 +4,16 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-28 — P9-07 Phase 9 documentation and status (verified)
+
+Post-merge check of #39. P9-07 moves from Delivered to Verified (seen Risk Med, seen Size Sm), and Phase 9 is closed.
+
+| Check | Result |
+| --- | --- |
+| Redeploy | `pages.yml` run 46109548724 on the merge commit `d5f26c1`: Build site and Deploy to GitHub Pages passed; the `github-pages` deployment is `d5f26c1` (2026-11-28 04:53Z) |
+| Live check | `scripts/p9_06_live_site_check.py` on the Pages URL: Home, Architecture, Pipeline, Operations, Reference 200 with their h1; 79 distinct links ok (27 internal, 52 external); 16 repository anchors present; 108 claims extracted |
+| Home row 9 | "9 \| This report site, hosted on GitHub Pages \| Verified", matching the `ROADMAP.md` phase overview |
+
 ### 2026-11-28 — P9-07 Phase 9 documentation and status (delivered); Phase 9 verified
 
 P9-07 closes Site v1 on the P9-06 result ([`docs/architecture/phase-9-live-run.md`](architecture/phase-9-live-run.md)). Finding F1 is closed: `PROJECT_STATUS.md` named Phase 4 in its header while Phase 9 was in progress; it now records Phase 9 as verified, cites the P9-06 result in its objective and in a new Phase 9 baseline, and names Phase 4 as the current phase, with P11-04 first. The Phase 9 acceptance items are checked on the verified P9-01 to P9-06 rows. Phase 9 is Verified in the `ROADMAP.md` phase overview, the site Home status table, and `PROJECT_STATUS.md`. `README.md` marks the report site as implemented, links the P9-06 result, and gives the orchestration section the implemented icon, which still showed planned after Phase 3 closed. `site/README.md` no longer calls the site a scaffold. The README test now finds the Report site section by its heading text rather than its icon. No unresolved mismatch. Seen Risk Med, seen Size Sm (docs, one site table cell, one test).
