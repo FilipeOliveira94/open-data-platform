@@ -4,6 +4,19 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-28 — P9-05 GitHub Pages hosting (verified)
+
+Post-merge check of #36. P9-05 moves from Delivered to Verified (seen Risk Hi, seen Size Md: about 490 hand-written lines of script, workflow and tests).
+
+| Check | Result |
+| --- | --- |
+| Pages setting | Source GitHub Actions (`build_type: workflow`), public, HTTPS enforced |
+| First deploy from `main` | `pages.yml` run 46105004800 on the merge commit `c8ceb87`: Build site and Deploy to GitHub Pages passed; the `github-pages` deployment is `c8ceb87` |
+| Live URL | `https://filipeoliveira94.github.io/open-data-platform/` and `architecture/`, `pipeline/`, `operations/`, `reference/`, `sitemap-index.xml` return 200; an unknown path returns 404 |
+| Links on the live Home | Every root-relative `href` and `src` starts with `/open-data-platform/`; the CSS and JS fetched return 200 |
+| About → Website | `homepageUrl` is the Pages URL |
+| Not run | A browser walk and a comparison of the live pages to `PROJECT_STATUS.md`: that is P9-06 |
+
 ### 2026-11-28 — P9-05 GitHub Pages hosting (delivered)
 
 `site/astro.config.mjs` sets `site` (`https://filipeoliveira94.github.io`) and `base` (`/open-data-platform`); the build now writes `sitemap-index.xml`. `.github/workflows/pages.yml` runs on pull requests, pushes to `main`, and `workflow_dispatch`, with no path filter. Its `build` job (read-only token) installs the lockfile on Node 22.23.4, runs `npm run build`, then `scripts/check_site_links.py`. Only on `main` it uploads `site/dist`, and the `deploy` job, the only one with `pages: write` and `id-token: write`, runs `actions/deploy-pages` in a non-cancelling `pages` concurrency group. The link check resolves every HTML `href`, `src`, `srcset`, `<meta>` URL on the site origin, and CSS `url()` against its file's URL and fails on a target outside the base, missing from `dist/`, or resolving outside `dist/`; it prints paths, never page text. `site/README.md` has a Hosting section; Operations and Reference name `pages.yml`; the README Site line says it serves the last successful deploy from `main`. Status stays Delivered until the owner enables Pages (source GitHub Actions), the first deploy from `main` passes, and About → Website is set.
