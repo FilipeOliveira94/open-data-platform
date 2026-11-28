@@ -484,7 +484,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 - [ ] Site builds locally via a documented command; CI builds the static output and deploys it to GitHub Pages.
 - [ ] Public URL is set on the GitHub repository Website field and linked from the README Platform report block.
 - [ ] Navigation and page roles match the growth scheme above; reference page links back to repo docs/ADRs.
-- [ ] A live site result is recorded and compared to `PROJECT_STATUS.md` (P9-06).
+- [x] A live site result is recorded and compared to `PROJECT_STATUS.md` (P9-06, [result](docs/architecture/phase-9-live-run.md)).
 - [ ] Documentation and `PROJECT_STATUS.md` cite that result (P9-07).
 
 ### Issues
@@ -496,7 +496,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 | P9-03 | Pipeline and Operations pages | P9-01 | Hi/Hi | Md/Md | Verified | Pipeline covers ingestion through Gold and the Airflow daily and weekly schedules, backfills, quality gate, and quarantine from the Phase 1–3 docs; CDC is labeled planned. Operations covers CI (Phase 0) and the Phase 3 quality gate; observability, lineage, and the resource footprint are labeled planned. The stale status lines on both pages are fixed. Pipeline shows one branded diagram-design image, quality gate and quarantine, light and dark, generated under `docs/assets/diagrams/` and embedded in the Phase 3 orchestration doc (added at plan approval, owner decision). No figure: figures 2–9 arrive with P8-08 and figure 11 with P5-10 |
 | P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/Lo | Sm/Sm | Verified | Reference links to GitHub, ADRs, roadmap, and setup; README Platform report block points to the GitHub Pages URL. The figure manifest link arrives with P8-08 |
 | P9-05 | GitHub Pages hosting and Website field | P9-04 | Hi/Hi | Sm/Md | Verified | A GitHub Actions workflow builds `site/` and deploys it to GitHub Pages, with the Astro `site` and `base` set for the project URL; hosting documented in `site/README.md`; CI build green; repository About → Website set to the Pages URL. Later site updates redeploy through the same workflow |
-| P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Med/- | Sm/- | Not started | Open the published GitHub Pages URL. Walk Home, Architecture, Pipeline, Operations, and Reference. Compare status, counts, and any metric claim to `PROJECT_STATUS.md` and the Phase 0–3 docs. Record broken links, missing pages, and mismatches. Do not treat a single screenshot of the site as this check |
+| P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Med/Med | Sm/Md | Verified | Open the published GitHub Pages URL. Walk Home, Architecture, Pipeline, Operations, and Reference. Compare status, counts, and any metric claim to `PROJECT_STATUS.md` and the Phase 0–3 docs. Record broken links, missing pages, and mismatches. Do not treat a single screenshot of the site as this check |
 | P9-07 | Phase 9 documentation and status | P9-06 | Med/- | Sm/- | Not started | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings; a mismatch is fixed and the site redeployed. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
 
 **Suggested order:** P9-01 → P9-02 ∥ P9-03 → P9-04 → P9-05 → P9-06 → P9-07. Phase close is P9-06 then P9-07.
@@ -651,7 +651,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-28 (P9-05 verified; first deploy from `main` serves the site, About → Website set) |
+| Last updated | 2026-11-28 (P9-06 verified; live site walked, links and claims checked, one ledger finding for P9-07) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -660,6 +660,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-28: P9-06 verified. `scripts/p9_06_live_site_check.py` and a browser walk checked the live site; [result](docs/architecture/phase-9-live-run.md). One finding (F1, the `PROJECT_STATUS.md` header) goes to P9-07.
 - 2026-11-28: P9-05 verified. The first Pages deploy from `main` serves the five routes under the project URL, and About → Website is set to it.
 - 2026-11-28: P9-05 delivered. `site/astro.config.mjs` sets `site` and `base` for the project Pages URL; `.github/workflows/pages.yml` builds the site on every pull request and push, fails on links outside the base, and deploys only from `main`. Verified after the owner enables Pages, the first deploy passes, and About → Website is set.
 - 2026-11-28: P9-04 verified. Reference links the repository, CI, setup, status, roadmap, decisions, and the Phase 1–3 docs, and labels the figure manifest planned (P8-08); the README Report site block links the GitHub Pages URL, live once P9-05 deploys. Site tests check those links and the planned label.
