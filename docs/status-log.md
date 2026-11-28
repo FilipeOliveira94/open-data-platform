@@ -17,7 +17,7 @@ Pipeline (now `pipeline.mdx`) covers the raw landing and completion marker, the 
 | `npm run build` | Complete. The same three warnings as on `main` (no `i18n` collection, no `404` entry, sitemap skipped until P9-05 sets `site`) |
 | T3 preview on `astro preview`, 1440 and 390 px, light and dark | Both lead paragraphs, the 7-row DAG table, the CI and Planned tables, the theme-matching diagram export, the Architecture link, no page-level horizontal scroll at 390 px (tables and the diagram scroll inside their box), no console errors or failed requests. External GitHub links were not fetched. Evidence outside the repo (`~/evidence/open-data-platform/P9-03/`) |
 | `code-reviewer` | PASS. Warnings fixed: the live result kept the weekly-check caveat and says which refreshes read 4 objects, the site README names `pipeline.mdx`, CI names both push branches and a test checks them |
-| `po-reviewer` | Plan: NEEDS FILIPE (diagram option, secrets section), decided by the owner |
+| `po-reviewer` | Plan: NEEDS FILIPE (diagram option, secrets section), decided by the owner. Acceptance: APPROVED, every criterion met |
 
 ---
 
