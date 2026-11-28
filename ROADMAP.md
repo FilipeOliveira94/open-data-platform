@@ -67,7 +67,7 @@ Every issue that adds or changes a pipeline step (ingestion, Bronze, Silver, Gol
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
 | 7 | Withdrawn: AWS deployment path ([R1-01](#refactor-r1--project-level-adjustments), [ADR-0029](docs/decisions/0029-open-source-only-platform.md)) | — | — | Withdrawn |
 | 8 | JupyterLab exploration and Superset charts over Gold, read-only via Trino | After Phase 2 (parallel with 3–6) | Phase 2 verified | Not started |
-| 9 | Platform report site v1: multi-page static report on GitHub Pages from verified Phase 0–3 material; later phases add theirs through site update issues | Now, after Refactor R1 and before Phase 4 | Phase 3 verified | Not started |
+| 9 | Platform report site v1: multi-page static report on GitHub Pages from verified Phase 0–3 material; later phases add theirs through site update issues | Now, after Refactor R1 and before Phase 4 | Phase 3 verified | In progress |
 | 10 | Table contracts and quality observability (ODCS contracts, Data Contract CLI, BCB SGS source) | Position not fixed; toward the end, decided by Filipe during execution | Phase 3 verified | Not started |
 | 11 | BioGuardia Atlantic operational sources at scale: daily export (about 24M rows a day), telemetry stream (1M events an hour), PII masking, data skew, SCD Type 2, reconciliation | Position not fixed, decided by Filipe; P11-01 to P11-03 run now under a waiver | P11-01 to P11-03: none (waiver, `DECISIONS.md` 2026-11-26); P11-04 onward: Phase 3 verified; P11-08 and P11-15: P5-07 | In progress (P11-01 to P11-03) |
 
@@ -492,7 +492,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 | ID | Title | Depends on | Expected/Seen Risk | Expected/Seen Size | Status | Acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
 | P9-01 | Site scaffold and page map | Phase 3 | Lo/Lo | Sm/Sm | Verified | `site/` as Astro Starlight with the brand theme (palette and Urbanist from `filipeoliveira-hub-assets/brand`) and a header link to the portfolio; five routes (Home, Architecture, Pipeline, Operations, Reference); local preview via `npm run dev` |
-| P9-02 | Home and Architecture pages | P9-01 | Hi/- | Md/- | Not started | Home states the platform purpose and the verified status of Phases 0–3; its status table matches the phase overview (the scaffold still shows Phase 2 in progress). Architecture covers the stack, medallion, contracts, Airflow orchestration, and batch vs stream, with streaming CDC labeled planned. Diagrams come from `docs/`. No figure: figures 1 and 10 arrive with P8-08 |
+| P9-02 | Home and Architecture pages | P9-01 | Hi/Hi | Md/Md | Verified | Home states the platform purpose and the verified status of Phases 0–3; its status table matches the phase overview (the scaffold still shows Phase 2 in progress). Architecture covers the stack, medallion, contracts, Airflow orchestration, and batch vs stream, with streaming CDC labeled planned. Diagrams come from `docs/`. No figure: figures 1 and 10 arrive with P8-08 |
 | P9-03 | Pipeline and Operations pages | P9-01 | Hi/- | Md/- | Not started | Pipeline covers ingestion through Gold and the Airflow daily and weekly schedules, backfills, quality gate, and quarantine from the Phase 1–3 docs; CDC is labeled planned. Operations covers CI (Phase 0) and the Phase 3 quality gate; observability, lineage, and the resource footprint are labeled planned. The stale status lines on both pages are fixed. No figure: figures 2–9 arrive with P8-08 and figure 11 with P5-10 |
 | P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/- | Sm/- | Not started | Reference links to GitHub, ADRs, roadmap, and setup; README Platform report block points to the GitHub Pages URL. The figure manifest link arrives with P8-08 |
 | P9-05 | GitHub Pages hosting and Website field | P9-04 | Hi/- | Sm/- | Not started | A GitHub Actions workflow builds `site/` and deploys it to GitHub Pages, with the Astro `site` and `base` set for the project URL; hosting documented in `site/README.md`; CI build green; repository About → Website set to the Pages URL. Later site updates redeploy through the same workflow |
@@ -651,7 +651,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-27 (P9-01; site scaffold verified) |
+| Last updated | 2026-11-27 (P9-02; Home and Architecture pages verified) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -660,6 +660,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-27: P9-02 verified. Home states the purpose and a status table that matches the phase overview (Phase 9 row set to In progress); its 3D map is labeled target architecture. Architecture covers the stack, medallion, contracts, Airflow orchestration, and batch vs stream with CDC planned, with two branded diagrams generated under `docs/assets/diagrams/`. Unit tests keep the pages consistent with the docs.
 - 2026-11-27: P9-01 verified. The `site/` Starlight scaffold now uses the brand theme instead of Catppuccin (owner decision; acceptance reworded) and links to the portfolio from the header. It serves the five routes from `npm run dev` and `npm run build`; its dependencies are pinned to the locked versions.
 - 2026-11-27: R1-03 verified. `postgres_oltp` is now `olist_synth_cdc` (PostgreSQL schema `olist_synth`, Gold schema `olist_synth_operations`, `_olist_synth_` models) in code, DAGs, dbt, contracts, storage, tests, and living docs; the old tables, prefixes, registry rows, and DAG history are deleted. Dated records keep the old names.
 - 2026-11-27: R1-02 verified. Phase 9 becomes Site v1 on GitHub Pages from verified Phase 0–3 material and depends on Phase 3 only. Site update issues before each close pair: P4-11, P5-10, P6-10, P8-08, P10-13, P11-19; the live runs compare the site and the documentation issues fix it. P8-08 exports the figures and P8-06 checks them; the figure table gains a Published by column and figure 11 (Grafana, P5-10). Seen risk Med (phase acceptance changed).
