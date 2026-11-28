@@ -7,7 +7,7 @@ CI and the Phase 3 quality gate are **verified**. Observability, lineage, and th
 
 ## Continuous integration
 
-GitHub Actions runs one job, `lint-and-test`, on every push to `main` and on every pull request, with uv `0.13.1` and Python 3.12 ([`ci.yml`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/.github/workflows/ci.yml)). It installs the locked dependencies and runs these steps:
+GitHub Actions runs one job, `lint-and-test`, on every push to `main` or `master` and on every pull request, with uv `0.13.1` and Python 3.12 ([`ci.yml`](https://github.com/FilipeOliveira94/open-data-platform/blob/main/.github/workflows/ci.yml)). It installs the locked dependencies and runs these steps:
 
 | Step | Command |
 | --- | --- |

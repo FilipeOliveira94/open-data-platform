@@ -98,11 +98,11 @@ Detail: [quality gate and quarantine](https://github.com/FilipeOliveira94/open-d
 
 The [P3-14 live run](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-live-run.md), 2026-11-26 to 2026-11-27, ran the shipped DAGs ([summary](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/phase-3-orchestration.md#live-result)):
 
-- Every daily and weekly landing matched the PostgreSQL rows of its window and the previous landing of that window. The weekly run landed the one late seller the daily runs had missed.
+- Every daily and weekly landing matched the PostgreSQL rows of its window and the previous landing of that window. The weekly run landed the one late seller the daily runs had missed. The weekly Silver check compared only the sellers of the late day; the newer all-four-dataset weekly comparison has not run live.
 - A rerun of the same run and of the same window left Silver unchanged, with no duplicate key.
 - A refresh with no new raw objects wrote no table; 152 Silver reads during refreshes all succeeded, none empty.
 - One missed midnight gave one catch-up run and a clean gap report.
-- Each refresh read 4 new raw objects out of 245 to 273.
+- Each refresh triggered by a new extract read 4 new raw objects out of the 245 to 273 promoted so far.
 
 The failure paths (a missed day, retries, a failed `reconcile_gold`, a killed Silver write that leaves the previous table readable, coalescing, and a failed check that stays blocked) are the [P3-09 scenarios](https://github.com/FilipeOliveira94/open-data-platform/blob/main/docs/architecture/airflow-local.md#orchestration-success-and-failure-scenarios-p3-09), run on 2026-11-24.
 

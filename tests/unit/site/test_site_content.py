@@ -227,6 +227,11 @@ def test_operations_ci_matches_workflow() -> None:
     setup = next(s for s in steps if s.get("uses", "").startswith("astral-sh/setup-uv"))
     assert f"uv `{setup['with']['version']}`" in page
     assert f"Python {setup['with']['python-version']}" in page
+    # PyYAML reads the bare key `on` as True (YAML 1.1).
+    triggers = workflow.get("on", workflow.get(True))
+    assert "pull_request" in triggers and "pull request" in page
+    for branch in triggers["push"]["branches"]:
+        assert f"`{branch}`" in page, f"CI push branch {branch} is not on the page"
 
 
 def _roadmap_status() -> tuple[dict[str, str], dict[str, str]]:
