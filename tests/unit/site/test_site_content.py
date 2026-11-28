@@ -143,13 +143,16 @@ def test_reference_links_repo_adrs_roadmap_and_setup() -> None:
 
 def test_reference_figure_manifest_is_planned_until_p8_08() -> None:
     _phases, issues = _roadmap_status()
-    line = next(
+    assert not issues["P8-08"].startswith("Verified"), (
+        "P8-08 is verified: link the figure manifest on Reference and update this test"
+    )
+    lines = [
         line
         for line in REFERENCE.read_text(encoding="utf-8").splitlines()
         if "figure manifest" in line.lower()
-    )
-    if not issues["P8-08"].startswith("Verified"):
-        assert "planned" in line and "P8-08" in line, line
+    ]
+    assert lines, "Reference no longer mentions the figure manifest"
+    assert all("planned" in line and "P8-08" in line for line in lines), lines
 
 
 def test_readme_report_site_links_pages_url() -> None:
