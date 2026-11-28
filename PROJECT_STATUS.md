@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-28 (P9-07 delivered; Phase 9 verified, Phase 4 next) |
+| Last updated | 2026-11-28 (P9-07 verified; Phase 9 closed, Phase 4 next) |
 | Current phase | Phase 4 — Streaming CDC; P11-04 (Spark on Kafka) comes first |
 | Phase status | Not started |
 
@@ -22,7 +22,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 9 (Site v1) is **verified** (2026-11-28). The report site is live at https://filipeoliveira94.github.io/open-data-platform/, built and deployed from `main` by `pages.yml`. The P9-06 live check found no broken link, no missing page, and no site claim that disagrees with its source ([result](docs/architecture/phase-9-live-run.md)). Its one finding, F1, was this file's header, which named Phase 4 while Phase 9 was in progress; P9-07 closed Phase 9, so Phase 4 is now the current phase in the header and in this objective. P9-07 is delivered and becomes verified once the merge redeploys the site and a rerun of the live check shows Home row 9 as Verified. Phase 4 is next. It depends on Phase 3 (verified) and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 (Spark Structured Streaming on Kafka) comes first.
+Phase 9 (Site v1) is **verified** (2026-11-28). The report site is live at https://filipeoliveira94.github.io/open-data-platform/, built and deployed from `main` by `pages.yml`. The P9-06 live check found no broken link, no missing page, and no site claim that disagrees with its source ([result](docs/architecture/phase-9-live-run.md)). Its one finding, F1, was this file's header, which named Phase 4 while Phase 9 was in progress; P9-07 closed Phase 9, so Phase 4 is now the current phase in the header and in this objective. P9-07 is verified: the merge `d5f26c1` redeployed the site, and the rerun of the live check shows Home row 9 as Verified. Phase 4 is next. It depends on Phase 3 (verified) and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 (Spark Structured Streaming on Kafka) comes first.
 
 ## Next work
 
@@ -58,7 +58,7 @@ Acceptance detail: `ROADMAP.md` → Phase 4.
 | Environment | WSL2 and the live GitHub Pages site at deployed commit `2ec9eb0` (P9-06) |
 | Checks | `scripts/p9_06_live_site_check.py` against the live URL, browser walk, `make lint`, `make test` |
 | Result | PASS. 5 pages 200, 79 distinct links ok, 16 repository anchors present, 108 claims: 96 match, 12 skipped as not a claim, 0 mismatch. Result: [`docs/architecture/phase-9-live-run.md`](docs/architecture/phase-9-live-run.md) |
-| P9-07 checks | `make lint` PASS, `make test` 727 passed, `npm run build` PASS; the live check is rerun after the merge redeploys the site |
+| P9-07 checks | `make lint` PASS, `make test` 727 passed, `npm run build` PASS; after the merge, `pages.yml` deployed `d5f26c1` and the live check passed on it (5 pages 200, 79 links ok, 16 repository anchors, 108 claims, Home row 9 Verified) |
 
 ---
 

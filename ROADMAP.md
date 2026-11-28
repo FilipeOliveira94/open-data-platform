@@ -497,7 +497,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 | P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/Lo | Sm/Sm | Verified | Reference links to GitHub, ADRs, roadmap, and setup; README Platform report block points to the GitHub Pages URL. The figure manifest link arrives with P8-08 |
 | P9-05 | GitHub Pages hosting and Website field | P9-04 | Hi/Hi | Sm/Md | Verified | A GitHub Actions workflow builds `site/` and deploys it to GitHub Pages, with the Astro `site` and `base` set for the project URL; hosting documented in `site/README.md`; CI build green; repository About → Website set to the Pages URL. Later site updates redeploy through the same workflow |
 | P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Med/Med | Sm/Md | Verified | Open the published GitHub Pages URL. Walk Home, Architecture, Pipeline, Operations, and Reference. Compare status, counts, and any metric claim to `PROJECT_STATUS.md` and the Phase 0–3 docs. Record broken links, missing pages, and mismatches. Do not treat a single screenshot of the site as this check |
-| P9-07 | Phase 9 documentation and status | P9-06 | Med/Med | Sm/Sm | Delivered | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings; a mismatch is fixed and the site redeployed. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
+| P9-07 | Phase 9 documentation and status | P9-06 | Med/Med | Sm/Sm | Verified | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings; a mismatch is fixed and the site redeployed. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
 
 **Suggested order:** P9-01 → P9-02 ∥ P9-03 → P9-04 → P9-05 → P9-06 → P9-07. Phase close is P9-06 then P9-07.
 
@@ -651,7 +651,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-28 (P9-07 delivered; Phase 9 verified) |
+| Last updated | 2026-11-28 (P9-07 verified after the redeploy; Phase 9 closed) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -660,6 +660,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-28: P9-07 verified. The merge redeployed the site, and the live check on it shows Home row 9 as Verified with every page and link resolving.
 - 2026-11-28: P9-07 delivered; Phase 9 verified. `PROJECT_STATUS.md` moves to Phase 4 and cites the P9-06 result (finding F1 closed); the phase overview, the site Home table, and the README say Phase 9 is verified. P9-07 is verified after the merge redeploys the site and the live check passes on it.
 - 2026-11-28: P9-06 verified. `scripts/p9_06_live_site_check.py` and a browser walk checked the live site; [result](docs/architecture/phase-9-live-run.md). One finding (F1, the `PROJECT_STATUS.md` header) goes to P9-07.
 - 2026-11-28: P9-05 verified. The first Pages deploy from `main` serves the five routes under the project URL, and About → Website is set to it.
