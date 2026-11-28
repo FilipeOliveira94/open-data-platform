@@ -83,5 +83,5 @@ The home page opens with a 3D map of the target architecture (not a status view;
 
 - Only facts recorded as **verified** in `PROJECT_STATUS.md` are stated as delivered.
 - Site v1 content and GitHub Pages hosting are **Phase 9**. Later results arrive through each phase's site update issue (P4-11, P5-10, P6-10, P8-08, P10-13, P11-19).
-- P8-08 exports figures 1–10 and P5-10 adds figure 11; the phase's live run checks them. This scaffold does not invent charts. The figure list is the site figure table in `ROADMAP.md`.
+- P8-08 exports figures 1–10 and P5-10 adds figure 11; the phase's live run checks them. The site does not invent charts. The figure list is the site figure table in `ROADMAP.md`.
 - This tree does not replace repository docs as the source of truth.

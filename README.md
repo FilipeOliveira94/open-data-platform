@@ -24,7 +24,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 | --- | --- |
 | Current phase | Phase 4 — Streaming CDC. Not started; P11-04 (Spark on Kafka) comes first |
 | Objective | Change capture from PostgreSQL through Debezium and Kafka, next to the daily and weekly batch |
-| In place | Phases 0–3. Orchestration run on [2026-11-27](docs/architecture/phase-3-live-run.md) |
+| In place | Phases 0–3 and the report site (Phase 9). Orchestration run on [2026-11-27](docs/architecture/phase-3-live-run.md); live site check on [2026-11-28](docs/architecture/phase-9-live-run.md) |
 | Ledger | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) · scope in [`ROADMAP.md`](ROADMAP.md) |
 
 ---
@@ -38,7 +38,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 | Processing | Implemented | 2 | Spark · Iceberg · Trino · dbt |
 | Orchestration | Implemented | 3 | Airflow |
 | CDC | Proposed | 4 | Debezium · Kafka · Spark |
-| Report site | Scaffold | 9 | Astro |
+| Report site | Implemented | 9 | Astro |
 | Dataviz | Proposed | 8 | Jupyter · Superset |
 | Lineage | Proposed | 5 | OpenLineage · dbt |
 | Resource footprint | Proposed | 5 | — |
@@ -81,7 +81,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 - **Commit:** Bronze merges new raw objects; Silver and Gold replace each table in one commit.
 - **Docs:** [Lakehouse](docs/architecture/phase-2-lakehouse.md) · [Gold model](docs/architecture/gold-model-design.md) · [2026-11-11 run](docs/architecture/phase-2-live-run.md)
 
-### 📋 Orchestration
+### ✅ Orchestration
 
 - **Scheduler:** Airflow on the local Compose stack.
 - **Daily batch:** One PostgreSQL window per day.
@@ -101,7 +101,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 - **Delivery:** Exactly-once is not claimed.
 - **Docs:** [ADR-0008](docs/decisions/0008-streaming-cdc.md)
 
-### 🚧 Report site
+### ✅ Report site
 
 - **Pages:** Home, architecture, pipeline, operations, and reference.
 - **Stack:** Astro Starlight with the author's brand theme (violet and pink, Urbanist); the header links to the [portfolio](https://filipeoliveira-hub.com.br).
@@ -109,7 +109,7 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 - **Site:** [filipeoliveira94.github.io/open-data-platform](https://filipeoliveira94.github.io/open-data-platform/), served from the last successful deploy from `main`.
 - **Preview:** `cd site && npm ci && npm run dev`
 - **Hosting:** GitHub Pages, built and deployed by [`pages.yml`](.github/workflows/pages.yml) on pushes to `main`; pull requests build it without deploying. See [`site/README.md`](site/README.md) → Hosting.
-- **Docs:** [`site/README.md`](site/README.md) · [Reference page source](site/src/content/docs/reference.md)
+- **Docs:** [`site/README.md`](site/README.md) · [Reference page source](site/src/content/docs/reference.md) · [2026-11-28 live check](docs/architecture/phase-9-live-run.md)
 
 ### 📋 Dataviz
 

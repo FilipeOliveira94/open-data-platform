@@ -67,7 +67,7 @@ Every issue that adds or changes a pipeline step (ingestion, Bronze, Silver, Gol
 | 6 | CI/CD expansion, resilience tests, security checks | Sprint 6 (weeks 12–13) | Phases 1–3 verified; Phase 4/5 as applicable | Not started |
 | 7 | Withdrawn: AWS deployment path ([R1-01](#refactor-r1--project-level-adjustments), [ADR-0029](docs/decisions/0029-open-source-only-platform.md)) | — | — | Withdrawn |
 | 8 | JupyterLab exploration and Superset charts over Gold, read-only via Trino | After Phase 2 (parallel with 3–6) | Phase 2 verified | Not started |
-| 9 | Platform report site v1: multi-page static report on GitHub Pages from verified Phase 0–3 material; later phases add theirs through site update issues | Now, after Refactor R1 and before Phase 4 | Phase 3 verified | In progress |
+| 9 | Platform report site v1: multi-page static report on GitHub Pages from verified Phase 0–3 material; later phases add theirs through site update issues | Now, after Refactor R1 and before Phase 4 | Phase 3 verified | Verified |
 | 10 | Table contracts and quality observability (ODCS contracts, Data Contract CLI, BCB SGS source) | Position not fixed; toward the end, decided by Filipe during execution | Phase 3 verified | Not started |
 | 11 | BioGuardia Atlantic operational sources at scale: daily export (about 24M rows a day), telemetry stream (1M events an hour), PII masking, data skew, SCD Type 2, reconciliation | Position not fixed, decided by Filipe; P11-01 to P11-03 run now under a waiver | P11-01 to P11-03: none (waiver, `DECISIONS.md` 2026-11-26); P11-04 onward: Phase 3 verified; P11-08 and P11-15: P5-07 | In progress (P11-01 to P11-03) |
 
@@ -479,13 +479,13 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 
 **Phase acceptance (all required):**
 
-- [ ] Static site under `site/` with the five pages populated from verified Phase 0–3 material.
-- [ ] Content matches delivered/verified work; no planned-but-unbuilt capabilities presented as complete. The Home status table matches the phase overview.
-- [ ] Site builds locally via a documented command; CI builds the static output and deploys it to GitHub Pages.
-- [ ] Public URL is set on the GitHub repository Website field and linked from the README Platform report block.
-- [ ] Navigation and page roles match the growth scheme above; reference page links back to repo docs/ADRs.
+- [x] Static site under `site/` with the five pages populated from verified Phase 0–3 material (P9-01 to P9-04).
+- [x] Content matches delivered/verified work; no planned-but-unbuilt capabilities presented as complete. The Home status table matches the phase overview (P9-02 to P9-04, P9-06).
+- [x] Site builds locally via a documented command; CI builds the static output and deploys it to GitHub Pages (P9-01, P9-05).
+- [x] Public URL is set on the GitHub repository Website field and linked from the README Platform report block (P9-04, P9-05).
+- [x] Navigation and page roles match the growth scheme above; reference page links back to repo docs/ADRs (P9-01, P9-04, P9-06).
 - [x] A live site result is recorded and compared to `PROJECT_STATUS.md` (P9-06, [result](docs/architecture/phase-9-live-run.md)).
-- [ ] Documentation and `PROJECT_STATUS.md` cite that result (P9-07).
+- [x] Documentation and `PROJECT_STATUS.md` cite that result (P9-07).
 
 ### Issues
 
@@ -497,7 +497,7 @@ Withdrawn on 2026-11-27 by [R1-01](#refactor-r1--project-level-adjustments): the
 | P9-04 | Reference page and repo cross-links | P9-02, P9-03 | Lo/Lo | Sm/Sm | Verified | Reference links to GitHub, ADRs, roadmap, and setup; README Platform report block points to the GitHub Pages URL. The figure manifest link arrives with P8-08 |
 | P9-05 | GitHub Pages hosting and Website field | P9-04 | Hi/Hi | Sm/Md | Verified | A GitHub Actions workflow builds `site/` and deploys it to GitHub Pages, with the Astro `site` and `base` set for the project URL; hosting documented in `site/README.md`; CI build green; repository About → Website set to the Pages URL. Later site updates redeploy through the same workflow |
 | P9-06 | Live run, result, and consistency check | P9-04, P9-05 | Med/Med | Sm/Md | Verified | Open the published GitHub Pages URL. Walk Home, Architecture, Pipeline, Operations, and Reference. Compare status, counts, and any metric claim to `PROJECT_STATUS.md` and the Phase 0–3 docs. Record broken links, missing pages, and mismatches. Do not treat a single screenshot of the site as this check |
-| P9-07 | Phase 9 documentation and status | P9-06 | Med/- | Sm/- | Not started | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings; a mismatch is fixed and the site redeployed. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
+| P9-07 | Phase 9 documentation and status | P9-06 | Med/Med | Sm/Sm | Delivered | Site copy, README, and `PROJECT_STATUS.md` match the P9-06 findings; a mismatch is fixed and the site redeployed. Unresolved mismatches are listed as limitations. Tone stays factual. No unverified metrics or cost figures |
 
 **Suggested order:** P9-01 → P9-02 ∥ P9-03 → P9-04 → P9-05 → P9-06 → P9-07. Phase close is P9-06 then P9-07.
 
@@ -651,7 +651,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 | Document | Reference |
 | --- | --- |
 | Created | 2026-10-15 |
-| Last updated | 2026-11-28 (P9-06 verified; live site walked, links and claims checked, one ledger finding for P9-07) |
+| Last updated | 2026-11-28 (P9-07 delivered; Phase 9 verified) |
 | Owns | Program scope and issue acceptance |
 | Related | `PROJECT_STATUS.md`, `docs/status-log.md`, `DECISIONS.md`, `docs/project-genesis.md` (previously `docs/project-context-for-cursor.md`), `AGENTS.md`, `CLAUDE.md` |
 | Changelog | [Changelog](#changelog) below; detail in `docs/status-log.md` |
@@ -660,6 +660,7 @@ Not scheduled. None of these belong to a phase objective. Do not assign an ID un
 
 ## Changelog
 
+- 2026-11-28: P9-07 delivered; Phase 9 verified. `PROJECT_STATUS.md` moves to Phase 4 and cites the P9-06 result (finding F1 closed); the phase overview, the site Home table, and the README say Phase 9 is verified. P9-07 is verified after the merge redeploys the site and the live check passes on it.
 - 2026-11-28: P9-06 verified. `scripts/p9_06_live_site_check.py` and a browser walk checked the live site; [result](docs/architecture/phase-9-live-run.md). One finding (F1, the `PROJECT_STATUS.md` header) goes to P9-07.
 - 2026-11-28: P9-05 verified. The first Pages deploy from `main` serves the five routes under the project URL, and About → Website is set to it.
 - 2026-11-28: P9-05 delivered. `site/astro.config.mjs` sets `site` and `base` for the project Pages URL; `.github/workflows/pages.yml` builds the site on every pull request and push, fails on links outside the base, and deploys only from `main`. Verified after the owner enables Pages, the first deploy passes, and About → Website is set.
