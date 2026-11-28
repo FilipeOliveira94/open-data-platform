@@ -1,4 +1,4 @@
-"""Consistency checks between the report site pages and the repository docs (P9-02).
+"""Consistency checks between the report site pages and the repository docs.
 
 The site states status, versions and decisions that the repository records
 elsewhere. These tests fail when a page drifts from its source, so a wrong
@@ -15,11 +15,16 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 DOCS_PAGES = ROOT / "site" / "src" / "content" / "docs"
 HOME = DOCS_PAGES / "index.mdx"
 ARCHITECTURE = DOCS_PAGES / "architecture.mdx"
+PIPELINE = DOCS_PAGES / "pipeline.mdx"
+OPERATIONS = DOCS_PAGES / "operations.md"
+ORCHESTRATION_DOC = ROOT / "docs" / "architecture" / "phase-3-orchestration.md"
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 DIAGRAMS = ROOT / "docs" / "assets" / "diagrams"
 REPO_URL = "https://github.com/FilipeOliveira94/open-data-platform/"
 
@@ -74,7 +79,7 @@ def test_architecture_adr_status_matches_decisions() -> None:
     assert status["D-014"] == "proposed"
 
     checked = 0
-    for page in (HOME, ARCHITECTURE):
+    for page in (HOME, ARCHITECTURE, PIPELINE, OPERATIONS):
         text = page.read_text(encoding="utf-8")
         for adr, stated in re.findall(
             r"\b(D-\d{3})\b[^\n|`]*`(approved|proposed|superseded)`", text
@@ -119,10 +124,15 @@ def test_site_repo_links_point_to_existing_paths() -> None:
     assert seen > 0
 
 
-def test_diagram_figure_sources_exist() -> None:
-    page = ARCHITECTURE.read_text(encoding="utf-8")
+DIAGRAM_PAGES = (ARCHITECTURE, PIPELINE)
+
+
+@pytest.mark.parametrize("page_path", DIAGRAM_PAGES, ids=lambda p: p.name)
+def test_diagram_figure_sources_exist(page_path: Path) -> None:
+    page = page_path.read_text(encoding="utf-8")
     assert f"export const repo = '{REPO_URL}blob/main/';" in page
     sources = re.findall(r"source=\{`\$\{repo\}([^`]+)`\}", page)
+    assert sources, f"{page_path.name} has no DiagramFigure"
     assert len(sources) == page.count("<DiagramFigure")
     for rel in sources:
         assert (ROOT / rel).is_file(), f"diagram source {rel} is missing"
@@ -143,7 +153,7 @@ def _load_builder():
     return module
 
 
-@pytest.mark.parametrize("name", ["lakehouse", "orchestration"])
+@pytest.mark.parametrize("name", ["lakehouse", "orchestration", "quality-gate"])
 def test_diagram_sources_match_generator(name: str, tmp_path: Path) -> None:
     builder = _load_builder()
     builder.HERE = tmp_path
@@ -171,19 +181,137 @@ def test_diagram_sources_match_generator(name: str, tmp_path: Path) -> None:
         )
 
 
-def test_architecture_diagrams_come_from_docs() -> None:
-    page = ARCHITECTURE.read_text(encoding="utf-8")
-    imports = re.findall(r"from '([^']+\.png)'", page)
-    assert imports, "Architecture imports no diagram"
-    for rel in imports:
-        target = (ARCHITECTURE.parent / rel).resolve()
-        assert target.parent == DIAGRAMS, f"{rel} is not under docs/assets/diagrams"
-        assert target.is_file()
+def test_site_diagrams_come_from_docs() -> None:
+    imports = []
+    for page_path in DIAGRAM_PAGES:
+        page = page_path.read_text(encoding="utf-8")
+        found = re.findall(r"from '([^']+\.png)'", page)
+        assert found, f"{page_path.name} imports no diagram"
+        for rel in found:
+            target = (page_path.parent / rel).resolve()
+            assert target.parent == DIAGRAMS, f"{rel} is not under docs/assets/diagrams"
+            assert target.is_file()
+        imports += found
 
     owners = {
         "lakehouse": ROOT / "docs" / "architecture" / "phase-2-lakehouse.md",
-        "orchestration": ROOT / "docs" / "architecture" / "phase-3-orchestration.md",
+        "orchestration": ORCHESTRATION_DOC,
+        "quality-gate": ORCHESTRATION_DOC,
     }
     for name, doc in owners.items():
         assert f"assets/diagrams/{name}.png" in doc.read_text(encoding="utf-8")
         assert any(f"/{name}.png" in rel for rel in imports)
+
+
+def test_pipeline_schedules_match_orchestration_doc() -> None:
+    doc = _table_rows(
+        _section(ORCHESTRATION_DOC.read_text(encoding="utf-8"), "## Schedules"),
+        "| DAG |",
+    )
+    page = _table_rows(PIPELINE.read_text(encoding="utf-8"), "| DAG |")
+    assert [[_plain(c) for c in row[:4]] for row in page] == [
+        [_plain(c) for c in row[:4]] for row in doc
+    ]
+
+
+def test_operations_ci_matches_workflow() -> None:
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))
+    steps = [step for job in workflow["jobs"].values() for step in job["steps"]]
+    expected = [(s["name"], s["run"].strip()) for s in steps if "run" in s]
+    page = OPERATIONS.read_text(encoding="utf-8")
+    shown = [
+        (row[0], row[1].strip("`")) for row in _table_rows(page, "| Step | Command |")
+    ]
+    assert shown == expected
+
+    setup = next(s for s in steps if s.get("uses", "").startswith("astral-sh/setup-uv"))
+    assert f"uv `{setup['with']['version']}`" in page
+    assert f"Python {setup['with']['python-version']}" in page
+
+
+def _roadmap_status() -> tuple[dict[str, str], dict[str, str]]:
+    roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+    phases = {
+        row[0]: _plain(row[-1])
+        for row in _table_rows(_section(roadmap, "## Phase overview"), "| Phase |")
+    }
+    issues = {}
+    for line in roadmap.splitlines():
+        m = re.match(r"\| ((?:P|R)\d+-\d{2}) \|", line)
+        if m:
+            issues[m.group(1)] = line.strip().strip("|").split("|")[5].strip()
+    return phases, issues
+
+
+@pytest.mark.parametrize("page_path", (PIPELINE, OPERATIONS), ids=lambda p: p.name)
+def test_planned_items_are_not_verified(page_path: Path) -> None:
+    """A sentence that says planned names its phase or issue, which is not verified.
+
+    The status comes from ROADMAP.md, so when a later issue verifies an item
+    this test fails until that phase's site update relabels the page.
+    """
+    phases, issues = _roadmap_status()
+    seen = 0
+    lines = [
+        line
+        for line in page_path.read_text(encoding="utf-8").splitlines()
+        if not line.startswith("#")
+    ]
+    sentences = [part for line in lines for part in re.split(r"(?<=[.;])\s+", line)]
+    for line in sentences:
+        if not re.search(r"\bplanned\b|not started", line, re.IGNORECASE):
+            continue
+        named = re.findall(r"\bPhase (\d+)\b", line)
+        ids = re.findall(r"\b(P\d+-\d{2})\b", line)
+        assert named or ids, (
+            f"{page_path.name}: planned line names no phase or issue: {line}"
+        )
+        for phase in named:
+            assert not phases[phase].startswith("Verified"), (
+                f"{page_path.name}: Phase {phase} is verified but labeled planned"
+            )
+        for issue in ids:
+            assert not issues[issue].startswith("Verified"), (
+                f"{page_path.name}: {issue} is verified but labeled planned"
+            )
+        seen += 1
+    assert seen > 0
+
+
+_LINK = re.compile(
+    r"\]\((" + re.escape(REPO_URL) + r"(?:blob|tree)/main/([^)#\s]+)[^)]*)\)"
+)
+_NUMBER = re.compile(r"(?<![\w.\-/#])\d+(?:[._,:\-]\d+)*")
+
+
+def _page_sections(text: str) -> list[str]:
+    body = text.split("\n---\n", 1)[1] if text.startswith("---\n") else text
+    body = "\n".join(
+        line
+        for line in body.splitlines()
+        if not line.startswith(("import ", "export "))
+    )
+    return re.split(r"\n(?=## )", body)
+
+
+@pytest.mark.parametrize("page_path", (PIPELINE, OPERATIONS), ids=lambda p: p.name)
+def test_page_numbers_come_from_linked_docs(page_path: Path) -> None:
+    """Each number in a section appears in a repo file linked from that section."""
+    checked = 0
+    for section in _page_sections(page_path.read_text(encoding="utf-8")):
+        sources = ""
+        for _url, rel in _LINK.findall(section):
+            path = ROOT / rel
+            if path.is_file():
+                sources += path.read_text(encoding="utf-8")
+        prose = _LINK.sub("]", section)
+        prose = re.sub(r"Phases? \d+(?:\s*(?:–|to|and)\s*\d+)?", "", prose)
+        prose = re.sub(r"<DiagramFigure[\s\S]*?/>", "", prose)
+        heading = section.splitlines()[0]
+        for number in _NUMBER.findall(prose):
+            whole = rf"(?<![\d.]){re.escape(number)}(?![\d]|\.\d)"
+            assert re.search(whole, sources), (
+                f"{page_path.name} {heading!r}: {number} is not in a linked repo file"
+            )
+            checked += 1
+    assert checked > 0

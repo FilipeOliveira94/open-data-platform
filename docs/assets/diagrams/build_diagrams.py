@@ -1,13 +1,15 @@
 """Build the architecture diagrams used by docs and the report site.
 
 Writes one self-contained HTML file per diagram and skin into this folder:
-``lakehouse.html``, ``lakehouse-dark.html``, ``orchestration.html`` and
-``orchestration-dark.html``. The PNGs next to them are exports of these files
+``lakehouse.html``, ``lakehouse-dark.html``, ``orchestration.html``,
+``orchestration-dark.html``, ``quality-gate.html`` and ``quality-gate-dark.html``.
+The PNGs next to them are exports of these files
 (``export_png.py`` from the diagram-design skill, scale 2).
 
 Skin: Filipe Oliveira personal brand (``filipeoliveira-hub-assets/brand``),
 Urbanist for names and Geist Mono for technical labels. Every fact drawn here
-comes from ``docs/architecture/phase-2-lakehouse.md``, the layer notes, and
+comes from ``docs/architecture/phase-2-lakehouse.md``, the layer notes,
+``docs/architecture/data-contracts.md``, and
 ``docs/architecture/phase-3-orchestration.md``; change those first.
 
 Run: ``python3 docs/assets/diagrams/build_diagrams.py``. After exporting the PNGs,
@@ -669,8 +671,163 @@ def orchestration_svg(s: Skin) -> tuple[str, int]:
     return "\n".join(out), width
 
 
+# --------------------------------------------------------------------------- #
+# Quality gate and quarantine (data-flow type, two lanes, Gold focal)
+# --------------------------------------------------------------------------- #
+
+Q_W, Q_GAP, Q_TOP, Q_H = 128, 28, 64, 88
+Q_XS = [20 + i * (Q_W + Q_GAP) for i in range(5)]
+Q_RECORDS = [
+    ("INGEST", "Contract check", ["classify records", "shape error: fail"]),
+    ("MINIO", "raw/ object", ["stored whole", "invalid rows stay"]),
+    ("SPARK", "Bronze", ["reads sidecar", "_quarantine_reasons"]),
+    ("SPARK", "Silver", ["exclude: dropped", "flag: kept, marked"]),
+    ("DBT", "Gold", ["stage_quarantine", "quality facts"]),
+]
+Q_CARDS = [
+    ("GATE", "bronze_checks · silver_checks", "an open check blocks the next layer"),
+    ("GUARD", "Volume guard", "a shrinking snapshot fails Silver"),
+]
+
+
+def quality_svg(s: Skin) -> tuple[str, int]:
+    width, height = 792, 412
+    slug = f"quality-gate{s.slug}"
+    arrow, arrow_accent = f"url(#{slug}-arrow)", f"url(#{slug}-arrow-accent)"
+    stroke = f'fill="none" stroke="{s.muted}" stroke-width="1.3" marker-end="{arrow}"'
+    accent = (
+        f'fill="none" stroke="{s.accent}" stroke-width="1.6" marker-end="{arrow_accent}"'
+    )
+    cx = [x + Q_W // 2 for x in Q_XS]
+    bottom, mid = Q_TOP + Q_H, Q_TOP + Q_H // 2
+    lane_y, lane_h = 216, 68
+    lane_mid = lane_y + lane_h // 2
+    route_y = 304
+    out: list[str] = [
+        f'<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" role="img" '
+        f'aria-labelledby="{slug}-title {slug}-desc">',
+        f'<title id="{slug}-title">Quality gate and quarantine on the batch path</title>',
+        f'<desc id="{slug}-desc">At ingestion each record is classified against its contract: '
+        "a structural error fails the batch, the raw object is stored whole, and findings go to "
+        "a quarantine sidecar. Bronze copies the finding reasons onto each record; Silver drops "
+        "or flags the record by the contract's on_invalid policy and records quality counts; "
+        "stage_quarantine loads the findings for the Gold quality facts. An open Bronze or "
+        "Silver check blocks the next layer, and the volume guard fails Silver when a snapshot "
+        "shrinks.</desc>",
+        markers(s, slug),
+        f'<rect width="{width}" height="{height}" fill="{s.paper}"/>',
+        text(
+            20,
+            44,
+            "RECORD PATH · ON_INVALID FROM THE CONTRACT",
+            size=9,
+            fill=s.muted,
+            weight=500,
+            spacing="0.18em",
+        ),
+    ]
+
+    # Connectors before nodes, so labels and cards sit on top.
+    for i in range(4):
+        style = accent if i == 3 else stroke
+        out.append(f'<path d="M {Q_XS[i] + Q_W},{mid} H {Q_XS[i + 1]}" {style}/>')
+    out.append(
+        f'<path d="M {cx[0]},{bottom} V {lane_mid - 8} Q {cx[0]},{lane_mid} {cx[0] + 8},{lane_mid} '
+        f'H {Q_XS[1]}" {stroke}/>'
+    )
+    label(out, s, (cx[0] + 8 + Q_XS[1]) / 2, lane_mid, "FINDINGS")
+    out.append(
+        f'<path d="M {Q_XS[1] + Q_W},{lane_mid} H {cx[2] - 8} Q {cx[2]},{lane_mid} {cx[2]},{lane_mid - 8} '
+        f'V {bottom}" {stroke}/>'
+    )
+    label(out, s, cx[2], 190, "REASONS")
+    out.append(f'<path d="M {cx[3]},{bottom} V {lane_y}" {stroke}/>')
+    label(out, s, cx[3], 190, "COUNTS")
+    out.append(
+        f'<path d="M {cx[1]},{lane_y + lane_h} V {route_y - 8} Q {cx[1]},{route_y} {cx[1] + 8},{route_y} '
+        f'H {cx[4] - 8} Q {cx[4]},{route_y} {cx[4]},{route_y - 8} V {bottom}" {accent}/>'
+    )
+    label(out, s, (cx[1] + cx[4]) / 2, route_y, "STAGE_QUARANTINE", accent=True)
+
+    for x, (tag, name, subs) in zip(Q_XS, Q_RECORDS, strict=True):
+        node(out, s, x, Q_TOP, Q_W, Q_H, tag, name, subs, focal=name == "Gold")
+    node(
+        out,
+        s,
+        Q_XS[1],
+        lane_y,
+        Q_W,
+        lane_h,
+        "MINIO",
+        "Sidecar",
+        ["reason, field, key"],
+    )
+    node(
+        out,
+        s,
+        Q_XS[3],
+        lane_y,
+        Q_W,
+        lane_h,
+        "ICEBERG",
+        "quality_counts",
+        ["per column, metric"],
+    )
+
+    card_y, card_h = 332, 60
+    card_w = (width - 40 - 16) // 2
+    for k, (tag, title, sub) in enumerate(Q_CARDS):
+        px = 20 + k * (card_w + 16)
+        out.append(
+            f'<rect x="{px}" y="{card_y}" width="{card_w}" height="{card_h}" rx="6" '
+            f'fill="{s.card}" stroke="{s.rule}" stroke-width="1"/>'
+        )
+        out.append(
+            f'<rect x="{px + 12}" y="{card_y + 12}" width="44" height="16" rx="2" '
+            f'fill="none" stroke="{s.muted}" stroke-opacity="0.6" stroke-width="0.8"/>'
+        )
+        out.append(
+            text(
+                px + 34,
+                card_y + 24,
+                tag,
+                size=9,
+                fill=s.ink,
+                weight=500,
+                anchor="middle",
+                spacing="0.12em",
+            )
+        )
+        out.append(
+            text(
+                px + 72,
+                card_y + 26,
+                title,
+                size=13,
+                fill=s.ink,
+                family=SANS,
+                weight=700,
+            )
+        )
+        out.append(text(px + 72, card_y + 44, sub, size=10.5, fill=s.muted))
+
+    out.append("</svg>")
+    return "\n".join(out), width
+
+
 def main() -> None:
     for skin in (LIGHT, DARK):
+        svg, width = quality_svg(skin)
+        (HERE / f"quality-gate{skin.slug}.html").write_text(
+            page(
+                "Quality gate and quarantine",
+                "Open Data Platform · verified through Phase 3",
+                svg,
+                skin,
+                width,
+            ),
+            encoding="utf-8",
+        )
         svg, width = lakehouse_svg(skin)
         (HERE / f"lakehouse{skin.slug}.html").write_text(
             page(
@@ -695,7 +852,14 @@ def main() -> None:
         )
 
 
-NAMES = ("lakehouse", "lakehouse-dark", "orchestration", "orchestration-dark")
+NAMES = (
+    "lakehouse",
+    "lakehouse-dark",
+    "orchestration",
+    "orchestration-dark",
+    "quality-gate",
+    "quality-gate-dark",
+)
 
 
 def record_exports() -> None:
