@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 PYTEST ?= $(UV) run pytest
 RUFF ?= $(UV) run ruff
 
-.PHONY: help setup sync lint format test test-unit test-minio spark-ivy-warm live-bronze live-silver live-refresh live-rebuild live-prune-work coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation dbt-unit live-gold runtime-build up airflow-up down ps logs clean
+.PHONY: help setup sync lint format test test-unit test-minio spark-ivy-warm live-bronze live-silver live-refresh live-rebuild live-prune-work coverage-report stage-quarantine dbt-parse dbt-build dbt-test-reconciliation dbt-unit live-gold kafka-spark-probe kafka-spark-probe-drill kafka-spark-probe-trino runtime-build up airflow-up down ps logs clean
 
 # One run label per make invocation (ADR-0024). The work directory and the
 # staging keys carry it, so a make run and an Airflow run never share staging.
@@ -203,6 +203,32 @@ stream-stop: ## Stop the BioGuardia producer and Kafka (keeps the log volume and
 
 stream-check: ## Measure the stream for MINUTES (default 60): end-offset deltas per topic, CPU, memory, disk
 	bash scripts/p11_03_stream_check.sh $(or $(MINUTES),60)
+
+# P11-04: Spark Structured Streaming on Kafka probe. Needs `make stream-up`
+# first. ARGS is one kafka_probe.py mode: run, drain, rewind-commit, check, drop.
+kafka-spark-probe: ## P11-04 Spark-Kafka probe; ARGS="run --run-label r1" (see docs/sources/bioguardia-telemetry.md)
+	@test -n "$(ARGS)" || (echo "ARGS is required, for example ARGS=check" >&2; exit 2)
+	@set -e; \
+	set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(ensure_spark_ivy); \
+	$(COMPOSE) up -d --wait postgres minio; \
+	$(call medallion_step,ensure-catalog); \
+	$(COMPOSE) --profile lakehouse --profile streaming run --rm -T spark /opt/odp/spark/run_kafka_probe.sh $(ARGS)
+
+kafka-spark-probe-drill: ## P11-04: run, rewind, kill mid-batch, drain, check, drop (RUN_SECONDS, default 120)
+	bash scripts/p11_04_kafka_probe_drill.sh $(or $(RUN_SECONDS),120)
+
+kafka-spark-probe-trino: ## P11-04: count the probe table through Trino
+	@set -e; \
+	set -a; \
+	[ -f .env.example ] && . ./.env.example; \
+	[ -f .env ] && . ./.env; \
+	set +a; \
+	$(COMPOSE) --profile lakehouse up -d --wait trino; \
+	$(COMPOSE) --profile lakehouse exec -T trino trino --output-format TSV --execute "SELECT count(*) AS probe_rows FROM iceberg.scratch_p11_04.telemetry_probe"
 
 runtime-build: ## Build the shared runtime image (Airflow + Spark + dbt)
 	$(COMPOSE) --profile lakehouse build spark
