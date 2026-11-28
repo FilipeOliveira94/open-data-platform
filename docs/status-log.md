@@ -4,6 +4,17 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-28 — P9-07 Phase 9 documentation and status (delivered); Phase 9 verified
+
+P9-07 closes Site v1 on the P9-06 result ([`docs/architecture/phase-9-live-run.md`](architecture/phase-9-live-run.md)). Finding F1 is closed: `PROJECT_STATUS.md` named Phase 4 in its header while Phase 9 was in progress; it now records Phase 9 as verified, cites the P9-06 result in its objective and in a new Phase 9 baseline, and names Phase 4 as the current phase, with P11-04 first. The Phase 9 acceptance items are checked on the verified P9-01 to P9-06 rows. Phase 9 is Verified in the `ROADMAP.md` phase overview, the site Home status table, and `PROJECT_STATUS.md`. `README.md` marks the report site as implemented, links the P9-06 result, and gives the orchestration section the implemented icon, which still showed planned after Phase 3 closed. `site/README.md` no longer calls the site a scaffold. The README test now finds the Report site section by its heading text rather than its icon. No unresolved mismatch. Seen Risk Med, seen Size Sm (docs, one site table cell, one test).
+
+| Check | Result |
+| --- | --- |
+| `make lint` | PASS (Ruff clean; Markdown tables: 71 files, 0 with an empty header row) |
+| `make test` | 727 passed |
+| `cd site && npm run build` | PASS, 6 pages built |
+| Not run | The redeploy and a rerun of `scripts/p9_06_live_site_check.py` on it: they follow the merge, and P9-07 is verified when they pass |
+
 ### 2026-11-28 — P9-06 live site run and consistency check (verified)
 
 `scripts/p9_06_live_site_check.py` checked the published site at deployed commit `2ec9eb0` (= `origin/main`), and a browser walk went through its navigation. Each claim was compared to its source and to `PROJECT_STATUS.md`. Result: [`docs/architecture/phase-9-live-run.md`](architecture/phase-9-live-run.md). Seen Risk Med, seen Size Md (about 780 hand-written lines of script and tests, above the Sm bound).

@@ -6,8 +6,8 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-28 (P9-06 verified; live site checked, one finding for P9-07) |
-| Current phase | Phase 4 — Streaming CDC |
+| Last updated | 2026-11-28 (P9-07 delivered; Phase 9 verified, Phase 4 next) |
+| Current phase | Phase 4 — Streaming CDC; P11-04 (Spark on Kafka) comes first |
 | Phase status | Not started |
 
 **Status values:** not started · in progress · delivered · verified · blocked · withdrawn
@@ -22,13 +22,12 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue. R1-03 renamed the PostgreSQL source to olist-synth-cdc (`olist_synth_cdc`, schema `olist_synth`, Gold `olist_synth_operations`); Silver and Gold counts match the pre-rename run and the old objects are deleted. Refactor R1 is complete. Site v1 (Phase 9) is in progress: P9-01 verified the `site/` scaffold and its five routes, P9-02 filled Home and Architecture, P9-03 filled Pipeline and Operations, P9-04 filled Reference and linked the GitHub Pages URL from the README, and P9-05 verified the GitHub Pages workflow (`pages.yml`): the first deploy from `main` serves the site at https://filipeoliveira94.github.io/open-data-platform/ and About → Website is set. P9-06 checked the live site: every page and link resolves and every claim matches its source; its one finding (F1) is this file's header, which P9-07 fixes ([result](docs/architecture/phase-9-live-run.md)). P9-07 is next.
+Phase 9 (Site v1) is **verified** (2026-11-28). The report site is live at https://filipeoliveira94.github.io/open-data-platform/, built and deployed from `main` by `pages.yml`. The P9-06 live check found no broken link, no missing page, and no site claim that disagrees with its source ([result](docs/architecture/phase-9-live-run.md)). Its one finding, F1, was this file's header, which named Phase 4 while Phase 9 was in progress; P9-07 closed Phase 9, so Phase 4 is now the current phase in the header and in this objective. P9-07 is delivered and becomes verified once the merge redeploys the site and a rerun of the live check shows Home row 9 as Verified. Phase 4 is next. It depends on Phase 3 (verified) and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 (Spark Structured Streaming on Kafka) comes first.
 
 ## Next work
 
-1. **Phase 9 (Site v1)** — P9-07 (documentation and status, including P9-06 finding F1). Acceptance: `ROADMAP.md` → Phase 9.
-2. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
-3. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
+1. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
+2. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
 
 ---
 
@@ -59,6 +58,17 @@ Acceptance detail: `ROADMAP.md` → Phase 4.
 | Environment | WSL2 and the live GitHub Pages site at deployed commit `2ec9eb0` (P9-06) |
 | Checks | `scripts/p9_06_live_site_check.py` against the live URL, browser walk, `make lint`, `make test` |
 | Result | PASS. 5 pages 200, 79 distinct links ok, 16 repository anchors present, 108 claims: 96 match, 12 skipped as not a claim, 0 mismatch. Result: [`docs/architecture/phase-9-live-run.md`](docs/architecture/phase-9-live-run.md) |
+| P9-07 checks | `make lint` PASS, `make test` 727 passed, `npm run build` PASS; the live check is rerun after the merge redeploys the site |
+
+---
+
+## Phase 9 baseline
+
+Phase 9 is **verified**. Live result: [`docs/architecture/phase-9-live-run.md`](docs/architecture/phase-9-live-run.md) (2026-11-28). Hosting: [`site/README.md`](site/README.md) → Hosting.
+
+`site/` is Astro Starlight with five pages (Home, Architecture, Pipeline, Operations, Reference) written from verified Phase 0–3 material. `pages.yml` builds the site on every pull request and push and deploys only from `main`; the repository About → Website field and the README link the Pages URL. Planned work is labeled planned on each page. Site tests check that the Home status table matches the `ROADMAP.md` phase overview. Later phases publish their results through their own site update issues (P4-11, P5-10, P6-10, P8-08, P10-13, P11-19), and `scripts/p9_06_live_site_check.py` can rerun the live check.
+
+Closed Phase 9 narrative: [`ROADMAP.md`](ROADMAP.md) (Phase 9), [`docs/status-log.md`](docs/status-log.md).
 
 ---
 
@@ -153,7 +163,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 6 | CI/CD expansion, resilience, security | Not started |
 | 7 | Withdrawn: AWS path (R1-01, ADR-0029) | Withdrawn |
 | 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–6) |
-| 9 | Platform report site v1 on GitHub Pages from Phase 0–3 material | In progress: P9-01 to P9-05 verified (scaffold, all five pages, Pages hosting); runs before Phase 4 |
+| 9 | Platform report site v1 on GitHub Pages from Phase 0–3 material | Verified (2026-11-28) |
 | 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3) |
 | 11 | BioGuardia Atlantic sources at scale: daily export, telemetry stream, PII, skew, SCD2, reconciliation | In progress (waiver): P11-01 to P11-03 verified; drops 2026-11-26 to 2026-12-31 in MinIO; stream running. Processing (P11-04 on) waits for Phase 3 |
 
@@ -189,13 +199,15 @@ None.
 
 ## Platform report site
 
-Astro Starlight scaffold with the brand theme (violet and pink, Urbanist) and a header link to the portfolio, under `site/` (verified facts only). Site v1 (Phase 9) fills the pages from verified Phase 0–3 material and hosts them on GitHub Pages; P9-02 filled Home (purpose, a status table that matches the `ROADMAP.md` phase overview, the 3D map labeled target architecture) and Architecture (stack, medallion, contracts, Airflow orchestration, batch vs stream, with diagrams from `docs/assets/diagrams/`); P9-03 filled Pipeline and Operations; P9-04 filled Reference. From Phase 4 on, each phase has a site update issue before its close pair. Preview: `cd site && npm run dev` — see `site/README.md`. The site figure table in `ROADMAP.md` names each figure and the issue that publishes it (P8-08, P5-10).
+Site v1 is live at https://filipeoliveira94.github.io/open-data-platform/: Astro Starlight under `site/` with the brand theme (violet and pink, Urbanist), a header link to the portfolio, and verified facts only. P9-02 filled Home (purpose, a status table that matches the `ROADMAP.md` phase overview, the 3D map labeled target architecture) and Architecture (stack, medallion, contracts, Airflow orchestration, batch vs stream, with diagrams from `docs/assets/diagrams/`); P9-03 filled Pipeline and Operations; P9-04 filled Reference; P9-05 hosts it on GitHub Pages; P9-06 checked the live site. From Phase 4 on, each phase has a site update issue before its close pair. Preview: `cd site && npm run dev` — see `site/README.md`. The site figure table in `ROADMAP.md` names each figure and the issue that publishes it (P8-08, P5-10).
 
 | Page | Status |
 | --- | --- |
 | Home / Architecture | Verified Phase 0–3 content (P9-02) |
 | Pipeline / Operations | Verified Phase 0–3 content (P9-03) |
 | Reference | Links to the repository, setup, status, roadmap, decisions, and phase docs (P9-04) |
+| Hosting | GitHub Pages, deployed from `main` by `pages.yml` (P9-05) |
+| Live check | No broken link, missing page, or claim mismatch ([P9-06 result](docs/architecture/phase-9-live-run.md)) |
 
 ---
 

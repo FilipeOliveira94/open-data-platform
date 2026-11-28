@@ -157,7 +157,9 @@ def test_reference_figure_manifest_is_planned_until_p8_08() -> None:
 
 def test_readme_report_site_links_pages_url() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    block = readme[readme.index("### 🚧 Report site") :]
+    heading = re.search(r"^### \S+ Report site$", readme, re.MULTILINE)
+    assert heading, "README has no Report site section"
+    block = readme[heading.start() :]
     block = block[: block.index("\n### ", 1)]
     assert f"]({PAGES_URL})" in block
 
