@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-28 (P9-05 verified; site live on GitHub Pages) |
+| Last updated | 2026-11-28 (P9-06 verified; live site checked, one finding for P9-07) |
 | Current phase | Phase 4 — Streaming CDC |
 | Phase status | Not started |
 
@@ -22,11 +22,11 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue. R1-03 renamed the PostgreSQL source to olist-synth-cdc (`olist_synth_cdc`, schema `olist_synth`, Gold `olist_synth_operations`); Silver and Gold counts match the pre-rename run and the old objects are deleted. Refactor R1 is complete. Site v1 (Phase 9) is in progress: P9-01 verified the `site/` scaffold and its five routes, P9-02 filled Home and Architecture, P9-03 filled Pipeline and Operations, P9-04 filled Reference and linked the GitHub Pages URL from the README, and P9-05 verified the GitHub Pages workflow (`pages.yml`): the first deploy from `main` serves the site at https://filipeoliveira94.github.io/open-data-platform/ and About → Website is set. P9-06 is next.
+Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue. R1-03 renamed the PostgreSQL source to olist-synth-cdc (`olist_synth_cdc`, schema `olist_synth`, Gold `olist_synth_operations`); Silver and Gold counts match the pre-rename run and the old objects are deleted. Refactor R1 is complete. Site v1 (Phase 9) is in progress: P9-01 verified the `site/` scaffold and its five routes, P9-02 filled Home and Architecture, P9-03 filled Pipeline and Operations, P9-04 filled Reference and linked the GitHub Pages URL from the README, and P9-05 verified the GitHub Pages workflow (`pages.yml`): the first deploy from `main` serves the site at https://filipeoliveira94.github.io/open-data-platform/ and About → Website is set. P9-06 checked the live site: every page and link resolves and every claim matches its source; its one finding (F1) is this file's header, which P9-07 fixes ([result](docs/architecture/phase-9-live-run.md)). P9-07 is next.
 
 ## Next work
 
-1. **Phase 9 (Site v1)** — P9-06 (live run and consistency check), then P9-07. Acceptance: `ROADMAP.md` → Phase 9.
+1. **Phase 9 (Site v1)** — P9-07 (documentation and status, including P9-06 finding F1). Acceptance: `ROADMAP.md` → Phase 9.
 2. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
 3. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
 
@@ -55,10 +55,10 @@ Acceptance detail: `ROADMAP.md` → Phase 4.
 
 | Validation | Detail |
 | --- | --- |
-| Date | 2026-11-27 |
-| Environment | WSL2, repository checks only (P3-15 is documentation) |
-| Checks | `make lint` |
-| Result | PASS. The phase result it cites is the P3-14 live run: [`docs/architecture/phase-3-live-run.md`](docs/architecture/phase-3-live-run.md) |
+| Date | 2026-11-28 |
+| Environment | WSL2 and the live GitHub Pages site at deployed commit `2ec9eb0` (P9-06) |
+| Checks | `scripts/p9_06_live_site_check.py` against the live URL, browser walk, `make lint`, `make test` |
+| Result | PASS. 5 pages 200, 79 distinct links ok, 16 repository anchors present, 108 claims: 96 match, 12 skipped as not a claim, 0 mismatch. Result: [`docs/architecture/phase-9-live-run.md`](docs/architecture/phase-9-live-run.md) |
 
 ---
 
