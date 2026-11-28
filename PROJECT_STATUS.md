@@ -6,8 +6,8 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-28 (P9-07 verified; Phase 9 closed, Phase 4 next) |
-| Current phase | Phase 4 — Streaming CDC; P11-04 (Spark on Kafka) comes first |
+| Last updated | 2026-11-28 (P11-04 verified; P4-01 next) |
+| Current phase | Phase 4 — Streaming CDC |
 | Phase status | Not started |
 
 **Status values:** not started · in progress · delivered · verified · blocked · withdrawn
@@ -22,12 +22,12 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 9 (Site v1) is **verified** (2026-11-28). The report site is live at https://filipeoliveira94.github.io/open-data-platform/, built and deployed from `main` by `pages.yml`. The P9-06 live check found no broken link, no missing page, and no site claim that disagrees with its source ([result](docs/architecture/phase-9-live-run.md)). Its one finding, F1, was this file's header, which named Phase 4 while Phase 9 was in progress; P9-07 closed Phase 9, so Phase 4 is now the current phase in the header and in this objective. P9-07 is verified: the merge `d5f26c1` redeployed the site, and the rerun of the live check shows Home row 9 as Verified. Phase 4 is next. It depends on Phase 3 (verified) and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 (Spark Structured Streaming on Kafka) comes first.
+Phase 4 (Streaming CDC) is next; it depends on Phase 3 (verified) and on P11-01 to P11-04, which are all verified. P11-04 (2026-11-28) proved Spark 3.5.8 with `spark-sql-kafka-0-10_2.12:3.5.8` (`kafka-clients` 3.4.1) on the Kafka 4.3.2 broker: the stream wrote an Iceberg scratch table that Trino counted, and a clean stop, a replayed commit, and a SIGKILL mid-batch all resumed from the checkpoint with no offset written twice and no gap. Result: [ADR-0028](docs/decisions/0028-telemetry-message-broker.md#evidence--validation). P4-01 starts the phase. Phase 9 (Site v1) is verified and live at https://filipeoliveira94.github.io/open-data-platform/ ([result](docs/architecture/phase-9-live-run.md)).
 
 ## Next work
 
-1. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
-2. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
+1. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
+2. **P11-05** — Contracts and landing ingestion of the daily exports. Acceptance: `ROADMAP.md` → P11-05.
 
 ---
 
@@ -55,10 +55,9 @@ Acceptance detail: `ROADMAP.md` → Phase 4.
 | Validation | Detail |
 | --- | --- |
 | Date | 2026-11-28 |
-| Environment | WSL2 and the live GitHub Pages site at deployed commit `2ec9eb0` (P9-06) |
-| Checks | `scripts/p9_06_live_site_check.py` against the live URL, browser walk, `make lint`, `make test` |
-| Result | PASS. 5 pages 200, 79 distinct links ok, 16 repository anchors present, 108 claims: 96 match, 12 skipped as not a claim, 0 mismatch. Result: [`docs/architecture/phase-9-live-run.md`](docs/architecture/phase-9-live-run.md) |
-| P9-07 checks | `make lint` PASS, `make test` 727 passed, `npm run build` PASS; after the merge, `pages.yml` deployed `d5f26c1` and the live check passed on it (5 pages 200, 79 links ok, 16 repository anchors, 108 claims, Home row 9 Verified) |
+| Environment | WSL2, Docker Desktop: Kafka 4.3.2 with the telemetry producer, the runtime image (Spark 3.5.8), PostgreSQL JDBC catalog, MinIO, Trino 484 (P11-04) |
+| Checks | `make kafka-spark-probe-drill`, `make lint`, `make test` (749 passed), site `npm run build` |
+| Result | PASS. r1 17,121 rows; a replayed epoch skipped by Iceberg; SIGKILL mid-batch 14; r3 26,958 rows; Spark = Trino after each step, no duplicate offsets, no gaps, scratch table dropped. Result: [ADR-0028](docs/decisions/0028-telemetry-message-broker.md#evidence--validation) |
 
 ---
 

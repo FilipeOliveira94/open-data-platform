@@ -96,6 +96,25 @@ make stream-stop
 
 `ODP_TELEMETRY_RATE_SCALE` multiplies the event rate (0.1 gives a tenth) for light runs. It changes the world, so set it before the first run: the counters of the daily export follow it.
 
+## Spark consumer proof (P11-04)
+
+Spark 3.5.8 reads this broker through `spark-sql-kafka-0-10_2.12:3.5.8` (result in [ADR-0028](../decisions/0028-telemetry-message-broker.md#evidence--validation)). The probe is not a pipeline step: it writes a scratch table and drops it.
+
+```bash
+make stream-up
+make spark-ivy-warm                     # caches the Kafka source with the Iceberg jars
+make kafka-spark-probe-drill            # run, rewind a commit, kill mid-batch, drain, check, drop
+make kafka-spark-probe ARGS=check       # one mode at a time: run, drain, rewind-commit, check, drop
+make kafka-spark-probe-trino            # Trino count of the probe table
+make kafka-spark-probe ARGS=drop
+```
+
+The drill prints counts, offsets, and batch ids only. `make kafka-spark-probe` runs as uid 50000; an Ivy cache with directories from the older Spark image (uid 185) must be made writable first, or Ivy reports `hadoop-client-runtime` as not found:
+
+```bash
+docker run --rm --user 0 --entrypoint chmod -v "$PWD/.local/spark-ivy:/ivy" odp-runtime:airflow3.4.0-spark3.5.8 -R a+rwX /ivy
+```
+
 ## Measured volume
 
 Measured on 2026-11-26 on the development host (16 CPUs), seed 7, scale 1, with the orchestration profile (Airflow) stopped, by `make stream-check` and `telemetry verify`.

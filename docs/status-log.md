@@ -4,6 +4,19 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-28 — P11-04 Spark Structured Streaming on Kafka: compatibility proof (verified)
+
+Spark 3.5.8 in the runtime image reads the Kafka 4.3.2 broker through `spark-sql-kafka-0-10_2.12:3.5.8`, pinned in `docker/spark/warm_ivy.sh` and cached in `.local/spark-ivy`. Ivy resolved `kafka-clients` 3.4.1. `docker/spark/kafka_probe.py` (through `run_kafka_probe.sh`, the same secrets file as the batch runners) streamed `bioguardia.telemetry.health.v1` into `local.scratch_p11_04.telemetry_probe` through the JDBC catalog. Seen Risk Med, seen Size Md (about 830 hand-written lines against the Sm ceiling of about 400). Versions and result: [ADR-0028](decisions/0028-telemetry-message-broker.md#evidence--validation).
+
+| Check | Result |
+| --- | --- |
+| `make spark-ivy-warm` | PASS after the cache was made writable: `org.apache.hadoop` in `.local/spark-ivy/cache` belonged to uid 185 (older Spark image), so Ivy, running as uid 50000, reported `hadoop-client-runtime` 3.3.4 as not found |
+| `make kafka-spark-probe-drill` (final code) | PASS. r1: 120 s, 14 batches, 17,121 rows, Trino 17,121. Commit-log entry 13 removed; r2 replayed batch 13 and Iceberg logged `Skipping epoch 13 ... already committed`. r2's driver JVM SIGKILLed while batch 14 was in flight (no orderly shutdown in the log); epochs 0 to 13 after the kill. r3 `AvailableNow`: 26,958 rows, Trino 26,958. After each step: rows = distinct `(partition, offset)`, gapless partitions, r3 starts at r1's last offset + 1, table tail = newest committed end offset, one snapshot per epoch. `drop` removed the table, namespace, checkpoint, and scratch objects; Trino reports the schema does not exist |
+| Found during the drill | A first version `exec`ed `spark-submit`, so the JVM was PID 1 in the `compose run` container and ignored the SIGKILL; only the Python driver died and Spark stopped in order. The wrapper now runs `spark-submit` as a child. A replayed epoch that Iceberg skips leaves its data files as orphans (P11-09 needs orphan-file cleanup) |
+| `make lint` | PASS |
+| `make test` | 749 passed |
+| `cd site && npm run build` | PASS, 6 pages; Home row 11 now reads "In progress (P11-01 to P11-04)", matching the roadmap overview |
+
 ### 2026-11-28 — P9-07 Phase 9 documentation and status (verified)
 
 Post-merge check of #39. P9-07 moves from Delivered to Verified (seen Risk Med, seen Size Sm), and Phase 9 is closed.

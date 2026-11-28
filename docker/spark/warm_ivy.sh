@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Resolve and cache the pinned lakehouse jars into spark.jars.ivy (/tmp/.ivy2).
-# Pins match run_bronze.sh / run_silver.sh. No SQL work.
+# Pins match run_bronze.sh / run_silver.sh, plus the Kafka source of
+# run_kafka_probe.sh. No SQL work.
 set -euo pipefail
 
 mkdir -p /tmp/.ivy2/cache /tmp/.ivy2/jars /tmp/.ivy2/local
@@ -9,6 +10,8 @@ packages="org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0"
 packages="${packages},org.apache.hadoop:hadoop-aws:3.3.4"
 packages="${packages},com.amazonaws:aws-java-sdk-bundle:1.12.262"
 packages="${packages},org.postgresql:postgresql:42.7.14"
+# P11-04: the Kafka source for Structured Streaming (run_kafka_probe.sh).
+packages="${packages},org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.8"
 
 # spark-sql writes derby.log, metastore_db, and spark-warehouse to the current
 # directory. The runtime image user cannot write the mounted repo, so use the
