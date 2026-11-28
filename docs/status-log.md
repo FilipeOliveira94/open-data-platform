@@ -6,7 +6,7 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ### 2026-11-28 — P9-06 live site run and consistency check (verified)
 
-`scripts/p9_06_live_site_check.py` checked the published site at deployed commit `2ec9eb0` (= `origin/main`), and a browser walk went through its navigation. Each claim was compared to its source and to `PROJECT_STATUS.md`. Result: [`docs/architecture/phase-9-live-run.md`](architecture/phase-9-live-run.md). Seen Risk Med, seen Size Md (about 650 hand-written lines of script and tests, above the Sm bound).
+`scripts/p9_06_live_site_check.py` checked the published site at deployed commit `2ec9eb0` (= `origin/main`), and a browser walk went through its navigation. Each claim was compared to its source and to `PROJECT_STATUS.md`. Result: [`docs/architecture/phase-9-live-run.md`](architecture/phase-9-live-run.md). Seen Risk Med, seen Size Md (about 740 hand-written lines of script and tests, above the Sm bound).
 
 | Check | Result |
 | --- | --- |
