@@ -4,6 +4,21 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-28 — P9-05 GitHub Pages hosting (delivered)
+
+`site/astro.config.mjs` sets `site` (`https://filipeoliveira94.github.io`) and `base` (`/open-data-platform`); the build now writes `sitemap-index.xml`. `.github/workflows/pages.yml` runs on pull requests, pushes to `main`, and `workflow_dispatch`, with no path filter. Its `build` job (read-only token) installs the lockfile on Node 22.23.4, runs `npm run build`, then `scripts/check_site_links.py`. Only on `main` it uploads `site/dist`, and the `deploy` job, the only one with `pages: write` and `id-token: write`, runs `actions/deploy-pages` in a non-cancelling `pages` concurrency group. The link check resolves every HTML `href`, `src`, `srcset`, `<meta>` URL on the site origin, and CSS `url()` against its file's URL and fails on a target outside the base, missing from `dist/`, or resolving outside `dist/`; it prints paths, never page text. `site/README.md` has a Hosting section; Operations and Reference name `pages.yml`; the README Site line says it serves the last successful deploy from `main`. Status stays Delivered until the owner enables Pages (source GitHub Actions), the first deploy from `main` passes, and About → Website is set.
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest tests/unit/site` | 42 passed. New: `test_check_site_links.py` (unprefixed and missing targets fail, relative links resolve against the page URL, `srcset` entries, site-origin and `<meta>` URLs, CSS `url()`, trailing slash on a file, encoded `..` cannot leave `dist`, the 404 page's own URL, a planted page value never in the output) and `test_pages_hosting.py` (`site` plus `base` equal the README URL; triggers without a path filter; read-only top-level permissions; Pages permissions only on `deploy`; upload and deploy only from `main`; no `configure-pages` in the build job; link check between build and upload; no secrets). Both files failed before the script and the workflow existed |
+| `uv run pytest tests/unit` | 709 passed |
+| `make lint` equivalents | Ruff clean; 70 Markdown files, 0 with an empty table header |
+| `npm run build` + link check | Complete, 6 pages, `sitemap-index.xml` written; 0 broken links in 6 HTML files. The pre-change build (no `base`) gave 99 broken links |
+| `astro preview` under the base | The five routes, `sitemap-index.xml`, CSS and the diagram images return 200; `/architecture/` without the base returns 404 |
+| Browser walk, 1440 px light and dark, 390 px dark | Home styled, sidebar links under the base, Architecture light diagrams and Pipeline dark diagram load, Operations `pages.yml` sentence and relative link, Reference Pages workflow row; no console errors, no failed requests, no sideways scroll at 390 px. Evidence outside the repo (`~/evidence/open-data-platform/P9-05/`) |
+| `code-reviewer` | Round 1 BLOCK: `configure-pages` in the build job had no Pages permission and would fail on `main` (removed); the link check skipped site-origin absolute links, `<meta>` URLs, CSS `url()`, and a trailing slash on a file (added). Round 2 PASS |
+| Not run | The workflow on GitHub, the first deploy, and the live URL: they need the owner's Pages setting and the merge |
+
 ### 2026-11-28 — P9-04 Reference page and repo cross-links
 
 Reference (`reference.md`) has five link tables: Repository (GitHub, the CI workflow and its runs, `AGENTS.md`), Setup (README, `.env.example`, `docs/sources/`, Local Airflow, `site/README.md`), Status and roadmap (`PROJECT_STATUS.md`, `ROADMAP.md`, this log), Architecture decisions (`DECISIONS.md`, `docs/decisions/`, ADR-0029), and the Phase 1–3 architecture docs and live runs. The stale "Phases 0–9" and "D-001 and D-002 approved" lines are gone. The figure manifest is labeled planned for P8-08. The README Report site block links `https://filipeoliveira94.github.io/open-data-platform/` and says it goes live once P9-05 deploys it.

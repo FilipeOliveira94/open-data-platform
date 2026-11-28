@@ -3,7 +3,11 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
+// GitHub Pages project URL: https://filipeoliveira94.github.io/open-data-platform/
+// (deployed by .github/workflows/pages.yml; see site/README.md → Hosting).
 export default defineConfig({
+	site: 'https://filipeoliveira94.github.io',
+	base: '/open-data-platform',
 	integrations: [
 		starlight({
 			title: 'Open Data Platform',

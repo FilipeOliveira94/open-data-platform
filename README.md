@@ -106,9 +106,9 @@ Local work uses Windows 11, WSL2, and Docker Compose. Every component is open so
 - **Pages:** Home, architecture, pipeline, operations, and reference.
 - **Stack:** Astro Starlight with the author's brand theme (violet and pink, Urbanist); the header links to the [portfolio](https://filipeoliveira-hub.com.br).
 - **Content:** Verified facts only.
-- **Site:** [filipeoliveira94.github.io/open-data-platform](https://filipeoliveira94.github.io/open-data-platform/), live once P9-05 deploys it to GitHub Pages.
+- **Site:** [filipeoliveira94.github.io/open-data-platform](https://filipeoliveira94.github.io/open-data-platform/), served from the last successful deploy from `main`.
 - **Preview:** `cd site && npm ci && npm run dev`
-- **Hosting:** P9-05 publishes the site on GitHub Pages and sets the repository About → Website field to the same URL.
+- **Hosting:** GitHub Pages, built and deployed by [`pages.yml`](.github/workflows/pages.yml) on pushes to `main`; pull requests build it without deploying. See [`site/README.md`](site/README.md) → Hosting.
 - **Docs:** [`site/README.md`](site/README.md) · [Reference page source](site/src/content/docs/reference.md)
 
 ### 📋 Dataviz

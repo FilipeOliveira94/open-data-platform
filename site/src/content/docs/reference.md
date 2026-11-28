@@ -11,6 +11,7 @@ The repository documents are the source of truth. This site summarizes only fact
 | --- | --- |
 | [GitHub repository](https://github.com/FilipeOliveira94/open-data-platform) | Source code, issues, and pull requests |
 | [CI workflow](https://github.com/FilipeOliveira94/open-data-platform/blob/main/.github/workflows/ci.yml) | Ruff, the Markdown table check, and unit tests on pushes to `main` and on every pull request |
+| [Pages workflow](https://github.com/FilipeOliveira94/open-data-platform/blob/main/.github/workflows/pages.yml) | Builds this site, checks its links, and deploys it to GitHub Pages from `main` |
 | [CI runs](https://github.com/FilipeOliveira94/open-data-platform/actions) | Results of the CI workflow |
 | [AGENTS.md](https://github.com/FilipeOliveira94/open-data-platform/blob/main/AGENTS.md) | Working rules: architecture principles, data handling, security, and testing |
 
