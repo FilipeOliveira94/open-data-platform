@@ -124,3 +124,57 @@ def test_empty_or_missing_dist_fails(tmp_path: Path) -> None:
 def test_base_must_have_both_slashes(dist: Path) -> None:
     with pytest.raises(ValueError):
         check.check_dist(dist, "/open-data-platform")
+
+
+SITE = "https://filipeoliveira94.github.io"
+
+
+def test_absolute_links_to_the_site_origin_are_checked(dist: Path) -> None:
+    _page(
+        dist,
+        "index.html",
+        f'<link rel="canonical" href="{SITE}{BASE}pipeline/">'
+        f'<meta property="og:url" content="{SITE}{BASE}gone/">'
+        f'<meta name="description" content="{SITE}{BASE}pipeline/">'
+        f'<a href="{SITE}/other-repo/">x</a>',
+    )
+    errors = check.check_dist(dist, BASE, SITE)
+    assert len(errors) == 2, errors
+    assert any("meta content -> /open-data-platform/gone/" in e for e in errors)
+    assert any("-> /other-repo/ (outside base" in e for e in errors)
+
+
+def test_trailing_slash_on_a_file_fails(dist: Path) -> None:
+    _page(dist, "index.html", f'<img src="{BASE}img.png/">')
+    errors = check.check_dist(dist, BASE)
+    assert len(errors) == 1 and "img.png/" in errors[0]
+
+
+def test_css_urls_are_checked(dist: Path) -> None:
+    _page(dist, "index.html", "")
+    (dist / "_astro" / "a.css").write_text(
+        f"@font-face{{src:url({BASE}_astro/font.woff2)}}"
+        f"a{{background:url('img.png')}}b{{background:url(\"data:image/png;base64,AA\")}}"
+        "c{background:url(../img.png)}",
+        encoding="utf-8",
+    )
+    errors = check.check_dist(dist, BASE)
+    assert len(errors) == 2, errors
+    assert all(e.startswith("_astro/a.css: url() -> ") for e in errors)
+    assert any("_astro/font.woff2" in e for e in errors)
+    assert any("/open-data-platform/_astro/img.png" in e for e in errors)
+
+
+def test_encoded_dot_segments_cannot_leave_dist(dist: Path) -> None:
+    (dist.parent / "secret.txt").write_text("x", encoding="utf-8")
+    _page(dist, "index.html", f'<a href="{BASE}%2e%2e/secret.txt">x</a>')
+    errors = check.check_dist(dist, BASE)
+    assert len(errors) == 1 and "resolves outside dist" in errors[0]
+
+
+def test_404_page_may_name_its_own_url(dist: Path) -> None:
+    _page(dist, "404.html", f'<link rel="canonical" href="{SITE}{BASE}404/">')
+    assert check.check_dist(dist, BASE, SITE) == []
+    (dist / "404.html").unlink()
+    _page(dist, "index.html", f'<a href="{BASE}404/">x</a>')
+    assert len(check.check_dist(dist, BASE, SITE)) == 1

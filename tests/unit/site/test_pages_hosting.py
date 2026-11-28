@@ -80,8 +80,9 @@ def test_only_main_deploys() -> None:
     assert deploy["concurrency"] == {"group": "pages", "cancel-in-progress": False}
     _step(deploy, "actions/deploy-pages")
     build = jobs["build"]
-    for uses in ("actions/configure-pages", "actions/upload-pages-artifact"):
-        assert _step(build, uses)["if"] == MAIN_ONLY, f"{uses} runs outside main"
+    assert _step(build, "actions/upload-pages-artifact")["if"] == MAIN_ONLY
+    # The build job has no Pages permission, so it must not call the Pages API.
+    assert not any("configure-pages" in s.get("uses", "") for s in _steps(build))
 
 
 def test_build_checks_links_before_upload() -> None:
@@ -92,7 +93,7 @@ def test_build_checks_links_before_upload() -> None:
     runs = [s.get("run", "") for s in steps]
     base = _astro_setting("base") + "/"
     check = next(i for i, r in enumerate(runs) if "scripts/check_site_links.py" in r)
-    assert f"site/dist {base}" in runs[check]
+    assert f"site/dist {base} {_astro_setting('site')}" in runs[check]
     build_step = next(i for i, r in enumerate(runs) if "npm run build" in r)
     upload = steps.index(_step(build, "actions/upload-pages-artifact"))
     assert build_step < check < upload

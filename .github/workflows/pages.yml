@@ -39,11 +39,9 @@ jobs:
         run: npm run build
 
       - name: Check links under the Pages base
-        run: python3 scripts/check_site_links.py site/dist /open-data-platform/
-
-      - name: Configure Pages
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: actions/configure-pages@v6
+        run: >-
+          python3 scripts/check_site_links.py site/dist /open-data-platform/
+          https://filipeoliveira94.github.io
 
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

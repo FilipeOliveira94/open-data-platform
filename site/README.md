@@ -38,7 +38,7 @@ npm run preview
 Static output is written to `dist/`. The site is built for the GitHub Pages base `/open-data-platform`, so preview it at `http://localhost:4321/open-data-platform/`. Check the links under that base from the repository root:
 
 ```bash
-python3 scripts/check_site_links.py site/dist /open-data-platform/
+python3 scripts/check_site_links.py site/dist /open-data-platform/ https://filipeoliveira94.github.io
 ```
 
 ## Hosting
@@ -46,10 +46,10 @@ python3 scripts/check_site_links.py site/dist /open-data-platform/
 The site is published on GitHub Pages at <https://filipeoliveira94.github.io/open-data-platform/>.
 
 - `astro.config.mjs` sets `site` (`https://filipeoliveira94.github.io`) and `base` (`/open-data-platform`), so every page and asset link carries the project path and the build writes `sitemap-index.xml`. `tests/unit/site/test_pages_hosting.py` fails when they drift from the README link.
-- [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) runs on every pull request, every push to `main`, and by hand (`workflow_dispatch`). The `build` job installs the lockfile with Node 22, runs `npm run build`, and runs `scripts/check_site_links.py`, which fails the build when a link falls outside the base or points at a file missing from `dist/`.
+- [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) runs on every pull request, every push to `main`, and by hand (`workflow_dispatch`). The `build` job installs the lockfile with Node 22, runs `npm run build`, and runs `scripts/check_site_links.py`, which fails the build when a link (HTML `href`, `src`, `srcset`, a `<meta>` URL on the site, or a CSS `url()`) falls outside the base or points at a file missing from `dist/`.
 - Only `main` deploys: the upload and the `deploy` job are skipped on pull requests and other branches. Only the `deploy` job can write to Pages (`pages: write`, `id-token: write`); the rest of the workflow reads the repository. It uses no secrets. One deploy runs at a time and is never cancelled halfway.
 - There is no path filter, so every merge to `main` rebuilds and redeploys the whole site. Later site update issues (P4-11, P5-10, P6-10, P8-08, P10-13, P11-19) redeploy by merging to `main`; no extra step.
-- One-time repository settings, made by the owner: Settings → Pages → Source set to **GitHub Actions** (without it, the deploy job fails and nothing is published; enable it and re-run the workflow), and About → Website set to the Pages URL.
+- One-time repository settings, made by the owner: Settings → Pages → Source set to **GitHub Actions** (without it, the `deploy` job fails and nothing is published; enable it and re-run the workflow), and About → Website set to the Pages URL.
 
 ## Content
 
