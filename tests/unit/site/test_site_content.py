@@ -124,6 +124,44 @@ def test_site_repo_links_point_to_existing_paths() -> None:
     assert seen > 0
 
 
+REFERENCE = DOCS_PAGES / "reference.md"
+PAGES_URL = "https://filipeoliveira94.github.io/open-data-platform/"
+
+
+def test_reference_links_repo_adrs_roadmap_and_setup() -> None:
+    text = REFERENCE.read_text(encoding="utf-8")
+    assert f"]({REPO_URL.rstrip('/')})" in text, "Reference does not link GitHub"
+    for rel in (
+        "blob/main/DECISIONS.md",
+        "tree/main/docs/decisions",
+        "blob/main/ROADMAP.md",
+        "blob/main/README.md",
+        "blob/main/site/README.md",
+    ):
+        assert f"]({REPO_URL}{rel})" in text, f"Reference does not link {rel}"
+
+
+def test_reference_figure_manifest_is_planned_until_p8_08() -> None:
+    _phases, issues = _roadmap_status()
+    assert not issues["P8-08"].startswith("Verified"), (
+        "P8-08 is verified: link the figure manifest on Reference and update this test"
+    )
+    lines = [
+        line
+        for line in REFERENCE.read_text(encoding="utf-8").splitlines()
+        if "figure manifest" in line.lower()
+    ]
+    assert lines, "Reference no longer mentions the figure manifest"
+    assert all("planned" in line and "P8-08" in line for line in lines), lines
+
+
+def test_readme_report_site_links_pages_url() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    block = readme[readme.index("### 🚧 Report site") :]
+    block = block[: block.index("\n### ", 1)]
+    assert f"]({PAGES_URL})" in block
+
+
 DIAGRAM_PAGES = (ARCHITECTURE, PIPELINE)
 
 
@@ -248,7 +286,9 @@ def _roadmap_status() -> tuple[dict[str, str], dict[str, str]]:
     return phases, issues
 
 
-@pytest.mark.parametrize("page_path", (PIPELINE, OPERATIONS), ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "page_path", (PIPELINE, OPERATIONS, REFERENCE), ids=lambda p: p.name
+)
 def test_planned_items_are_not_verified(page_path: Path) -> None:
     """A sentence that says planned names its phase or issue, which is not verified.
 

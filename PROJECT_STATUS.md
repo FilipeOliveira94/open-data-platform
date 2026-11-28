@@ -6,7 +6,7 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 | --- | --- |
 | Repository | [FilipeOliveira94/open-data-platform](https://github.com/FilipeOliveira94/open-data-platform) |
 | Started | 2026-10-14 |
-| Last updated | 2026-11-28 (P9-03 verified; Pipeline and Operations pages) |
+| Last updated | 2026-11-28 (P9-04 verified; Reference page and README site link) |
 | Current phase | Phase 4 — Streaming CDC |
 | Phase status | Not started |
 
@@ -22,11 +22,11 @@ Operational ledger for the **current phase**. Issue backlog and acceptance text 
 
 ## Current objective
 
-Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue. R1-03 renamed the PostgreSQL source to olist-synth-cdc (`olist_synth_cdc`, schema `olist_synth`, Gold `olist_synth_operations`); Silver and Gold counts match the pre-rename run and the old objects are deleted. Refactor R1 is complete. Site v1 (Phase 9) is in progress: P9-01 verified the `site/` scaffold and its five routes, P9-02 filled Home and Architecture, and P9-03 filled Pipeline and Operations.
+Phase 3 is **verified** (2026-11-27). Phase 4 starts. It depends on Phase 3 and on P11-01 to P11-04; P11-01 to P11-03 are verified, and P11-04 was waiting for Phase 3 (waiver in [`DECISIONS.md`](DECISIONS.md)). The project-level refactor R1 runs first: R1-01 removed the AWS path, so the core is open source only ([ADR-0029](docs/decisions/0029-open-source-only-platform.md)) and Phase 7 is withdrawn. R1-02 moved Site v1 (Phase 9) before Phase 4 and gave every later phase a site update issue. R1-03 renamed the PostgreSQL source to olist-synth-cdc (`olist_synth_cdc`, schema `olist_synth`, Gold `olist_synth_operations`); Silver and Gold counts match the pre-rename run and the old objects are deleted. Refactor R1 is complete. Site v1 (Phase 9) is in progress: P9-01 verified the `site/` scaffold and its five routes, P9-02 filled Home and Architecture, P9-03 filled Pipeline and Operations, and P9-04 filled Reference and linked the GitHub Pages URL from the README.
 
 ## Next work
 
-1. **Phase 9 (Site v1)** — P9-04, then P9-05 to P9-07: pages from verified Phase 0–3 material, GitHub Pages hosting. Acceptance: `ROADMAP.md` → Phase 9.
+1. **Phase 9 (Site v1)** — P9-05 (GitHub Pages hosting and the Website field), then P9-06 and P9-07. Acceptance: `ROADMAP.md` → Phase 9.
 2. **P11-04** — Spark Structured Streaming on Kafka: compatibility proof. Acceptance: `ROADMAP.md` → P11-04.
 3. **P4-01** — PostgreSQL logical replication prerequisites. Acceptance: `ROADMAP.md` → P4-01.
 
@@ -153,7 +153,7 @@ Phase scope, dependencies, and status: [`ROADMAP.md`](ROADMAP.md) → Phase over
 | 6 | CI/CD expansion, resilience, security | Not started |
 | 7 | Withdrawn: AWS path (R1-01, ADR-0029) | Withdrawn |
 | 8 | JupyterLab exploration and Superset charts over Gold (read-only via Trino) | Not started (after Phase 2; parallel with 3–6) |
-| 9 | Platform report site v1 on GitHub Pages from Phase 0–3 material | In progress: P9-01 (scaffold, five routes) and P9-02 (Home, Architecture) verified; runs before Phase 4 |
+| 9 | Platform report site v1 on GitHub Pages from Phase 0–3 material | In progress: P9-01 to P9-04 verified (scaffold, all five pages); hosting is P9-05; runs before Phase 4 |
 | 10 | Table contracts and quality observability | Not started (position not fixed; needs Phase 3) |
 | 11 | BioGuardia Atlantic sources at scale: daily export, telemetry stream, PII, skew, SCD2, reconciliation | In progress (waiver): P11-01 to P11-03 verified; drops 2026-11-26 to 2026-12-31 in MinIO; stream running. Processing (P11-04 on) waits for Phase 3 |
 
@@ -189,13 +189,13 @@ None.
 
 ## Platform report site
 
-Astro Starlight scaffold with the brand theme (violet and pink, Urbanist) and a header link to the portfolio, under `site/` (verified facts only). Site v1 (Phase 9) fills the pages from verified Phase 0–3 material and hosts them on GitHub Pages; P9-02 filled Home (purpose, a status table that matches the `ROADMAP.md` phase overview, the 3D map labeled target architecture) and Architecture (stack, medallion, contracts, Airflow orchestration, batch vs stream, with diagrams from `docs/assets/diagrams/`); Pipeline and Operations are P9-03. From Phase 4 on, each phase has a site update issue before its close pair. Preview: `cd site && npm run dev` — see `site/README.md`. The site figure table in `ROADMAP.md` names each figure and the issue that publishes it (P8-08, P5-10).
+Astro Starlight scaffold with the brand theme (violet and pink, Urbanist) and a header link to the portfolio, under `site/` (verified facts only). Site v1 (Phase 9) fills the pages from verified Phase 0–3 material and hosts them on GitHub Pages; P9-02 filled Home (purpose, a status table that matches the `ROADMAP.md` phase overview, the 3D map labeled target architecture) and Architecture (stack, medallion, contracts, Airflow orchestration, batch vs stream, with diagrams from `docs/assets/diagrams/`); P9-03 filled Pipeline and Operations; P9-04 filled Reference. From Phase 4 on, each phase has a site update issue before its close pair. Preview: `cd site && npm run dev` — see `site/README.md`. The site figure table in `ROADMAP.md` names each figure and the issue that publishes it (P8-08, P5-10).
 
 | Page | Status |
 | --- | --- |
 | Home / Architecture | Verified Phase 0–3 content (P9-02) |
-| Pipeline | Scaffold, including verified Phase 1 raw ingestion |
-| Operations / Reference | Scaffold (Phase 0 facts) |
+| Pipeline / Operations | Verified Phase 0–3 content (P9-03) |
+| Reference | Links to the repository, setup, status, roadmap, decisions, and phase docs (P9-04) |
 
 ---
 
