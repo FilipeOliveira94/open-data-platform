@@ -77,8 +77,14 @@ def fetch_url(url: str, method: str) -> Response:
     try:
         if urlsplit(url).scheme not in FETCH_SCHEMES:
             return Response(None, error="scheme not fetched")
+        parts = urlsplit(url)
+        # Encode path and query only; an IDN host stays as written.
+        encoded = parts._replace(
+            path=quote(parts.path, safe=URL_SAFE),
+            query=quote(parts.query, safe=URL_SAFE),
+        ).geturl()
         request = urllib.request.Request(
-            quote(url, safe=URL_SAFE), method=method, headers={"User-Agent": USER_AGENT}
+            encoded, method=method, headers={"User-Agent": USER_AGENT}
         )
         with urllib.request.urlopen(request, timeout=20) as reply:
             body = reply.read() if method == "GET" else b""
@@ -284,8 +290,7 @@ def check_site(site: str, fetch: Fetch = fetch_url) -> Result:
     invalid: dict[str, dict[str, object]] = {}
 
     def note(base: str, target: str, page_name: str) -> None:
-        if target.startswith("#"):
-            return
+        # A bare "#id" joins to the page itself, so its id is checked too.
         try:
             url, fragment = urldefrag(urljoin(base, target))
             scheme = urlsplit(url).scheme
@@ -365,6 +370,8 @@ def check_site(site: str, fetch: Fetch = fetch_url) -> Result:
 REPO_BLOB = "https://github.com/FilipeOliveira94/open-data-platform/blob/main/"
 HEADING = re.compile(r"#{1,6}\s+(.*)")
 SETEXT = re.compile(r"=+\s*|-+\s*")
+# A line above "---" that starts a list, quote or table is not a setext title.
+NOT_SETEXT_TEXT = re.compile(r"\s*([-*+]\s|\d+[.)]\s|>|\|)")
 MD_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 
 
@@ -390,7 +397,11 @@ def heading_slugs(markdown: str) -> set[str]:
         text = None
         if match := HEADING.match(line):
             text = match.group(1)
-        elif SETEXT.fullmatch(line) and previous.strip():
+        elif (
+            SETEXT.fullmatch(line)
+            and previous.strip()
+            and not NOT_SETEXT_TEXT.match(previous)
+        ):
             text = previous  # setext: the line above an === or --- underline
         previous = "" if text is not None else line
         if text is None or HEADING.match(text):

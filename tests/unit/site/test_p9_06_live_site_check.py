@@ -262,3 +262,31 @@ def test_repo_anchor_outside_checkout_is_not_read(tmp_path: Path) -> None:
 def test_main_usage_errors_exit_3(tmp_path: Path) -> None:
     assert check.main([]) == 3
     assert check.main(["https://example.test/no-slash", str(tmp_path / "o.json")]) == 3
+
+
+def test_same_page_fragment_is_checked() -> None:
+    fetch = FakeFetch()
+    fetch.pages[SITE + "reference/"] = (
+        '<html><body><main><h1>Reference</h1><h2 id="ok">Ok</h2>'
+        '<a href="#ok">ok</a><a href="#missing">x</a></main></body></html>'
+    )
+    result = check.check_site(SITE, fetch)
+    link = result.links[SITE + "reference/"]
+    assert link["class"] == "broken" and link["missing_fragments"] == ["missing"]
+    assert result.exit_code() == 1
+
+
+def test_list_item_over_rule_is_not_a_heading() -> None:
+    assert check.heading_slugs("- a\n---\n1. b\n---\n> c\n---\n") == set()
+
+
+def test_idn_host_is_not_percent_encoded(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[str] = []
+
+    def opener(request, timeout):  # noqa: ARG001
+        seen.append(request.full_url)
+        raise TimeoutError
+
+    monkeypatch.setattr(check.urllib.request, "urlopen", opener)
+    check.fetch_url("https://bücher.test/ä", "HEAD")
+    assert seen == ["https://bücher.test/%C3%A4"]

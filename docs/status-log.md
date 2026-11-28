@@ -11,11 +11,11 @@ Chronological history of program status updates. The operational ledger is [`PRO
 | Check | Result |
 | --- | --- |
 | Pages | Home, Architecture, Pipeline, Operations, Reference return 200 with their title and h1; an unknown path returns 404 |
-| Links | 79 distinct URLs (27 internal, 52 external) all 200; 0 broken, 0 unverified; 16 repository heading anchors present |
+| Links | 79 distinct URLs (27 internal, 52 external) all 200; 0 broken, 0 unverified; 34 in-site fragments and 16 repository heading anchors present |
 | Browser walk | Sidebar navigation across the five pages; light and dark diagrams load; at 375 px no page overflows and the Menu button navigates |
 | Claims | 108 extracted: 96 match, 12 skipped as not a claim, 0 mismatch |
 | Finding F1 | `PROJECT_STATUS.md` header names Phase 4 as the current phase while Phase 9 is in progress; owner P9-07 |
-| Repository checks | `make lint` PASS; `make test` 724 passed; `ruff check` and `ruff format --check` on the script PASS |
+| Repository checks | `make lint` PASS; `make test` 727 passed; `ruff check` and `ruff format --check` on the script PASS |
 
 ### 2026-11-28 — P9-05 GitHub Pages hosting (verified)
 
