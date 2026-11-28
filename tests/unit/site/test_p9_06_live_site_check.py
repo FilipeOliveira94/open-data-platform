@@ -157,3 +157,108 @@ def test_repo_anchors_checked_against_checkout(tmp_path: Path) -> None:
 def test_heading_slugs_follow_github() -> None:
     slugs = check.heading_slugs("## Catchup, gaps, and backfill\n## A b\n## A b\n")
     assert slugs == {"catchup-gaps-and-backfill", "a-b", "a-b-1"}
+
+
+def test_fetch_url_never_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    import http.client
+
+    def boom(exc: Exception):
+        def opener(request, timeout):  # noqa: ARG001
+            raise exc
+
+        return opener
+
+    for exc in (
+        http.client.BadStatusLine("x"),
+        http.client.InvalidURL("x"),
+        UnicodeEncodeError("ascii", "é", 0, 1, "x"),
+        TimeoutError(),
+    ):
+        monkeypatch.setattr(check.urllib.request, "urlopen", boom(exc))
+        response = check.fetch_url("https://ext.test/a", "HEAD")
+        assert response.status is None and check.classify(response) == "unverified"
+    assert check.fetch_url("http://[bad/x", "GET").status is None
+    assert check.fetch_url("file:///etc/hostname", "GET").error == "scheme not fetched"
+
+
+def test_fetch_url_encodes_spaces_and_non_ascii(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[str] = []
+
+    class Reply:
+        status = 200
+        headers: dict[str, str] = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b""
+
+    def opener(request, timeout):  # noqa: ARG001
+        seen.append(request.full_url)
+        return Reply()
+
+    monkeypatch.setattr(check.urllib.request, "urlopen", opener)
+    assert check.fetch_url("https://ext.test/café a?q=1%20b", "GET").status == 200
+    assert seen == ["https://ext.test/caf%C3%A9%20a?q=1%20b"]
+
+
+def test_odd_hrefs_are_skipped_or_broken_not_fatal() -> None:
+    fetch = FakeFetch()
+    fetch.pages[SITE] = HOME.replace(
+        "</main>",
+        '<a href="file:///etc/hostname">f</a><a href="ftp://ext.test/x">f</a>'
+        '<a href="http://[bad/x">bad</a></main>',
+    )
+    result = check.check_site(SITE, fetch)
+    assert not any(u.startswith(("file:", "ftp:")) for u, _ in fetch.calls)
+    assert result.links["http://[bad/x"]["class"] == "broken"
+    assert result.links["http://[bad/x"]["scope"] == "internal"
+
+
+def test_claims_split_on_div_br_and_unclosed_cells() -> None:
+    page = check.parse_page(
+        "<main><div>Total 5</div><div>Next 6.</div><p>A 1<br>B 2</p>"
+        "<blockquote>Q 3</blockquote><h5>H 4</h5>"
+        "<table><tr><td>1<td>2<tr><td>3</table></main>"
+    )
+    texts = [c["text"] for c in check.claims_of(page)]
+    assert "Total 5" in texts and "Next 6." in texts
+    assert "A 1" in texts and "B 2" in texts
+    assert "Q 3" in texts and "H 4" in texts
+    assert "1 | 2" in texts and "3" in texts
+
+
+def test_heading_slugs_links_fences_setext() -> None:
+    markdown = (
+        "# The [foo](http://x) bar\n~~~\n# fenced\n~~~\n"
+        "Setext title\n============\n\nSub one\n---\n"
+    )
+    assert check.heading_slugs(markdown) == {"the-foo-bar", "setext-title", "sub-one"}
+
+
+def test_repo_anchor_outside_checkout_is_not_read(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (tmp_path / "secret.md").write_text("# Leak\n")
+    result = check.Result(SITE)
+    url = REPO + "../secret.md"
+    result.links[url] = {
+        "scope": "external",
+        "status": 200,
+        "class": "ok",
+        "pages": ["Home"],
+        "fragments_unchecked": ["leak"],
+    }
+    check.check_repo_anchors(result, root)
+    assert result.links[url]["class"] == "broken"
+
+
+def test_main_usage_errors_exit_3(tmp_path: Path) -> None:
+    assert check.main([]) == 3
+    assert check.main(["https://example.test/no-slash", str(tmp_path / "o.json")]) == 3

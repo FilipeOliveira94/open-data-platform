@@ -4,6 +4,19 @@ Chronological history of program status updates. The operational ledger is [`PRO
 
 ---
 
+### 2026-11-28 — P9-06 live site run and consistency check (verified)
+
+`scripts/p9_06_live_site_check.py` checked the published site at deployed commit `2ec9eb0` (= `origin/main`), and a browser walk went through its navigation. Each claim was compared to its source and to `PROJECT_STATUS.md`. Result: [`docs/architecture/phase-9-live-run.md`](architecture/phase-9-live-run.md). Seen Risk Med, seen Size Md (about 650 hand-written lines of script and tests, above the Sm bound).
+
+| Check | Result |
+| --- | --- |
+| Pages | Home, Architecture, Pipeline, Operations, Reference return 200 with their title and h1; an unknown path returns 404 |
+| Links | 79 distinct URLs (27 internal, 52 external) all 200; 0 broken, 0 unverified; 16 repository heading anchors present |
+| Browser walk | Sidebar navigation across the five pages; light and dark diagrams load; at 375 px no page overflows and the Menu button navigates |
+| Claims | 108 extracted: 96 match, 12 skipped as not a claim, 0 mismatch |
+| Finding F1 | `PROJECT_STATUS.md` header names Phase 4 as the current phase while Phase 9 is in progress; owner P9-07 |
+| Repository checks | `make lint` PASS; `make test` 724 passed; `ruff check` and `ruff format --check` on the script PASS |
+
 ### 2026-11-28 — P9-05 GitHub Pages hosting (verified)
 
 Post-merge check of #36. P9-05 moves from Delivered to Verified (seen Risk Hi, seen Size Md: about 490 hand-written lines of script, workflow and tests).

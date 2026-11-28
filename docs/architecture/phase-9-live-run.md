@@ -1,6 +1,6 @@
 # P9-06 — Live site run, result, and consistency check
 
-One check of the published report site on 2026-11-28, 04:14Z, at https://filipeoliveira94.github.io/open-data-platform/. Two methods were used. `scripts/p9_06_live_site_check.py` fetched the five pages, requested every link and asset on them, and extracted every claim that holds a digit. A browser walk then went through the site navigation in both themes and at phone width. Each claim was compared to the repository source that owns it and to [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md). The site is public and holds no row values or secrets; the script output names URLs, statuses, and counts.
+One check of the published report site on 2026-11-28, final run 04:22Z (the first run at 04:14Z gave the same pages, links, and 108 claims), at https://filipeoliveira94.github.io/open-data-platform/. Two methods were used. `scripts/p9_06_live_site_check.py` fetched the five pages, requested every link and asset on them, and extracted every claim that holds a digit. A browser walk then went through the site navigation in both themes and at phone width. Each claim was compared to the repository source that owns it and to [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md). The site is public and holds no row values or secrets; the script output names URLs, statuses, and counts.
 
 Result: no broken link, no missing page, and no claim on the site that disagrees with its source. One finding, F1, is in `PROJECT_STATUS.md` itself. P9-07 owns it.
 
@@ -28,7 +28,7 @@ Other paths: an unknown path returns 404 with the site's 404 page. `architecture
 
 ## Links
 
-Every `href`, `src`, and `srcset` on the five pages and every `url(...)` in the site CSS was requested once per URL, with HEAD falling back to GET and one retry. Statuses: **ok** is 2xx after redirects, **broken** is 4xx or 5xx after the retry or a missing `#fragment`, **unverified** is 429, a timeout, or a network error after the retry. The script exits 1 when a page or an internal link is broken, and 2 when only external links are broken. External broken links are still findings. Unverified links do not fail the run.
+Every `href`, `src`, and `srcset` on the five pages and every `url(...)` in the site CSS was requested once per URL, with HEAD falling back to GET and one retry. Statuses: **ok** is 2xx after redirects, **broken** is 4xx or 5xx after the retry or a missing `#fragment`, **unverified** is 429, a timeout, or a network error after the retry. Only `http` and `https` links are requested; an `href` that cannot be parsed counts as a broken internal link. The script exits 1 when a page or an internal link is broken, 2 when only external links are broken, and 3 on a usage error. External broken links are still findings. Unverified links do not fail the run.
 
 | Referenced from | Internal ok | External ok | Broken | Unverified |
 | --- | --- | --- | --- | --- |

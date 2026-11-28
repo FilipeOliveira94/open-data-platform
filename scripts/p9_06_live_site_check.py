@@ -20,14 +20,19 @@ Claims: every table row and every sentence inside <main> (code blocks
 excluded) that contains a digit, with its page. They go to the JSON file for
 the manual comparison against the repository docs.
 
+Only http and https links are requested; mailto:, data:, file: and other
+schemes are skipped. An href that cannot be parsed is a broken internal link.
+
 Exit 1 when a route or an internal link is broken, 2 when only external links
-are broken (still findings), 0 otherwise. Unverified links never fail the run.
+are broken (still findings), 3 on a usage error, 0 otherwise. Unverified links
+never fail the run.
 Output names URLs, statuses and counts; the site is public and holds no row
 values or secrets.
 """
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import sys
@@ -38,7 +43,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urldefrag, urljoin, urlsplit
+from urllib.parse import quote, unquote, urldefrag, urljoin, urlsplit
 
 ROUTES = {
     "Home": "",
@@ -50,7 +55,9 @@ ROUTES = {
 USER_AGENT = "open-data-platform-site-check/1.0"
 CSS_URL = re.compile(r"""url\(\s*['"]?([^'")]+)['"]?\s*\)""")
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z(`\[])")
-SKIP_SCHEMES = ("mailto:", "data:", "javascript:", "tel:")
+FETCH_SCHEMES = ("http", "https")
+# Keep reserved and already-escaped characters; encode spaces and non-ASCII.
+URL_SAFE = ":/?#[]@!$&'()*+,;=%~"
 RETRY_DELAY_S = 2.0
 
 
@@ -66,16 +73,21 @@ Fetch = Callable[[str, str], Response]
 
 
 def fetch_url(url: str, method: str) -> Response:
-    request = urllib.request.Request(
-        url, method=method, headers={"User-Agent": USER_AGENT}
-    )
+    """GET or HEAD one http(s) URL; any failure to get a status is unverified."""
     try:
+        if urlsplit(url).scheme not in FETCH_SCHEMES:
+            return Response(None, error="scheme not fetched")
+        request = urllib.request.Request(
+            quote(url, safe=URL_SAFE), method=method, headers={"User-Agent": USER_AGENT}
+        )
         with urllib.request.urlopen(request, timeout=20) as reply:
             body = reply.read() if method == "GET" else b""
             return Response(reply.status, body, reply.headers.get("Content-Type", ""))
     except urllib.error.HTTPError as exc:
         return Response(exc.code, error=f"HTTP {exc.code}")
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+    except (OSError, http.client.HTTPException, ValueError) as exc:
+        # URLError and TimeoutError are OSErrors; ValueError covers a URL that
+        # cannot be parsed or encoded, HTTPException a malformed reply.
         return Response(None, error=type(exc).__name__)
 
 
@@ -90,7 +102,10 @@ def classify(response: Response) -> str:
 class _Page(HTMLParser):
     """Links, ids, title, h1, and digit-bearing text of one HTML page."""
 
-    BLOCKS = {"p", "li", "td", "th", "h1", "h2", "h3", "h4", "dd", "dt", "figcaption"}
+    BLOCKS = {
+        *("p", "li", "td", "th", "dd", "dt", "figcaption", "summary"),
+        *("h1", "h2", "h3", "h4", "h5", "h6", "div", "blockquote", "section"),
+    }
     SKIP = {"script", "style", "pre", "template"}
 
     def __init__(self) -> None:
@@ -121,6 +136,11 @@ class _Page(HTMLParser):
             elif name in ("href", "src"):
                 self.links.append(value.strip())
         if tag in ("br", "img", "meta", "link", "input", "hr", "source"):
+            if tag == "br" and self._main and not self._skip:
+                if self._cell is not None:
+                    self._cell.append(" ")
+                elif self._row is None:
+                    self._flush()
             return
         self._stack.append(tag)
         if tag == "main":
@@ -133,8 +153,12 @@ class _Page(HTMLParser):
             self._in_h1 = True
         if self._main and not self._skip:
             if tag == "tr":
+                self._end_cell()
+                if self._row is not None:  # <tr> without </tr>
+                    self.rows.append(self._row)
                 self._row = []
             elif tag in ("td", "th") and self._row is not None:
+                self._end_cell()  # <td> without </td>
                 self._cell = []
             elif tag in self.BLOCKS:
                 self._flush()
@@ -156,10 +180,10 @@ class _Page(HTMLParser):
         if tag in self.SKIP:
             self._skip -= 1
         if self._main and not self._skip:
-            if tag in ("td", "th") and self._cell is not None and self._row is not None:
-                self._row.append(_squash("".join(self._cell)))
-                self._cell = None
+            if tag in ("td", "th"):
+                self._end_cell()
             elif tag == "tr" and self._row is not None:
+                self._end_cell()
                 self.rows.append(self._row)
                 self._row = None
             elif tag in self.BLOCKS or tag == "main":
@@ -178,6 +202,11 @@ class _Page(HTMLParser):
             self._cell.append(data)
         elif self._row is None:
             self._buf.append(data)
+
+    def _end_cell(self) -> None:
+        if self._cell is not None and self._row is not None:
+            self._row.append(_squash("".join(self._cell)))
+        self._cell = None
 
     def _flush(self) -> None:
         text = _squash("".join(self._buf))
@@ -252,13 +281,27 @@ def check_site(site: str, fetch: Fetch = fetch_url) -> Result:
     fragments: dict[str, set[str]] = {}
     ids: dict[str, set[str]] = {}
 
-    def note(target: str, page_name: str) -> None:
-        if target.startswith("#") or target.lower().startswith(SKIP_SCHEMES):
+    invalid: dict[str, dict[str, object]] = {}
+
+    def note(base: str, target: str, page_name: str) -> None:
+        if target.startswith("#"):
             return
-        url, fragment = urldefrag(target)
+        try:
+            url, fragment = urldefrag(urljoin(base, target))
+            scheme = urlsplit(url).scheme
+        except ValueError:
+            # A malformed href on our own page is a markup bug: broken, internal.
+            entry = invalid.setdefault(
+                target,
+                {"scope": "internal", "status": None, "class": "broken", "pages": []},
+            )
+            entry["pages"] = sorted({*entry["pages"], page_name})  # type: ignore[misc]
+            return
+        if scheme not in FETCH_SCHEMES:  # mailto:, data:, file:, ftp: ...
+            return
         referrers.setdefault(url, set()).add(page_name)
         if fragment:
-            fragments.setdefault(url, set()).add(fragment)
+            fragments.setdefault(url, set()).add(unquote(fragment))
 
     for name, route in ROUTES.items():
         url = site + route
@@ -274,7 +317,7 @@ def check_site(site: str, fetch: Fetch = fetch_url) -> Result:
             entry |= {"title": _squash(page.title), "h1": _squash(page.h1)}
             ids[url] = page.ids
             for target in page.links:
-                note(urljoin(url, target), name)
+                note(url, target, name)
             for claim in claims_of(page):
                 result.claims.append({"page": name, **claim})
         result.pages.append(entry)
@@ -293,7 +336,7 @@ def check_site(site: str, fetch: Fetch = fetch_url) -> Result:
         if is_css and link["class"] == "ok":
             css = response.body.decode("utf-8", "replace")
             for target in CSS_URL.findall(css):
-                note(urljoin(url, target.strip()), f"css:{url}")
+                note(url, target.strip(), f"css:{url}")
         if internal and url in fragments and link["class"] == "ok":
             found = ids.get(url)
             if found is None:
@@ -315,25 +358,44 @@ def check_site(site: str, fetch: Fetch = fetch_url) -> Result:
             "class": classify(response),
             "pages": sorted(referrers[url]),
         }
+    result.links |= invalid
     return result
 
 
 REPO_BLOB = "https://github.com/FilipeOliveira94/open-data-platform/blob/main/"
 HEADING = re.compile(r"#{1,6}\s+(.*)")
+SETEXT = re.compile(r"=+\s*|-+\s*")
+MD_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
+
+
+def _slug(text: str) -> str:
+    text = MD_LINK.sub(r"\1", text.strip()).lower()
+    return re.sub(r"[^\w\- ]", "", text).replace(" ", "-")
 
 
 def heading_slugs(markdown: str) -> set[str]:
     """GitHub's heading ids: lowercase, punctuation dropped, spaces to hyphens."""
     slugs: set[str] = set()
     seen: dict[str, int] = {}
-    fenced = False
+    fence = ""
+    previous = ""
     for line in markdown.splitlines():
-        if line.lstrip().startswith("```"):
-            fenced = not fenced
-        match = None if fenced else HEADING.match(line)
-        if not match:
+        marker = line.lstrip()[:3]
+        if marker in ("```", "~~~") and (not fence or marker == fence):
+            fence = "" if fence else marker
+            previous = ""
             continue
-        slug = re.sub(r"[^\w\- ]", "", match.group(1).strip().lower()).replace(" ", "-")
+        if fence:
+            continue
+        text = None
+        if match := HEADING.match(line):
+            text = match.group(1)
+        elif SETEXT.fullmatch(line) and previous.strip():
+            text = previous  # setext: the line above an === or --- underline
+        previous = "" if text is not None else line
+        if text is None or HEADING.match(text):
+            continue
+        slug = _slug(text)
         count = seen.get(slug, 0)
         seen[slug] = count + 1
         slugs.add(slug if count == 0 else f"{slug}-{count}")
@@ -345,10 +407,10 @@ def check_repo_anchors(result: Result, root: Path) -> None:
         fragments = link.get("fragments_unchecked")
         if not fragments or not url.startswith(REPO_BLOB) or not url.endswith(".md"):
             continue
-        path = root / url[len(REPO_BLOB) :]
-        have = (
-            heading_slugs(path.read_text(encoding="utf-8")) if path.is_file() else set()
-        )
+        base = root.resolve()
+        path = (base / unquote(url[len(REPO_BLOB) :])).resolve()
+        inside = path.is_relative_to(base) and path.is_file()
+        have = heading_slugs(path.read_text(encoding="utf-8")) if inside else set()
         missing = sorted(set(fragments) - have)  # type: ignore[arg-type]
         del link["fragments_unchecked"]
         link["fragments_checked"] = len(fragments)  # type: ignore[arg-type]
@@ -361,9 +423,13 @@ def main(argv: list[str]) -> int:
         print(
             "usage: p9_06_live_site_check.py <site url ending in /> <out.json> [repo]"
         )
-        return 2
+        return 3
     site, out = argv[0], argv[1]
-    result = check_site(site)
+    try:
+        result = check_site(site)
+    except ValueError as exc:
+        print(f"usage error: {exc}")
+        return 3
     if len(argv) == 3:
         check_repo_anchors(result, Path(argv[2]))
     Path(out).write_text(
